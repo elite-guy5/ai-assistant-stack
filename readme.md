@@ -1,8 +1,6 @@
 # Overview
 This document walks you through configuring an optimized AI coding environment. The goal is to reduce token waste, improve model response quality, and keep costs in check across agentic coding sessions.
 
-[[_TOC_]]
-
 # Recommended Layered Configuration
 
 Apply all three layers for maximum effect in a production coding environment:
