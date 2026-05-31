@@ -30,20 +30,23 @@ Layer 4 — Workspace Rules (CLAUDE.md)
 # Pre-Reqs
 Assuming you have your AI tool installed, you will need Node.js and Python installed in order to execute the commands below. 
 
-## Node.js aks npm
+### Node.js aks npm
+
 GitHub Link: [https://github.com/npm/cli](https://github.com/npm/cli)
+
+**macOS / Linux / WSL:**
 ~~~sh
 curl -qL https://www.npmjs.com/install.sh | sh
 ~~~
 
-## Python
+### Python
 
-Mac
+**macOS**
 ~~~sh
 brew install python
 ~~~
 
-Windows
+**Windows**
 - Open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
 - Run the following command:
 
@@ -61,7 +64,7 @@ Intercepts CLI tool calls (e.g., `git diff`, `cargo test`, `docker ps`) and filt
 
 > **Important:** rtk only intercepts Bash tool calls. Native agent tools (`Read`, `Grep`, `Glob`) bypass the hook — use `cat`, `rg`, `find` via Bash if you need rtk filtering on those operations.
 
-## Install
+### Step 1: Install
 
 **macOS / Linux:**
 ~~~sh
@@ -79,7 +82,7 @@ winget install rtk-ai.rtk
 
 > **Windows note:** Install [WSL 2](https://learn.microsoft.com/en-us/windows/wsl/install) before proceeding. The Bash hook that intercepts shell commands requires a Unix shell. Without WSL, the hook is unavailable and rtk falls back to injecting instructions into `CLAUDE.md`, which increases prompt tokens rather than reducing them.
 
-## Initialize (Global Hook)
+### Step 2: Initialize (Global Hook)
 
 **macOS / Linux / WSL:**
 ~~~sh
@@ -111,7 +114,7 @@ rtk init --agent hermes         # Hermes
 git status  # Automatically rewritten to rtk git status
 ~~~
 
-## VS Code Extension
+### Step 3: VS Code Extension
 
 Open the **Extensions** tab in VS Code (`Ctrl+Shift+X` / `Cmd+Shift+X`), search **rtk inspector**, and install the extension by **PeterMEFrandsen**.
 
@@ -123,7 +126,7 @@ GitHub Link: [GitHub: juliusbrussee/caveman](https://github.com/juliusbrussee/ca
 
 Adds a `/caveman` slash command that forces Claude Code into a minimal, verbose-free response mode. Reduces output bloat in long sessions.
 
-## Global Install
+### Step 1: Global Install
 
 **macOS / Linux / WSL:**
 ~~~sh
@@ -148,30 +151,34 @@ GitHub Link: [kuzu-memory](https://github.com/bobmatnyc/kuzu-memory)
 
 Lightweight graph-backed memory system for AI coding tools. Stores project decisions, conventions, and context in a local KuzuDB graph database. Retrieves relevant memories in under 100ms to enhance prompts automatically. Integrates with Claude Code via MCP + hooks — memories are injected at session start without manual prompting.
 
-## Install
+### Step 1: Install
 
+**macOS / Linux / WSL:**
 ~~~sh
 pip install kuzu-memory
 ~~~
 
-## Setup (global, run once)
+### Step 2: Setup (global, run once)
 
-### Claude Code
+- Claude Code
 
+**macOS / Linux / WSL:**
 ~~~
 kuzu-memory setup
 ~~~
 
 Auto-detects Claude Code, installs MCP server and session hooks globally. No per-project config required.
 
-### Claude Desktop and VS Code
+- Claude Desktop and VS Code
 
+**macOS / Linux / WSL:**
 ~~~sh
 npm install -g @kuzu-memory/mcp-server
 ~~~
 
 **Claude Desktop** — add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
+**macOS / Linux / WSL:**
 ~~~json
 {
   "mcpServers": {
@@ -207,7 +214,7 @@ npm install -g @kuzu-memory/mcp-server
 # Layer# 4: CLAUDE.md Configuration
 A well-structured `CLAUDE.md` is the foundation. Keep it **under 200 lines**. It loads at every session start, so bloat here costs tokens on every turn.
 
-## Global Preferences (`~/.claude/CLAUDE.md`)
+### Global Preferences (`~/.claude/CLAUDE.md`)
 Applies across all repositories on the machine. Use this for personal behavior rules and developer-specific defaults.
 
 **Starter template — copy and adapt:**
