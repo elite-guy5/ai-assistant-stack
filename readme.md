@@ -25,6 +25,11 @@ Layer 4 — Workspace Rules (CLAUDE.md)
 ~~~
 
 **Key principle:** Configure hooks at the shell level rather than relying on natural language prompts to instruct the agent to "compress output." Prompt-level instructions consume tokens and achieve only 70–85% compliance. Shell hooks achieve 100% coverage with zero token overhead.
+----
+
+
+
+
 # rtk (Rust Token Killer)
 ----
 GitHub Link: [GitHub: rtk-ai/rtk](https://github.com/rtk-ai/rtk)
@@ -87,6 +92,10 @@ git status  # Automatically rewritten to rtk git status
 ----
 
 Open the **Extensions** tab in VS Code (`Ctrl+Shift+X` / `Cmd+Shift+X`), search **rtk inspector**, and install the extension by **PeterMEFrandsen**.
+----
+
+
+
 
 # Caveman Skill (Claude Code)
 ----
@@ -113,8 +122,11 @@ npx skills add JuliusBrussee/caveman -a codex
 claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman
 gemini extensions install https://github.com/JuliusBrussee/caveman
 ~~~
+----
 
 
+
+----
 # kuzu-memory
 ----
 GitHub Link: [PyPI: kuzu-memory](https://pypi.org/project/kuzu-memory/)
@@ -172,7 +184,11 @@ npm install -g @kuzu-memory/mcp-server
   }
 }
 ~~~
+----
 
+
+
+----
 # CLAUDE.md Configuration
 ----
 A well-structured `CLAUDE.md` is the foundation. Keep it **under 200 lines**. It loads at every session start, so bloat here costs tokens on every turn.
