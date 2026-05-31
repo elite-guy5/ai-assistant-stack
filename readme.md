@@ -300,10 +300,11 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 Prefix all shell commands with `rtk` — intercepts and filters output before it enters the prompt.
 See full command reference: @RTK.md
 
+### Caveman Skill
+Use `/caveman` to reduce output verbosity in long sessions.
+
 ### kuzu-memory
 At session start: `kuzu-memory enhance "<topic>"` to load relevant context.
 After significant operations: `kuzu-memory learn "<decision or finding>"`.
 
-### Caveman Skill
-Use `/caveman` to reduce output verbosity in long sessions.
 ~~~
