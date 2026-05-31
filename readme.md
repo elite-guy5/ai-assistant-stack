@@ -94,7 +94,7 @@ GitHub Link: [GitHub: juliusbrussee/caveman](https://github.com/juliusbrussee/ca
 
 Adds a `/caveman` slash command that forces Claude Code into a minimal, verbose-free response mode. Reduces output bloat in long sessions.
 
-## Install
+## Global Install
 
 **macOS / Linux / WSL:**
 ~~~
@@ -104,6 +104,14 @@ curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.
 **Windows (PowerShell):**
 ~~~
 irm https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.ps1 | iex
+~~~
+
+If the global install doesn't work you can add it per AI tool 
+~~~
+npx skills add JuliusBrussee/caveman -a antigravity
+npx skills add JuliusBrussee/caveman -a codex
+claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman
+gemini extensions install https://github.com/JuliusBrussee/caveman
 ~~~
 
 
