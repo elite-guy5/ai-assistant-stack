@@ -28,7 +28,7 @@ Layer 4 — Workspace Rules (CLAUDE.md)
 
 
 # Pre-Reqs
-Assuming you have your AI tool installed, you will need Node.js and Python installed in order to execute the commands below. 
+Assuming you have your AI tool installed, you will need Node.js and Python installed in order to execute the commands below. To install, open your terminal in your **Home Directory** /Users/yourname on Mac,  /home/yourname on Linux, C:\Users\YourName.
 
 ### Node.js aks npm
 
