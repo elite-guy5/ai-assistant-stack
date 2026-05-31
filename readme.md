@@ -65,6 +65,18 @@ winget install -e --id Python.Python.3
 Restart your terminal for the changes to take effect.
 ~~~
 
+### pipx
+
+**macOS / Linux**
+~~~sh
+brew install pipx
+~~~
+
+**Windows**
+~~~powershell
+python -m pip install --user pipx
+~~~
+
 
 # Layer 1: rtk (Rust Token Killer)
 GitHub Link: [GitHub: rtk-ai/rtk](https://github.com/rtk-ai/rtk)
