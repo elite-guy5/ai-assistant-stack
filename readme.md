@@ -50,7 +50,7 @@ choco install nodejs
 
 ### Python
 
-**macOS**
+**macOS / Linux**
 ~~~sh
 brew install python
 ~~~
