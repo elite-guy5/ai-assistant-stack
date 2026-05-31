@@ -10,9 +10,9 @@ Layer 1 — Shell Proxy (rtk)
   └── Filters CLI outputs before they enter the prompt history
       Intercepts Bash tool calls and compresses output before it enters the prompt
 
-Layer 2 — Payload Cleansing (prompt-refiner)
-  └── Strips redundant properties from tool schemas
-      Cleanses HTML/JSON payloads from RAG or external APIs
+Layer 2 — Prompt Simplification (caveman-skill)
+  └── Forces sessions into a minimal, verbose-free response mode.
+      Reduces output bloat in long sessions.
 
 Layer 3 — Persistent Memory (kuzu-memory)
   └── Injects project decisions, conventions, and context at session start
