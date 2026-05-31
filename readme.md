@@ -77,6 +77,13 @@ brew install pipx
 python -m pip install --user pipx
 ~~~
 
+### cmake
+
+**macOS / Linux**
+~~~sh
+brew install cmake
+~~~
+
 
 # Layer 1: rtk (Rust Token Killer)
 GitHub Link: [GitHub: rtk-ai/rtk](https://github.com/rtk-ai/rtk)
