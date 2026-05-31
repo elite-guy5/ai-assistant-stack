@@ -66,6 +66,23 @@ rtk init --global
 
 This injects a pre-tool Bash hook so commands like `git status` are automatically rewritten to `rtk git status` without any further configuration. On Windows without WSL, the hook is unavailable — use WSL for full functionality.
 
+Just incase you use multiple AI tools and the global init configuration doesn't work, you can run one of these
+~~~
+# 1. Install for your AI tool
+rtk init -g                     # Claude Code / Copilot (default)
+rtk init -g --gemini            # Gemini CLI
+rtk init -g --codex             # Codex (OpenAI)
+rtk init -g --agent cursor      # Cursor
+rtk init --agent windsurf       # Windsurf
+rtk init --agent cline          # Cline / Roo Code
+rtk init --agent kilocode       # Kilo Code
+rtk init --agent antigravity    # Google Antigravity
+rtk init --agent hermes         # Hermes
+
+# 2. Restart your AI tool, then test
+git status  # Automatically rewritten to rtk git status
+~~~
+
 ## VS Code Extension
 ----
 
