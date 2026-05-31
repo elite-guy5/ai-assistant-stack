@@ -71,26 +71,6 @@ This injects a pre-tool Bash hook so commands like `git status` are automaticall
 
 Open the **Extensions** tab in VS Code (`Ctrl+Shift+X` / `Cmd+Shift+X`), search **rtk inspector**, and install the extension by **PeterMEFrandsen**.
 
-# prompt-refiner
-----
-GitHub Link: [GitHub: prompt-refiner](https://github.com/prompt-refiner/prompt-refiner)
-
-Lightweight Python utility for cleaning RAG contexts, stripping API schemas, and redacting PII. Zero dependencies. Best used for unstructured API responses, HTML payloads, and function-calling schemas.
-
-## Install
-
-**macOS / Linux / WSL:**
-~~~sh
-pip install prompt-refiner
-~~~
-
-**Windows (PowerShell):**
-~~~powershell
-pip install prompt-refiner
-# If pip is not on PATH, use the Python launcher:
-py -m pip install prompt-refiner
-~~~
-
 # Caveman Skill (Claude Code)
 ----
 GitHub Link: [GitHub: juliusbrussee/caveman](https://github.com/juliusbrussee/caveman)
