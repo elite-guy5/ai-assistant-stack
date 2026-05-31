@@ -26,8 +26,33 @@ Layer 4 — Workspace Rules (CLAUDE.md)
 
 **Key principle:** Configure hooks at the shell level rather than relying on natural language prompts to instruct the agent to "compress output." Prompt-level instructions consume tokens and achieve only 70–85% compliance. Shell hooks achieve 100% coverage with zero token overhead.
 
+----
+# Pre-Reqs
+----
+Assuming you have your AI tool installed, you will need Node.js and Python installed in order to execute the commands below. 
 
+## Node.js aks npm
+[https://github.com/npm/cli](https://github.com/npm/cli)
+~~~
+curl -qL https://www.npmjs.com/install.sh | sh
+~~~
 
+## Python
+
+Mac
+~~~
+brew install python
+~~~
+
+Windows
+- Open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
+- Run the following command:
+
+~~~
+DOS
+winget install -e --id Python.Python.3
+Restart your terminal for the changes to take effect.
+~~~
 
 ----
 # rtk (Rust Token Killer)
