@@ -54,7 +54,7 @@ Restart your terminal for the changes to take effect.
 ~~~
 
 
-# rtk (Rust Token Killer)
+# Layer 1: rtk (Rust Token Killer)
 GitHub Link: [GitHub: rtk-ai/rtk](https://github.com/rtk-ai/rtk)
 
 Intercepts CLI tool calls (e.g., `git diff`, `cargo test`, `docker ps`) and filters output before it enters the prompt. Achieves **60–92% token reduction** on common commands with under 10ms latency.
@@ -118,7 +118,7 @@ Open the **Extensions** tab in VS Code (`Ctrl+Shift+X` / `Cmd+Shift+X`), search 
 
 
 
-# Caveman Skill (Claude Code)
+# Layer 2: Caveman Skill (Claude Code)
 GitHub Link: [GitHub: juliusbrussee/caveman](https://github.com/juliusbrussee/caveman)
 
 Adds a `/caveman` slash command that forces Claude Code into a minimal, verbose-free response mode. Reduces output bloat in long sessions.
@@ -143,10 +143,7 @@ claude plugin marketplace add JuliusBrussee/caveman && claude plugin install cav
 gemini extensions install https://github.com/JuliusBrussee/caveman
 ~~~
 
-
-
-
-# kuzu-memory
+# Layer 3: kuzu-memory
 GitHub Link: [kuzu-memory](https://github.com/bobmatnyc/kuzu-memory)
 
 Lightweight graph-backed memory system for AI coding tools. Stores project decisions, conventions, and context in a local KuzuDB graph database. Retrieves relevant memories in under 100ms to enhance prompts automatically. Integrates with Claude Code via MCP + hooks — memories are injected at session start without manual prompting.
@@ -207,7 +204,7 @@ npm install -g @kuzu-memory/mcp-server
 
 
 
-# CLAUDE.md Configuration
+# Layer# 4: CLAUDE.md Configuration
 A well-structured `CLAUDE.md` is the foundation. Keep it **under 200 lines**. It loads at every session start, so bloat here costs tokens on every turn.
 
 ## Global Preferences (`~/.claude/CLAUDE.md`)
