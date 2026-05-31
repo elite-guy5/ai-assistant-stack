@@ -176,7 +176,7 @@ Lightweight graph-backed memory system for AI coding tools. Stores project decis
 
 **macOS / Linux / WSL:**
 ~~~sh
-pip install kuzu-memory
+pipx install kuzu-memory
 ~~~
 
 ### Step 2: Setup (global, run once)
