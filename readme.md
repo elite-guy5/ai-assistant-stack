@@ -30,7 +30,7 @@ Layer 4 — Workspace Rules (CLAUDE.md)
 # Pre-Reqs
 Assuming you have your AI tool installed, you will need Node.js and Python installed in order to execute the commands below. To install, open your terminal in your **Home Directory** /Users/yourname on Mac,  /home/yourname on Linux, C:\Users\YourName.
 
-### Node.js aks npm
+### 1. Node.js aks npm
 
 GitHub Link: [https://github.com/npm/cli](https://github.com/npm/cli)
 
@@ -48,7 +48,7 @@ powershell -c "irm https://community.chocolatey.org/install.ps1|iex"
 choco install nodejs
 ~~~
 
-### Python
+### 2. Python
 
 **macOS / Linux**
 ~~~sh
@@ -65,7 +65,7 @@ winget install -e --id Python.Python.3
 Restart your terminal for the changes to take effect.
 ~~~
 
-### pipx
+### 3. pipx
 
 **macOS / Linux**
 ~~~sh
@@ -77,7 +77,7 @@ brew install pipx
 python -m pip install --user pipx
 ~~~
 
-### cmake
+### 4. cmake
 
 **macOS / Linux**
 ~~~sh
