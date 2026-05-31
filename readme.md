@@ -35,15 +35,20 @@ Assuming you have your AI tool installed, you will need Node.js and Python insta
 GitHub Link: [https://github.com/npm/cli](https://github.com/npm/cli)
 
 **macOS / Linux**
+- Pres cmd + space and search Terminal 
+- Run the following in your home directory
 ~~~sh
 #homebrew
 brew install node
 ~~~
 
 **Windows**
+- Open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
+- Run the following command:
 ~~~sh
 # Download and install Chocolatey:
 powershell -c "irm https://community.chocolatey.org/install.ps1|iex"
+
 # Download and install Node.js:
 choco install nodejs
 ~~~
@@ -51,6 +56,7 @@ choco install nodejs
 ### 2. Python
 
 **macOS / Linux**
+- Run the following in your home directory
 ~~~sh
 brew install python
 ~~~
@@ -68,11 +74,13 @@ Restart your terminal for the changes to take effect.
 ### 3. pipx
 
 **macOS / Linux**
+- Run the following in your home directory
 ~~~sh
 brew install pipx
 ~~~
 
 **Windows**
+- Open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
 ~~~powershell
 python -m pip install --user pipx
 ~~~
@@ -80,10 +88,13 @@ python -m pip install --user pipx
 ### 4. cmake
 
 **macOS / Linux**
+- Run the following in your home directory
 ~~~sh
 brew install cmake
 ~~~
+|
 
+|
 
 # Layer 1: rtk (Rust Token Killer)
 GitHub Link: [GitHub: rtk-ai/rtk](https://github.com/rtk-ai/rtk)
@@ -95,15 +106,13 @@ Intercepts CLI tool calls (e.g., `git diff`, `cargo test`, `docker ps`) and filt
 ### Step 1: Install
 
 **macOS / Linux:**
+- Run the following in your home directory
 ~~~sh
-# curl
-curl -sSL https://install.rtk.ai | sh
-
-# Or via Homebrew
 brew install rtk-ai/tap/rtk
 ~~~
 
 **Windows (PowerShell):**
+- Open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
 ~~~powershell
 winget install rtk-ai.rtk
 ~~~
@@ -113,14 +122,15 @@ winget install rtk-ai.rtk
 ### Step 2: Initialize (Global Hook)
 
 **macOS / Linux / WSL:**
+- Run the following in your home directory
 ~~~sh
 rtk init --global
 ~~~
 
 **Windows (limited mode, no hook):**
+- Open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
 ~~~sh
 rtk init --global
-# Note: runs in prompt-injection fallback mode without WSL
 ~~~
 
 This injects a pre-tool Bash hook so commands like `git status` are automatically rewritten to `rtk git status` without any further configuration. On Windows without WSL, the hook is unavailable — use WSL for full functionality.
@@ -146,9 +156,9 @@ git status  # Automatically rewritten to rtk git status
 
 Open the **Extensions** tab in VS Code (`Ctrl+Shift+X` / `Cmd+Shift+X`), search **rtk inspector**, and install the extension by **PeterMEFrandsen**.
 
+|
 
-
-
+|
 # Layer 2: Caveman Skill (Claude Code)
 GitHub Link: [GitHub: juliusbrussee/caveman](https://github.com/juliusbrussee/caveman)
 
@@ -157,11 +167,13 @@ Adds a `/caveman` slash command that forces Claude Code into a minimal, verbose-
 ### Step 1: Global Install
 
 **macOS / Linux / WSL:**
+- Run the following in your home directory
 ~~~sh
 curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash
 ~~~
 
 **Windows (PowerShell):**
+- Open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
 ~~~sh
 irm https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.ps1 | iex
 ~~~
@@ -173,7 +185,9 @@ npx skills add JuliusBrussee/caveman -a codex
 claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman
 gemini extensions install https://github.com/JuliusBrussee/caveman
 ~~~
+|
 
+|
 # Layer 3: kuzu-memory
 GitHub Link: [kuzu-memory](https://github.com/bobmatnyc/kuzu-memory)
 
@@ -182,6 +196,8 @@ Lightweight graph-backed memory system for AI coding tools. Stores project decis
 ### Step 1: Install
 
 **macOS / Linux / WSL:**
+- Run the following in your home directory on mac
+- For Windows, open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
 ~~~sh
 pipx install kuzu-memory
 ~~~
@@ -191,22 +207,28 @@ pipx install kuzu-memory
 - Claude Code
 
 **macOS / Linux / WSL:**
+- Run the following in your home directory
+  - For Windows, open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
 ~~~
 kuzu-memory setup
 ~~~
 
 Auto-detects Claude Code, installs MCP server and session hooks globally. No per-project config required.
 
-- Claude Desktop and VS Code
+### Step 3: Add mcp to Claude Desktop
 
 **macOS / Linux / WSL:**
+- Run the following in your home directory
+- For Windows, open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
 ~~~sh
 npm install -g @kuzu-memory/mcp-server
 ~~~
 
-**Claude Desktop** — add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+**Claude Desktop** —
+- Navigate to the folder locations below and add the json
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json` 
+- Windows:`%APPDATA%\Claude\claude_desktop_config.json` 
 
-**macOS / Linux / WSL:**
 ~~~json
 {
   "mcpServers": {
@@ -218,7 +240,10 @@ npm install -g @kuzu-memory/mcp-server
 }
 ~~~
 
-**VS Code** — add to `~/.vscode/mcp.json`:
+### Step 4: Add mcp to VS Code
+- Navigate to `~/.vscode/mcp.json`
+- Add json below
+- Alternatively, you can copy and paste the snipit into your AI Chat in VS Code and tell it to install it
 
 ~~~json
 {
@@ -234,18 +259,20 @@ npm install -g @kuzu-memory/mcp-server
   }
 }
 ~~~
+|
 
-
-
-
+|
 
 # Layer# 4: CLAUDE.md Configuration
 A well-structured `CLAUDE.md` is the foundation. Keep it **under 200 lines**. It loads at every session start, so bloat here costs tokens on every turn.
 
-### Global Preferences (`~/.claude/CLAUDE.md`)
+### Global Preferences 
+
 Applies across all repositories on the machine. Use this for personal behavior rules and developer-specific defaults.
 
 **Starter template — copy and adapt:**
+- Navigate to (`~/.claude/CLAUDE.md`)
+- Copy and paste the following into the CLAUDE.md file
 ~~~
 # CLAUDE.md
 
