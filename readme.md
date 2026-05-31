@@ -34,9 +34,18 @@ Assuming you have your AI tool installed, you will need Node.js and Python insta
 
 GitHub Link: [https://github.com/npm/cli](https://github.com/npm/cli)
 
-**macOS / Linux / WSL:**
+**macOS / Linux**
 ~~~sh
-curl -qL https://www.npmjs.com/install.sh | sh
+#homebrew
+brew install node
+~~~
+
+**Windows**
+~~~sh
+# Download and install Chocolatey:
+powershell -c "irm https://community.chocolatey.org/install.ps1|iex"
+# Download and install Node.js:
+choco install nodejs
 ~~~
 
 ### Python
