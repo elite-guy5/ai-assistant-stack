@@ -75,7 +75,7 @@ brew install rtk-ai/tap/rtk
 ~~~
 
 **Windows (PowerShell):**
-~~~powershell
+~~~
 winget install rtk-ai.rtk
 ~~~
 
@@ -84,12 +84,12 @@ winget install rtk-ai.rtk
 ## Initialize (Global Hook)
 
 **macOS / Linux / WSL:**
-~~~sh
+~~~
 rtk init --global
 ~~~
 
 **Windows (limited mode, no hook):**
-~~~powershell
+~~~
 rtk init --global
 # Note: runs in prompt-injection fallback mode without WSL
 ~~~
