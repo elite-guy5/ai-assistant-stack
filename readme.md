@@ -79,11 +79,6 @@ Adds a `/caveman` slash command that forces Claude Code into a minimal, verbose-
 
 ## Install
 
-All OS Systems 
-~~~
-npm install -g @juliusbrussee/caveman-code
-~~~
-
 **macOS / Linux / WSL:**
 ~~~
 curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash
