@@ -32,7 +32,7 @@ Layer 4 — Workspace Rules (CLAUDE.md)
 Assuming you have your AI tool installed, you will need Node.js and Python installed in order to execute the commands below. 
 
 ## Node.js aks npm
-[https://github.com/npm/cli](https://github.com/npm/cli)
+GitHub Link: [https://github.com/npm/cli](https://github.com/npm/cli)
 ~~~
 curl -qL https://www.npmjs.com/install.sh | sh
 ~~~
