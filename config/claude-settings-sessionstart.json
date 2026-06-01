@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.agents/scripts/seed-project-instructions.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

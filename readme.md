@@ -1,9 +1,68 @@
 # Overview
 This document walks you through configuring an optimized AI coding environment. The goal is to reduce token waste, improve model response quality, and keep costs in check across agentic coding sessions.
 
+# One-Command Install
+
+Run the installer for your platform. It downloads this repo, asks which optional tools to install, then installs the shared instruction templates and project seeding hook.
+
+**macOS / Linux / WSL**
+
+~~~sh
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash
+~~~
+
+**Windows PowerShell**
+
+~~~powershell
+irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1 | iex
+~~~
+
+The installer prompts for:
+
+- Project scope for instruction seeding. Default: `~/Documents/git`.
+- Whether to install and initialize RTK. Default: yes.
+- RTK agents to initialize. Default: `claude,codex`.
+- Whether to install Caveman. Default: yes.
+- Optional Caveman flags. Default: none.
+
+Useful non-interactive examples:
+
+~~~sh
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --non-interactive
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --non-interactive --skip-rtk --skip-caveman
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --dry-run
+~~~
+
+~~~powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1))) -NonInteractive
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1))) -NonInteractive -SkipRtk -SkipCaveman
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1))) -DryRun
+~~~
+
+If you cloned the repo locally, run:
+
+~~~sh
+bash scripts/install.sh
+~~~
+
+~~~powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1
+~~~
+
+Installer flags:
+
+- `--non-interactive` / `-NonInteractive` - use defaults and do not prompt.
+- `--dry-run` / `-DryRun` - preview actions.
+- `--project-scope <path>` / `-ProjectScope <path>` - set the default project root for seeding.
+- `--overwrite` / `-Overwrite` - replace managed files instead of writing `.new`.
+- `--skip-rtk` / `-SkipRtk` - skip RTK install/init.
+- `--skip-caveman` / `-SkipCaveman` - skip Caveman install.
+- `--rtk-agents <list>` / `-RtkAgents <list>` - comma-separated RTK agents.
+- `--caveman-args <args>` / `-CavemanArgs <args>` - pass extra flags to Caveman.
+
 # Recommended Layered Configuration
 
-Apply all three layers for maximum effect in a production coding environment:
+Apply all four layers for maximum effect in a production coding environment:
 
 ~~~
 Layer 1 — Shell Proxy (rtk)
@@ -14,21 +73,48 @@ Layer 2 — Prompt Simplification (caveman-skill)
   └── Forces sessions into a minimal, verbose-free response mode.
       Reduces output bloat in long sessions.
 
-Layer 3 — Persistent Memory (kuzu-memory)
-  └── Injects project decisions, conventions, and context at session start
-      Stores learnings asynchronously — compounds value over time
+Layer 3 - Global Instruction Files (CLAUDE.md + AGENTS.md)
+  └── Keeps personal behavior rules consistent across tools
+      Claude Code uses ~/.claude/CLAUDE.md
+      Codex uses ~/.codex/AGENTS.md
+      RTK guidance is included by reference instead of pasted inline
 
-Layer 4 — Workspace Rules (CLAUDE.md)
-  └── Manages instructions via path-scoped lazy loading
-      Keep global CLAUDE.md under 200 lines
-      Offload domain tasks to on-demand skills
+Layer 4 - Project Instruction Seeding
+  └── Creates project-local CLAUDE.md and AGENTS.md when missing
+      Runs from a Claude Code SessionStart hook
+      Uses templates instead of hand-copying instructions per repo
 ~~~
 
 **Key principle:** Configure hooks at the shell level rather than relying on natural language prompts to instruct the agent to "compress output." Prompt-level instructions consume tokens and achieve only 70–85% compliance. Shell hooks achieve 100% coverage with zero token overhead.
 
 
+# Repo Files
+
+This repo includes the files needed to install and maintain the instruction setup:
+
+- `scripts/bootstrap.sh` - remote macOS/Linux/WSL bootstrapper.
+- `scripts/bootstrap.ps1` - remote Windows PowerShell bootstrapper.
+- `scripts/install.sh` - macOS/Linux/WSL installer for tools, global files, templates, and the Claude Code SessionStart hook.
+- `scripts/install.ps1` - native Windows PowerShell installer.
+- `scripts/seed-project-instructions.sh` - shell project seeding hook.
+- `scripts/seed-project-instructions.ps1` - PowerShell project seeding hook.
+- `templates/CLAUDE.global.md` - global Claude Code instruction template.
+- `templates/AGENTS.global.md` - global Codex instruction template.
+- `templates/CLAUDE.project-template.md` - project-local Claude Code template.
+- `templates/AGENTS.project-template.md` - project-local Codex template.
+- `config/claude-settings-sessionstart.json` - standalone macOS/Linux/WSL Claude Code hook snippet.
+- `config/claude-settings-sessionstart.windows.json` - standalone Windows PowerShell Claude Code hook snippet.
+
+Installer behavior:
+
+- Creates missing target files.
+- Leaves existing files unchanged when they differ and writes `<target>.new` for review.
+- Installs the seeding scripts to `~/.agents/scripts/`.
+- Adds the Claude Code `SessionStart` hook if it is missing.
+- Use `--overwrite` only when you intentionally want to replace existing target files.
+
 # Pre-Reqs
-Assuming you have your AI tool installed, you will need Node.js and Python installed in order to execute the commands below. To install, open your terminal in your **Home Directory** /Users/yourname on Mac,  /home/yourname on Linux, C:\Users\YourName.
+Assuming you have your AI tool installed, you will need Node.js if you choose to install Caveman because the Caveman installer uses `npx`. Python is not required by this repo's installer. Open your terminal in your home directory, usually `~` on macOS/Linux/WSL or `%USERPROFILE%` on Windows.
 
 ### 1. Node.js aks npm
 
@@ -53,45 +139,6 @@ powershell -c "irm https://community.chocolatey.org/install.ps1|iex"
 choco install nodejs
 ~~~
 
-### 2. Python
-
-**macOS / Linux**
-- Run the following in your home directory
-~~~sh
-brew install python
-~~~
-
-**Windows**
-- Open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
-- Run the following command:
-
-~~~
-DOS
-winget install -e --id Python.Python.3
-Restart your terminal for the changes to take effect.
-~~~
-
-### 3. pipx
-
-**macOS / Linux**
-- Run the following in your home directory
-~~~sh
-brew install pipx
-~~~
-
-**Windows**
-- Open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
-~~~powershell
-python -m pip install --user pipx
-~~~
-
-### 4. cmake
-
-**macOS / Linux**
-- Run the following in your home directory
-~~~sh
-brew install cmake
-~~~
 |
 
 |
@@ -103,12 +150,12 @@ Intercepts CLI tool calls (e.g., `git diff`, `cargo test`, `docker ps`) and filt
 
 > **Important:** rtk only intercepts Bash tool calls. Native agent tools (`Read`, `Grep`, `Glob`) bypass the hook — use `cat`, `rg`, `find` via Bash if you need rtk filtering on those operations.
 
-### Step 1: Install
+### Manual install
 
 **macOS / Linux:**
 - Run the following in your home directory
 ~~~sh
-brew install rtk-ai/tap/rtk
+brew install rtk
 ~~~
 
 **Windows (PowerShell):**
@@ -164,7 +211,7 @@ GitHub Link: [GitHub: juliusbrussee/caveman](https://github.com/juliusbrussee/ca
 
 Adds a `/caveman` slash command that forces Claude Code into a minimal, verbose-free response mode. Reduces output bloat in long sessions.
 
-### Step 1: Global Install
+### Manual install
 
 **macOS / Linux / WSL:**
 - Run the following in your home directory
@@ -188,178 +235,122 @@ gemini extensions install https://github.com/JuliusBrussee/caveman
 |
 
 |
-# Layer 3: kuzu-memory
-GitHub Link: [kuzu-memory](https://github.com/bobmatnyc/kuzu-memory)
+# Layer 3: Global Instruction Files
 
-Lightweight graph-backed memory system for AI coding tools. Stores project decisions, conventions, and context in a local KuzuDB graph database. Retrieves relevant memories in under 100ms to enhance prompts automatically. Integrates with Claude Code via MCP + hooks — memories are injected at session start without manual prompting.
+Use global instruction files for personal defaults that should apply across repositories. The repo versions live in:
 
-### Step 1: Install
+- `templates/CLAUDE.global.md`
+- `templates/AGENTS.global.md`
 
-**macOS / Linux / WSL:**
-- Run the following in your home directory on mac
-- For Windows, open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
+Installed locations:
+
+- Claude Code: `~/.claude/CLAUDE.md`
+- Codex: `~/.codex/AGENTS.md`
+
+Keep these files concise. Put repository-specific commands, conventions, and gotchas in project-local instruction files instead.
+
+### Shared global sections
+
+Both global files now use the same core structure:
+
+- **Response Style:** professional, neutral, concise, main conclusion first, no filler, no emojis, no sycophantic openers.
+- **Reasoning and Clarification:** challenge weak assumptions, ask clarifying questions when needed, and verify APIs, versions, flags, commit SHAs, and package names before asserting them.
+- **Skill Usage:** Superpowers skills should auto-run only for software development work, not ordinary questions, local troubleshooting, install checks, or process inspection unless explicitly requested.
+- **Software Development Guidelines:** think before coding, keep changes simple and surgical, define verifiable goals, use plan mode for non-trivial work, use subagents when useful, and pause on hacky non-trivial changes before broad refactors.
+- **Memory & Knowledge:** use native agent memory for recall, the Obsidian vault for long-form human and agent knowledge, and automatic session logs or remember-style tooling for session journal data.
+
+### RTK include
+
+RTK creates and manages its own reference file when installed and initialized. Keep global instruction files small by referencing that installed RTK file instead of copying RTK guidance into this repo.
+
+- Claude Code ends with `@RTK.md`
+- Codex has an **RTK Usage** section that points to the RTK reference file under the current user's home directory.
+
+In `templates/AGENTS.global.md`, this is stored as:
+
+~~~md
+@{{HOME}}/.codex/RTK.md
+~~~
+
+The installer replaces `{{HOME}}` with the current user's actual home directory when writing `~/.codex/AGENTS.md`. This repo does not install `RTK.md`; run `rtk init` first so RTK creates the referenced file.
+
+This keeps global instruction files smaller while preserving the token-saving shell guidance.
+
+|
+
+|
+
+# Layer 4: Project Instruction Seeding
+
+Use project-local instruction files for repository-specific details. Repo templates:
+
+- `templates/CLAUDE.project-template.md`
+- `templates/AGENTS.project-template.md`
+
+Installed locations:
+
+- Claude Code template: `~/.claude/CLAUDE.project-template.md`
+- Codex template: `~/.codex/AGENTS.project-template.md`
+
+Each template includes:
+
+- Project purpose, language/framework, and key entry points.
+- Build, test, lint, and run commands.
+- Repo-specific conventions and gotchas.
+- A development workflow section that defers to Superpowers for relevant software development work.
+- A precedence note: project-local instructions override skills where they conflict.
+- A reminder that durable learnings belong in memory or the Obsidian vault, not in project instruction files.
+
+### Seeding hook
+
+The seeding hook creates project-local instruction files when they are missing.
+
+Repo script:
+
 ~~~sh
-pipx install kuzu-memory
+scripts/seed-project-instructions.sh
 ~~~
 
-### Step 2: Setup (global, run once)
+Installed script:
 
-- Claude Code
-
-**macOS / Linux / WSL:**
-- Run the following in your home directory
-  - For Windows, open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
-~~~
-kuzu-memory setup
-~~~
-
-Auto-detects Claude Code, installs MCP server and session hooks globally. No per-project config required.
-
-### Step 3: Add mcp to Claude Desktop
-
-**macOS / Linux / WSL:**
-- Run the following in your home directory
-- For Windows, open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
 ~~~sh
-npm install -g @kuzu-memory/mcp-server
+~/.agents/scripts/seed-project-instructions.sh
+~/.agents/scripts/seed-project-instructions.ps1
 ~~~
 
-**Claude Desktop** —
-- Navigate to the folder locations below and add the json
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json` 
-- Windows:`%APPDATA%\Claude\claude_desktop_config.json` 
+Behavior:
+
+- Only runs for projects under `~/Documents/git` by default.
+- Override the project scope with `PROJECT_SCOPE=/path/to/projects`.
+- Ignores hidden top-level folders.
+- Detects the first project directory below the configured project scope.
+- Creates `CLAUDE.md` from `~/.claude/CLAUDE.project-template.md` if missing.
+- Creates `AGENTS.md` from `~/.codex/AGENTS.project-template.md` if missing.
+- Does not overwrite existing project instruction files.
+- Supports dry runs with `DRY_RUN=1`.
+
+Claude Code hook entry in `~/.claude/settings.json`. Standalone repo snippets are in `config/claude-settings-sessionstart.json` and `config/claude-settings-sessionstart.windows.json`.
 
 ~~~json
 {
-  "mcpServers": {
-    "kuzu-memory": {
-      "command": "kuzu-memory",
-      "args": ["mcp"]
-    }
-  }
-}
-~~~
-
-### Step 4: Add mcp to VS Code
-- Navigate to `~/.vscode/mcp.json`
-- Add json below
-- Alternatively, you can copy and paste the snipit into your AI Chat in VS Code and tell it to install it
-
-~~~json
-{
-  "mcpServers": {
-    "kuzu-memory": {
-      "command": "kuzu-memory",
-      "args": ["mcp"],
-      "env": {
-        "KUZU_MEMORY_PROJECT_ROOT": "/path/to/your/project",
-        "KUZU_MEMORY_DB": "/path/to/your/project/.kuzu-memory/memories.db"
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.agents/scripts/seed-project-instructions.sh\"",
+            "timeout": 5
+          }
+        ]
       }
-    }
+    ]
   }
 }
 ~~~
-|
 
-|
+Manual test:
 
-# Layer# 4: CLAUDE.md Configuration
-A well-structured `CLAUDE.md` is the foundation. Keep it **under 200 lines**. It loads at every session start, so bloat here costs tokens on every turn.
-
-### Global Preferences 
-
-Applies across all repositories on the machine. Use this for personal behavior rules and developer-specific defaults.
-
-**Starter template — copy and adapt:**
-- Navigate to (`~/.claude/CLAUDE.md`)
-- Copy and paste the following into the CLAUDE.md file
-~~~
-# CLAUDE.md
-
-Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
-
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
-Read existing files before writing. Don't re-read unless changed.
-Thorough in reasoning, concise in output.
-Skip files over 100KB unless required.
-No sycophantic openers or closing fluff.
-No emojis or em-dashes.
-Do not guess APIs, versions, flags, commit SHAs, or package names. Verify by reading code or docs before asserting.
-
-
-## 1. Think Before Coding
-
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
-
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
-
-## 2. Simplicity First
-
-**Minimum code that solves the problem. Nothing speculative.**
-
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
-
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
-
-## 3. Surgical Changes
-
-**Touch only what you must. Clean up only your own mess.**
-
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: Every changed line should trace directly to the user's request.
-
-## 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
-
----
-
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
-
----
-
-## Tooling
-
-### RTK (Rust Token Killer)
-Prefix all shell commands with `rtk` — intercepts and filters output before it enters the prompt.
-See full command reference: @RTK.md
-
-### Caveman Skill
-Use `/caveman` to reduce output verbosity in long sessions.
-
-### kuzu-memory
-At session start: `kuzu-memory enhance "<topic>"` to load relevant context.
-After significant operations: `kuzu-memory learn "<decision or finding>"`.
-
+~~~sh
+DRY_RUN=1 bash ~/.agents/scripts/seed-project-instructions.sh ~/Documents/git/example-project
 ~~~
