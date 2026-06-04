@@ -739,7 +739,7 @@ install_rtk_binary() {
 
 rtk_init_arg() {
   case "$1" in
-    claude|"") printf '%s\n' "-g" ;;
+    claude|"") printf '%s\n' "-g --auto-patch" ;;
     codex) printf '%s\n' "-g --codex" ;;
     gemini) printf '%s\n' "-g --gemini" ;;
     copilot) printf '%s\n' "-g --copilot" ;;
@@ -937,10 +937,18 @@ install_caveman_agent_fallbacks() {
         run_cmd npx -y github:JuliusBrussee/caveman -- --only openclaw
         ;;
       codex)
-        run_cmd npx skills add JuliusBrussee/caveman -a codex
+        if [ "$non_interactive" = "1" ]; then
+          run_cmd npx skills add JuliusBrussee/caveman -a codex --yes --global
+        else
+          run_cmd npx skills add JuliusBrussee/caveman -a codex
+        fi
         ;;
       cursor)
-        run_cmd npx skills add JuliusBrussee/caveman -a cursor
+        if [ "$non_interactive" = "1" ]; then
+          run_cmd npx skills add JuliusBrussee/caveman -a cursor --yes --global
+        else
+          run_cmd npx skills add JuliusBrussee/caveman -a cursor
+        fi
         ;;
       copilot)
         run_cmd npx -y github:JuliusBrussee/caveman -- --only copilot --with-init
@@ -1899,7 +1907,6 @@ if asset_selected caveman && [ "$install_caveman" != "0" ] && prompt_yes_no "Ins
   install_caveman=1
   if [ "$non_interactive" != "1" ]; then
     caveman_mode="$(prompt_text "Caveman mode to use ($caveman_modes)" "$caveman_mode")"
-    caveman_args="$(prompt_text "Extra Caveman args" "$caveman_args")"
   fi
   validate_caveman_mode "$caveman_mode"
   install_step=$((install_step + 1))

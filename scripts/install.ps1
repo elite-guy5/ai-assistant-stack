@@ -906,7 +906,7 @@ function Get-RtkInitArgs {
   param([string]$Agent)
 
   switch ($Agent) {
-    "claude" { return @("init", "-g") }
+    "claude" { return @("init", "-g", "--auto-patch") }
     "codex" { return @("init", "-g", "--codex") }
     "gemini" { return @("init", "-g", "--gemini") }
     "copilot" { return @("init", "-g", "--copilot") }
@@ -1078,10 +1078,14 @@ function Install-CavemanAgentFallbacks {
         Invoke-SetupCommand -FilePath "npx" -Arguments @("-y", "github:JuliusBrussee/caveman", "--", "--only", "openclaw")
       }
       "codex" {
-        Invoke-SetupCommand -FilePath "npx" -Arguments @("skills", "add", "JuliusBrussee/caveman", "-a", "codex")
+        $args = @("skills", "add", "JuliusBrussee/caveman", "-a", "codex")
+        if ($NonInteractive) { $args += @("--yes", "--global") }
+        Invoke-SetupCommand -FilePath "npx" -Arguments $args
       }
       "cursor" {
-        Invoke-SetupCommand -FilePath "npx" -Arguments @("skills", "add", "JuliusBrussee/caveman", "-a", "cursor")
+        $args = @("skills", "add", "JuliusBrussee/caveman", "-a", "cursor")
+        if ($NonInteractive) { $args += @("--yes", "--global") }
+        Invoke-SetupCommand -FilePath "npx" -Arguments $args
       }
       "copilot" {
         Invoke-SetupCommand -FilePath "npx" -Arguments @("-y", "github:JuliusBrussee/caveman", "--", "--only", "copilot", "--with-init")
@@ -1681,7 +1685,6 @@ if ((Test-Asset "rtk") -and (-not $SkipRtk) -and (Read-YesNo -Prompt "Install RT
 if ((Test-Asset "caveman") -and (-not $SkipCaveman) -and (Read-YesNo -Prompt "Install Caveman for selected AI apps?" -Default $true)) {
   if (-not $NonInteractive) {
     $CavemanMode = Read-TextDefault -Prompt "Caveman mode to use ($($CavemanModes -join ','))" -Default $CavemanMode
-    $CavemanArgs = Read-TextDefault -Prompt "Extra Caveman args" -Default $CavemanArgs
   }
   Assert-CavemanMode -Mode $CavemanMode
   $installStep += 1
