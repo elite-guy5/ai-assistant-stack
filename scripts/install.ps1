@@ -4,6 +4,7 @@ param(
   [switch]$DryRun,
   [switch]$Overwrite,
   [switch]$OverwriteGlobalInstructions,
+  [switch]$OverwriteProjectTemplates,
   [string]$ProjectScope,
   [switch]$SkipRtk,
   [switch]$SkipCaveman,
@@ -156,6 +157,41 @@ function Copy-GlobalInstructionFile {
   }
 
   Write-Setup "skipped existing global instruction file $Target"
+}
+
+function Copy-ProjectTemplateFile {
+  param(
+    [string]$Source,
+    [string]$Target
+  )
+
+  if ($DryRun) {
+    if (-not (Test-Path $Target)) {
+      Write-Setup "dry-run: would install $Target"
+    } elseif ($OverwriteProjectTemplates -or $Overwrite) {
+      Write-Setup "dry-run: would overwrite $Target"
+    } else {
+      Write-Setup "dry-run: would skip existing project instruction template file $Target"
+    }
+    return
+  }
+
+  $parent = Split-Path -Parent $Target
+  New-Item -ItemType Directory -Force -Path $parent | Out-Null
+
+  if (-not (Test-Path $Target)) {
+    Copy-Item -Force $Source $Target
+    Write-Setup "installed $Target"
+    return
+  }
+
+  if ($OverwriteProjectTemplates -or $Overwrite) {
+    Copy-Item -Force $Source $Target
+    Write-Setup "overwrote $Target"
+    return
+  }
+
+  Write-Setup "skipped existing project instruction template file $Target"
 }
 
 function Copy-RenderedFile {
@@ -507,6 +543,9 @@ if (-not $NonInteractive) {
   if (-not $OverwriteGlobalInstructions) {
     $OverwriteGlobalInstructions = Read-YesNo -Prompt "Overwrite existing global Claude/Codex instruction files?" -Default $false
   }
+  if (-not $OverwriteProjectTemplates) {
+    $OverwriteProjectTemplates = Read-YesNo -Prompt "Overwrite existing project instruction template files?" -Default $false
+  }
   if (-not $SkipRtk) {
     $SkipRtk = -not (Read-YesNo -Prompt "Install and initialize RTK?" -Default $true)
   }
@@ -538,8 +577,8 @@ if ($RtkAgents -in @("all", "all available", "all-available")) {
 
 Copy-GlobalInstructionFile -Source (Join-Path $Root "templates/CLAUDE.global.md") -Target (Join-Path $HomeDir ".claude/CLAUDE.md")
 Copy-RenderedGlobalInstructionFile -Source (Join-Path $Root "templates/AGENTS.global.md") -Target (Join-Path $HomeDir ".codex/AGENTS.md")
-Copy-ManagedFile -Source (Join-Path $Root "templates/CLAUDE.project-template.md") -Target (Join-Path $HomeDir ".claude/CLAUDE.project-template.md")
-Copy-ManagedFile -Source (Join-Path $Root "templates/AGENTS.project-template.md") -Target (Join-Path $HomeDir ".codex/AGENTS.project-template.md")
+Copy-ProjectTemplateFile -Source (Join-Path $Root "templates/CLAUDE.project-template.md") -Target (Join-Path $HomeDir ".claude/CLAUDE.project-template.md")
+Copy-ProjectTemplateFile -Source (Join-Path $Root "templates/AGENTS.project-template.md") -Target (Join-Path $HomeDir ".codex/AGENTS.project-template.md")
 Copy-ManagedFile -Source (Join-Path $Root "scripts/optimize-ai.ps1") -Target (Join-Path $HomeDir ".agents/scripts/optimize-ai.ps1")
 Copy-RenderedFile -Source (Join-Path $Root "scripts/seed-project-instructions.ps1") -Target (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.ps1")
 Copy-RenderedFile -Source (Join-Path $Root "scripts/seed-project-instructions.sh") -Target (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.sh")

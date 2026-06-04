@@ -20,6 +20,7 @@ irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/
 The installer prompts for:
 
 - Whether to overwrite existing global Claude/Codex instruction files. Options: `y` / `n`. Default: `n`.
+- Whether to overwrite existing project instruction template files. Options: `y` / `n`. Default: `n`.
 - Project directory for project seeding instructions. Default: `~/Documents`.
 - Whether to install and initialize RTK. Options: `y` / `n`. Default: `y`.
 - RTK agents to initialize. Enter a comma-separated list or `all available`. Default: `claude,codex`.
@@ -59,6 +60,7 @@ Installer flags:
 - `--project-scope <path>` / `-ProjectScope <path>` - set the project directory for project seeding instructions.
 - `--overwrite` / `-Overwrite` - replace managed files instead of writing `.new`.
 - `--overwrite-global-instructions` / `-OverwriteGlobalInstructions` - replace existing `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`; default is to skip existing global instruction files.
+- `--overwrite-project-templates` / `-OverwriteProjectTemplates` - replace existing `~/.claude/CLAUDE.project-template.md` and `~/.codex/AGENTS.project-template.md`; default is to skip existing project instruction template files.
 - `--skip-rtk` / `-SkipRtk` - skip RTK install/init.
 - `--skip-caveman` / `-SkipCaveman` - skip Caveman install.
 - `--rtk-agents <list>` / `-RtkAgents <list>` - comma-separated RTK agents.
@@ -122,6 +124,7 @@ Installer behavior:
 
 - Creates missing target files.
 - Skips existing global Claude/Codex instruction files unless the global-instruction overwrite option is selected.
+- Skips existing project instruction template files unless the project-template overwrite option is selected.
 - Leaves existing files unchanged when they differ and writes `<target>.new` for review.
 - Installs the seeding scripts to `~/.agents/scripts/`.
 - Installs the AI ignore optimizer scripts to `~/.agents/scripts/`.

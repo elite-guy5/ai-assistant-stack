@@ -6,6 +6,7 @@ non_interactive=0
 dry_run=0
 overwrite="${OVERWRITE:-0}"
 overwrite_global_instructions=0
+overwrite_project_templates=0
 project_scope="${PROJECT_SCOPE:-$HOME/Documents}"
 install_rtk=""
 install_caveman=""
@@ -26,6 +27,8 @@ Options:
   --overwrite              Replace existing managed files instead of writing .new files
   --overwrite-global-instructions
                            Replace existing ~/.claude/CLAUDE.md and ~/.codex/AGENTS.md
+  --overwrite-project-templates
+                           Replace existing project instruction template files
   --skip-rtk               Do not install or initialize RTK
   --skip-caveman           Do not install Caveman
   --rtk-agents <list>      Comma-separated RTK agents to initialize (default: claude,codex)
@@ -42,6 +45,7 @@ while [ "$#" -gt 0 ]; do
     --dry-run) dry_run=1 ;;
     --overwrite) overwrite=1 ;;
     --overwrite-global-instructions) overwrite_global_instructions=1 ;;
+    --overwrite-project-templates) overwrite_project_templates=1 ;;
     --skip-rtk) install_rtk=0 ;;
     --skip-caveman) install_caveman=0 ;;
     --project-scope)
@@ -166,6 +170,10 @@ if prompt_yes_no "Overwrite existing global Claude/Codex instruction files?" "no
   overwrite_global_instructions=1
 fi
 
+if prompt_yes_no "Overwrite existing project instruction template files?" "no"; then
+  overwrite_project_templates=1
+fi
+
 if [ -z "$install_rtk" ]; then
   if prompt_yes_no "Install and initialize RTK?" "yes"; then
     install_rtk=1
@@ -264,6 +272,38 @@ copy_global_instruction_file() {
   fi
 
   printf 'skipped existing global instruction file %s\n' "$target"
+}
+
+copy_project_template_file() {
+  local source="$1"
+  local target="$2"
+
+  if [ "$dry_run" = "1" ]; then
+    if [ ! -e "$target" ]; then
+      printf 'dry-run: would install %s\n' "$target"
+    elif [ "$overwrite_project_templates" = "1" ] || [ "$overwrite" = "1" ]; then
+      printf 'dry-run: would overwrite %s\n' "$target"
+    else
+      printf 'dry-run: would skip existing project instruction template file %s\n' "$target"
+    fi
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$target")"
+
+  if [ ! -e "$target" ]; then
+    cp "$source" "$target"
+    printf 'installed %s\n' "$target"
+    return 0
+  fi
+
+  if [ "$overwrite_project_templates" = "1" ] || [ "$overwrite" = "1" ]; then
+    cp "$source" "$target"
+    printf 'overwrote %s\n' "$target"
+    return 0
+  fi
+
+  printf 'skipped existing project instruction template file %s\n' "$target"
 }
 
 render_template() {
@@ -596,8 +636,8 @@ install_caveman_tool() {
 
 copy_global_instruction_file "$ROOT/templates/CLAUDE.global.md" "$HOME/.claude/CLAUDE.md"
 render_global_instruction_template "$ROOT/templates/AGENTS.global.md" "$HOME/.codex/AGENTS.md"
-copy_managed_file "$ROOT/templates/CLAUDE.project-template.md" "$HOME/.claude/CLAUDE.project-template.md"
-copy_managed_file "$ROOT/templates/AGENTS.project-template.md" "$HOME/.codex/AGENTS.project-template.md"
+copy_project_template_file "$ROOT/templates/CLAUDE.project-template.md" "$HOME/.claude/CLAUDE.project-template.md"
+copy_project_template_file "$ROOT/templates/AGENTS.project-template.md" "$HOME/.codex/AGENTS.project-template.md"
 copy_managed_file "$ROOT/scripts/optimize-ai.sh" "$HOME/.agents/scripts/optimize-ai.sh"
 render_template "$ROOT/scripts/seed-project-instructions.sh" "$HOME/.agents/scripts/seed-project-instructions.sh"
 

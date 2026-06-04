@@ -4,6 +4,7 @@ param(
   [switch]$DryRun,
   [switch]$Overwrite,
   [switch]$OverwriteGlobalInstructions,
+  [switch]$OverwriteProjectTemplates,
   [string]$ProjectScope,
   [switch]$SkipRtk,
   [switch]$SkipCaveman,
@@ -36,6 +37,7 @@ try {
   if ($DryRun) { $installArgs += "-DryRun" }
   if ($Overwrite) { $installArgs += "-Overwrite" }
   if ($OverwriteGlobalInstructions) { $installArgs += "-OverwriteGlobalInstructions" }
+  if ($OverwriteProjectTemplates) { $installArgs += "-OverwriteProjectTemplates" }
   if ($ProjectScope) { $installArgs += @("-ProjectScope", $ProjectScope) }
   if ($SkipRtk) { $installArgs += "-SkipRtk" }
   if ($SkipCaveman) { $installArgs += "-SkipCaveman" }
