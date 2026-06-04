@@ -20,13 +20,12 @@ irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/
 The installer prompts for:
 
 - Whether to overwrite existing global Claude/Codex instruction files. Options: `y` / `n`. Default: `n`.
-- Whether to overwrite existing project instruction template files. Options: `y` / `n`. Default: `n`.
 - Project directory for project seeding instructions. Default: `~/Documents`.
 - Whether to install and initialize RTK. Options: `y` / `n`. Default: `y`.
 - RTK agents to initialize. Enter a comma-separated list or `all available`. Default: `claude,codex`.
 - RTK setup mode. Default: `auto`, which adds detected installed agents.
 - Whether to install Caveman. Options: `y` / `n`. Default: `y`.
-- Caveman mode to use. Options: `lite`, `full`, `ultra`, `wenyan-lite`, `wenyan-full`, `wenyan-ultra`. Default: `ultra`.
+- Persistent Caveman default mode. Default: `ultra`.
 - Optional Caveman flags. Default: none.
 
 Useful non-interactive examples:
@@ -60,13 +59,12 @@ Installer flags:
 - `--project-scope <path>` / `-ProjectScope <path>` - set the project directory for project seeding instructions.
 - `--overwrite` / `-Overwrite` - replace managed files instead of writing `.new`.
 - `--overwrite-global-instructions` / `-OverwriteGlobalInstructions` - replace existing `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`; default is to skip existing global instruction files.
-- `--overwrite-project-templates` / `-OverwriteProjectTemplates` - replace existing `~/.claude/CLAUDE.project-template.md` and `~/.codex/AGENTS.project-template.md`; default is to skip existing project instruction template files.
 - `--skip-rtk` / `-SkipRtk` - skip RTK install/init.
 - `--skip-caveman` / `-SkipCaveman` - skip Caveman install.
 - `--rtk-agents <list>` / `-RtkAgents <list>` - comma-separated RTK agents.
 - `--rtk-mode <mode>` / `-RtkMode <mode>` - RTK setup mode, default `auto`.
 - `--caveman-args <args>` / `-CavemanArgs <args>` - pass extra flags to Caveman.
-- `--caveman-mode <mode>` / `-CavemanMode <mode>` - Caveman mode to use: `lite`, `full`, `ultra`, `wenyan-lite`, `wenyan-full`, or `wenyan-ultra`; default `ultra`.
+- `--caveman-mode <mode>` / `-CavemanMode <mode>` - persistent Caveman default mode, default `ultra`.
 
 # Recommended Layered Configuration
 
@@ -124,7 +122,6 @@ Installer behavior:
 
 - Creates missing target files.
 - Skips existing global Claude/Codex instruction files unless the global-instruction overwrite option is selected.
-- Skips existing project instruction template files unless the project-template overwrite option is selected.
 - Leaves existing files unchanged when they differ and writes `<target>.new` for review.
 - Installs the seeding scripts to `~/.agents/scripts/`.
 - Installs the AI ignore optimizer scripts to `~/.agents/scripts/`.
@@ -258,7 +255,7 @@ GitHub Link: [GitHub: juliusbrussee/caveman](https://github.com/juliusbrussee/ca
 
 Adds a `/caveman` slash command that forces Claude Code into a minimal, verbose-free response mode. Reduces output bloat in long sessions.
 
-The installer prompts for the Caveman mode, writes `~/.config/caveman/config.json` with `defaultMode` set to that value, runs the upstream unified Caveman installer with `--all`, and adds per-agent fallback installs for detected non-Claude agents where needed. Some agents still require per-session activation if their native integration does not support always-on hooks.
+The installer writes `~/.config/caveman/config.json` with `defaultMode` set to `ultra`, runs the upstream unified Caveman installer with `--all`, and adds per-agent fallback installs for detected non-Claude agents where needed. Some agents still require per-session activation if their native integration does not support always-on hooks.
 
 ### Manual install
 
