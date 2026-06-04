@@ -59,6 +59,8 @@ function Get-ToolName {
     "rtk" { return "RTK" }
     "ignore-optimizer" { return "Optimize-AI" }
     "seeding" { return "Seed Project" }
+    "project-instructions" { return "Project Instructions" }
+    "reset-global-instructions" { return "Instruction Files" }
     default { return $Component }
   }
 }
@@ -286,6 +288,8 @@ function Read-TextDefault {
 function Prompt-UninstallComponents {
   $components = @(
     'global-instructions',
+    'reset-global-instructions',
+    'project-instructions',
     'project-templates',
     'seeding',
     'ignore-optimizer',
@@ -840,9 +844,67 @@ function Remove-TemplatePath {
   }
 }
 
+function Remove-ProjectInstructionSections {
+  if (-not (Test-Path -PathType Container $ProjectScope)) {
+    Add-UninstallReport -Section "Verification" -Tool "Project Instructions" -Category "Verification Issues" -Item "$ProjectScope not found" -Status "warn"
+    return
+  }
+
+  $changed = $false
+  foreach ($project in Get-ChildItem -Directory -Path $ProjectScope -ErrorAction SilentlyContinue) {
+    if ($project.Name.StartsWith(".")) {
+      continue
+    }
+    foreach ($file in @((Join-Path $project.FullName "CLAUDE.md"), (Join-Path $project.FullName "AGENTS.md"))) {
+      if (-not (Test-Path -PathType Leaf $file)) {
+        continue
+      }
+      if ($DryRun) {
+        Add-UninstallReport -Section "Instruction Files" -Tool "" -Category "Files Updated" -Item "Would remove managed project sections from $file"
+        Add-UninstallReport -Section "Preserved Files" -Tool "" -Category "Files Preserved" -Item $file
+        $changed = $true
+        continue
+      }
+
+      $before = Get-Content -Raw $file
+      $after = $before
+      foreach ($heading in @("Token-Saver File Boundaries", "Development Workflow")) {
+        $pattern = "(?s)`n?## $([regex]::Escape($heading))`n.*?(?=`n## |\s*$)"
+        $after = [regex]::Replace($after, $pattern, "`n")
+      }
+      $after = [regex]::Replace($after, "`n{3,}", "`n`n").TrimEnd() + "`n"
+      if ($after -ne $before) {
+        Set-Content -NoNewline -Encoding UTF8 -Path $file -Value $after
+        Add-UninstallReport -Section "Instruction Files" -Tool "" -Category "Files Updated" -Item "Removed managed project sections from $file"
+        Add-UninstallReport -Section "Preserved Files" -Tool "" -Category "Files Preserved" -Item $file
+        $changed = $true
+      }
+    }
+  }
+
+  if (-not $changed) {
+    Add-UninstallReport -Section "Instruction Files" -Tool "" -Category "Files Updated" -Item "No managed project instruction sections found"
+  }
+}
+
+function Reset-GlobalInstructionFiles {
+  foreach ($file in @((Join-Path $HomeDir ".claude/CLAUDE.md"), (Join-Path $HomeDir ".codex/AGENTS.md"))) {
+    if ($DryRun) {
+      Add-UninstallReport -Section "Instruction Files" -Tool "" -Category "Files Updated" -Item "Would reset $file"
+      Add-UninstallReport -Section "Preserved Files" -Tool "" -Category "Files Preserved" -Item $file
+      continue
+    }
+    $parent = Split-Path -Parent $file
+    New-Item -ItemType Directory -Force -Path $parent | Out-Null
+    Set-Content -NoNewline -Encoding UTF8 -Path $file -Value ""
+    Add-UninstallReport -Section "Instruction Files" -Tool "" -Category "Files Updated" -Item "Reset $file"
+    Add-UninstallReport -Section "Preserved Files" -Tool "" -Category "Files Preserved" -Item $file
+  }
+}
+
 function Get-SelectedUninstallComponents {
   if ([string]::IsNullOrWhiteSpace($UninstallComponents) -or $UninstallComponents -in @("all", "all available", "all-available")) {
-    return @("global-instructions", "project-templates", "seeding", "ignore-optimizer", "rtk", "caveman")
+    return @("global-instructions", "reset-global-instructions", "project-instructions", "project-templates", "seeding", "ignore-optimizer", "rtk", "caveman")
   }
   return @($UninstallComponents.Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 }
@@ -1097,6 +1159,12 @@ function Invoke-LegacyUninstall {
     Add-UninstallReport -Section "Instruction Files" -Tool "" -Category "Files Updated" -Item "Preserved AGENTS.md"
     Add-UninstallReport -Section "Preserved Files" -Tool "" -Category "Files Preserved" -Item (Join-Path $HomeDir ".claude/CLAUDE.md")
     Add-UninstallReport -Section "Preserved Files" -Tool "" -Category "Files Preserved" -Item (Join-Path $HomeDir ".codex/AGENTS.md")
+  }
+  if (Test-UninstallComponent "reset-global-instructions") {
+    Reset-GlobalInstructionFiles
+  }
+  if (Test-UninstallComponent "project-instructions") {
+    Remove-ProjectInstructionSections
   }
   if (Test-UninstallComponent "project-templates") {
     Remove-TemplatePath -Path (Join-Path $HomeDir ".claude/CLAUDE.project-template.md")

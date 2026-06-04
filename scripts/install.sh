@@ -38,6 +38,7 @@ Options:
   --uninstall              Remove selected installed components
   --uninstall-components <list>
                            Comma-separated uninstall components, or "all available"
+                           Components: global-instructions, reset-global-instructions, project-instructions, project-templates, seeding, ignore-optimizer, rtk, caveman
   --skip-rtk               Do not install or initialize RTK
   --skip-caveman           Do not install Caveman
   --rtk-agents <list>      Comma-separated RTK agents to initialize (default: claude,codex)
@@ -744,7 +745,7 @@ component_selected() {
 
 prompt_uninstall_components() {
   local component selected=""
-  for component in global-instructions project-templates seeding ignore-optimizer rtk caveman; do
+  for component in global-instructions reset-global-instructions project-instructions project-templates seeding ignore-optimizer rtk caveman; do
     if prompt_yes_no "Remove ${component//-/ }?" "no"; then
       selected="${selected:+$selected,}$component"
     fi
@@ -778,6 +779,8 @@ tool_for_component() {
     rtk) printf '%s\n' "RTK" ;;
     ignore-optimizer) printf '%s\n' "Optimize-AI" ;;
     seeding) printf '%s\n' "Seed Project" ;;
+    project-instructions) printf '%s\n' "Project Instructions" ;;
+    reset-global-instructions) printf '%s\n' "Instruction Files" ;;
     *) printf '%s\n' "$1" ;;
   esac
 }
@@ -792,6 +795,71 @@ remove_template_path() {
     rm -rf "$target"
     report_event "Templates" "" "Files Removed" "$target" "ok"
   fi
+}
+
+remove_project_instruction_sections() {
+  local project file changed=0
+
+  if [ ! -d "$project_scope" ]; then
+    report_event "Verification" "Project Instructions" "Verification Issues" "$project_scope not found" "warn"
+    return 0
+  fi
+
+  for project in "$project_scope"/*; do
+    [ -d "$project" ] || continue
+    case "$(basename "$project")" in .*) continue ;; esac
+    for file in "$project/CLAUDE.md" "$project/AGENTS.md"; do
+      [ -f "$file" ] || continue
+      if [ "$dry_run" = "1" ]; then
+        report_event "Instruction Files" "" "Files Updated" "Would remove managed project sections from $file" "ok"
+        report_preserved "$file"
+        changed=1
+        continue
+      fi
+      command -v node >/dev/null 2>&1 || {
+        report_event "Verification" "Project Instructions" "Verification Issues" "node not found; skipped $file" "warn"
+        continue
+      }
+      if node - "$file" <<'NODE'
+const fs = require("fs");
+const file = process.argv[2];
+const before = fs.readFileSync(file, "utf8");
+let after = before;
+for (const heading of ["Token-Saver File Boundaries", "Development Workflow"]) {
+  const re = new RegExp(`\\n?## ${heading}\\n[\\s\\S]*?(?=\\n## |\\s*$)`, "g");
+  after = after.replace(re, "\n");
+}
+after = after.replace(/\n{3,}/g, "\n\n").replace(/\s+$/g, "\n");
+if (after !== before) {
+  fs.writeFileSync(file, after);
+  process.exit(0);
+}
+process.exit(1);
+NODE
+      then
+        report_event "Instruction Files" "" "Files Updated" "Removed managed project sections from $file" "ok"
+        report_preserved "$file"
+        changed=1
+      fi
+    done
+  done
+
+  [ "$changed" = "1" ] || report_event "Instruction Files" "" "Files Updated" "No managed project instruction sections found" "ok"
+}
+
+reset_global_instruction_files() {
+  local file
+  for file in "$HOME/.claude/CLAUDE.md" "$HOME/.codex/AGENTS.md"; do
+    if [ "$dry_run" = "1" ]; then
+      report_event "Instruction Files" "" "Files Updated" "Would reset $file" "ok"
+      report_preserved "$file"
+      continue
+    fi
+    mkdir -p "$(dirname "$file")"
+    : > "$file"
+    report_event "Instruction Files" "" "Files Updated" "Reset $file" "ok"
+    report_preserved "$file"
+  done
 }
 
 report_uninstall_summary() {
@@ -933,7 +1001,7 @@ remove_path() {
 selected_components() {
   case "$uninstall_components" in
     ""|all|"all available"|"all-available")
-      printf '%s\n' "global-instructions,project-templates,seeding,ignore-optimizer,rtk,caveman"
+      printf '%s\n' "global-instructions,reset-global-instructions,project-instructions,project-templates,seeding,ignore-optimizer,rtk,caveman"
       ;;
     *) printf '%s\n' "$uninstall_components" ;;
   esac
@@ -1218,6 +1286,12 @@ legacy_uninstall_selected_components() {
     report_event "Instruction Files" "" "Files Updated" "Preserved AGENTS.md" "ok"
     report_preserved "$HOME/.claude/CLAUDE.md"
     report_preserved "$HOME/.codex/AGENTS.md"
+  fi
+  if component_selected "reset-global-instructions"; then
+    reset_global_instruction_files
+  fi
+  if component_selected "project-instructions"; then
+    remove_project_instruction_sections
   fi
   if component_selected "project-templates"; then
     remove_template_path "$HOME/.claude/CLAUDE.project-template.md"

@@ -160,8 +160,10 @@ Uninstall behavior:
 - Deletes files only when the manifest records them as installer-created full files.
 - Preserves user-owned `CLAUDE.md`, `AGENTS.md`, settings files, and other user-owned files unless a removable managed section is recorded.
 - Falls back to legacy cleanup rules when the manifest is missing or has no records for a selected component, and reports that fallback.
-- Prompts for components with `global-instructions`, `project-templates`, `seeding`, `ignore-optimizer`, `rtk`, `caveman`, or `all available`.
+- Prompts for components with `global-instructions`, `reset-global-instructions`, `project-instructions`, `project-templates`, `seeding`, `ignore-optimizer`, `rtk`, `caveman`, or `all available`.
 - `global-instructions` removes manifest-owned instruction files, or preserves user-owned instruction files.
+- `reset-global-instructions` explicitly blanks `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`.
+- `project-instructions` scans first-level projects in the configured project directory and removes managed Token-Saver and workflow sections from project-local `CLAUDE.md` and `AGENTS.md`; it never deletes those files.
 - `project-templates` removes `~/.claude/CLAUDE.project-template.md` and `~/.codex/AGENTS.project-template.md`.
 - `seeding` removes token-saver seeding scripts and matching Claude `SessionStart` hooks.
 - `ignore-optimizer` removes token-saver optimizer scripts.
