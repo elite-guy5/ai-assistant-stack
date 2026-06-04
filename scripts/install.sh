@@ -17,6 +17,10 @@ rtk_mode="auto"
 caveman_args=""
 caveman_mode="ultra"
 caveman_modes="lite,full,ultra,wenyan-lite,wenyan-full,wenyan-ultra"
+manifest_path="${TOKEN_SAVER_MANIFEST:-$HOME/.agents/install_manifest.json}"
+uninstall_active=0
+uninstall_report_file=""
+current_tool=""
 
 usage() {
   cat <<'EOF'
@@ -112,6 +116,79 @@ run_cmd() {
   "$@"
 }
 
+run_optional_uninstall_cmd() {
+  if [ "$dry_run" = "1" ]; then
+    if [ "$uninstall_active" = "1" ]; then
+      report_event "Skills and Plugins" "$current_tool" "Shell Commands Removed" "$*" "ok"
+    else
+      printf 'dry-run: %s\n' "$*"
+    fi
+    return 0
+  fi
+  if "$@"; then
+    [ "$uninstall_active" = "1" ] && report_event "Skills and Plugins" "$current_tool" "Shell Commands Removed" "$*" "ok"
+  else
+    [ "$uninstall_active" = "1" ] && report_event "Verification" "$current_tool" "Verification Issues" "$*" "warn" || printf 'warning: uninstall command failed: %s\n' "$*" >&2
+  fi
+}
+
+record_manifest() {
+  local type="$1"
+  local component="$2"
+  local ownership="$3"
+  local action="$4"
+  local path="$5"
+  local details="${6:-{}}"
+
+  if [ "$dry_run" = "1" ]; then
+    printf 'dry-run: would record manifest artifact %s %s %s\n' "$component" "$type" "$path"
+    return 0
+  fi
+
+  if ! command -v node >/dev/null 2>&1; then
+    printf 'warning: node required to update install manifest; skipping manifest record for %s\n' "$path" >&2
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$manifest_path")"
+  node - "$manifest_path" "$type" "$component" "$ownership" "$action" "$path" "$details" <<'NODE'
+const fs = require("fs");
+const [manifestPath, type, component, ownership, action, targetPath, detailsRaw] = process.argv.slice(2);
+let details = {};
+try { details = detailsRaw ? JSON.parse(detailsRaw) : {}; } catch { details = { raw: detailsRaw }; }
+let manifest = { schemaVersion: 1, managedBy: "token-saver-setup", artifacts: [] };
+if (fs.existsSync(manifestPath)) {
+  const raw = fs.readFileSync(manifestPath, "utf8").trim();
+  if (raw) manifest = JSON.parse(raw);
+}
+manifest.schemaVersion = 1;
+manifest.managedBy = "token-saver-setup";
+manifest.updatedAt = new Date().toISOString();
+manifest.artifacts = Array.isArray(manifest.artifacts) ? manifest.artifacts : [];
+const artifact = {
+  id: [component, type, targetPath, details.key || details.command || ""].join(":"),
+  type,
+  component,
+  ownership,
+  action,
+  path: targetPath,
+  details,
+  recordedAt: new Date().toISOString(),
+};
+const idx = manifest.artifacts.findIndex((item) => item.id === artifact.id);
+if (idx >= 0) manifest.artifacts[idx] = artifact;
+else manifest.artifacts.push(artifact);
+fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+NODE
+}
+
+record_directory() {
+  local target="$1"
+  local component="$2"
+  local ownership="$3"
+  record_manifest "directory" "$component" "$ownership" "created-or-ensured" "$target"
+}
+
 prompt_yes_no() {
   local prompt="$1"
   local default="$2"
@@ -179,6 +256,8 @@ validate_caveman_mode() {
 copy_managed_file() {
   local source="$1"
   local target="$2"
+  local component="${3:-managed-file}"
+  local existed=0
 
   if [ "$dry_run" = "1" ]; then
     if [ ! -e "$target" ] || [ "$overwrite" = "1" ]; then
@@ -191,10 +270,17 @@ copy_managed_file() {
     return 0
   fi
 
+  [ -e "$target" ] && existed=1
   mkdir -p "$(dirname "$target")"
 
   if [ ! -e "$target" ] || [ "$overwrite" = "1" ]; then
+    record_directory "$(dirname "$target")" "$component" "installer-created"
     cp "$source" "$target"
+    if [ "$existed" = "1" ]; then
+      record_manifest "file" "$component" "user-owned" "modified" "$target"
+    else
+      record_manifest "file" "$component" "installer-created" "created" "$target"
+    fi
     printf 'installed %s\n' "$target"
     return 0
   fi
@@ -210,6 +296,7 @@ copy_managed_file() {
 copy_global_instruction_file() {
   local source="$1"
   local target="$2"
+  local existed=0
 
   if [ "$dry_run" = "1" ]; then
     if [ ! -e "$target" ]; then
@@ -222,16 +309,25 @@ copy_global_instruction_file() {
     return 0
   fi
 
+  [ -e "$target" ] && existed=1
   mkdir -p "$(dirname "$target")"
 
   if [ ! -e "$target" ]; then
+    record_directory "$(dirname "$target")" "global-instructions" "installer-created"
     cp "$source" "$target"
+    record_manifest "global_instruction_file" "global-instructions" "installer-created" "created" "$target"
     printf 'installed %s\n' "$target"
     return 0
   fi
 
   if [ "$overwrite_global_instructions" = "1" ]; then
+    record_directory "$(dirname "$target")" "global-instructions" "installer-created"
     cp "$source" "$target"
+    if [ "$existed" = "1" ]; then
+      record_manifest "global_instruction_file" "global-instructions" "user-owned" "modified" "$target"
+    else
+      record_manifest "global_instruction_file" "global-instructions" "installer-created" "created" "$target"
+    fi
     printf 'overwrote %s\n' "$target"
     return 0
   fi
@@ -242,6 +338,7 @@ copy_global_instruction_file() {
 copy_project_template_file() {
   local source="$1"
   local target="$2"
+  local existed=0
 
   if [ "$dry_run" = "1" ]; then
     if [ ! -e "$target" ]; then
@@ -254,16 +351,25 @@ copy_project_template_file() {
     return 0
   fi
 
+  [ -e "$target" ] && existed=1
   mkdir -p "$(dirname "$target")"
 
   if [ ! -e "$target" ]; then
+    record_directory "$(dirname "$target")" "project-templates" "installer-created"
     cp "$source" "$target"
+    record_manifest "project_template_file" "project-templates" "installer-created" "created" "$target"
     printf 'installed %s\n' "$target"
     return 0
   fi
 
   if [ "$overwrite_project_templates" = "1" ] || [ "$overwrite" = "1" ]; then
+    record_directory "$(dirname "$target")" "project-templates" "installer-created"
     cp "$source" "$target"
+    if [ "$existed" = "1" ]; then
+      record_manifest "project_template_file" "project-templates" "user-owned" "modified" "$target"
+    else
+      record_manifest "project_template_file" "project-templates" "installer-created" "created" "$target"
+    fi
     printf 'overwrote %s\n' "$target"
     return 0
   fi
@@ -283,7 +389,7 @@ render_template() {
     -e "s/{{HOME}}/$home_replacement/g" \
     -e "s/{{PROJECT_SCOPE}}/$scope_replacement/g" \
     "$source" > "$temp"
-  copy_managed_file "$temp" "$target"
+  copy_managed_file "$temp" "$target" "seeding"
   rm -f "$temp"
 }
 
@@ -355,6 +461,7 @@ if (exists) {
   console.log(`added SessionStart hook to ${settingsPath}`);
 }
 NODE
+  record_manifest "settings_entry" "seeding" "user-owned" "ensured" "$settings_path" '{"key":"hooks.SessionStart","command":"seed-project-instructions.sh"}'
 }
 
 install_rtk_binary() {
@@ -477,6 +584,7 @@ initialize_rtk_agents() {
     args="$(rtk_init_arg "$agent")"
     # shellcheck disable=SC2086
     run_cmd rtk init $args
+    record_manifest "generated_tool_reference" "rtk" "external" "initialized" "rtk" "{\"agent\":\"$agent\",\"command\":\"rtk init $args\"}"
     IFS=","
   done
   IFS="$old_ifs"
@@ -596,12 +704,18 @@ install_caveman_tool() {
 
   # shellcheck disable=SC2086
   run_cmd npx -y github:JuliusBrussee/caveman -- $args
+  record_manifest "file" "caveman" "installer-created" "created-or-modified" "$HOME/.config/caveman/config.json"
+  record_manifest "generated_tool_reference" "caveman" "external" "installed" "npx" "{\"command\":\"npx -y github:JuliusBrussee/caveman -- $args\"}"
   install_caveman_agent_fallbacks
 }
 
 component_selected() {
   local wanted="$1"
   local old_ifs component
+
+  case "$uninstall_components" in
+    ""|all|"all available"|"all-available") return 0 ;;
+  esac
 
   old_ifs="$IFS"
   IFS="," 
@@ -628,6 +742,158 @@ prompt_uninstall_components() {
   printf '%s' "$selected"
 }
 
+section_line() {
+  printf '%s\n' "$1"
+  printf '%*s\n' 50 "" | tr ' ' "${2:--}"
+}
+
+report_event() {
+  local section="$1"
+  local tool="$2"
+  local category="$3"
+  local item="$4"
+  local status="${5:-ok}"
+
+  [ -n "$uninstall_report_file" ] || return 0
+  printf '%s\t%s\t%s\t%s\t%s\n' "$section" "$tool" "$category" "$item" "$status" >> "$uninstall_report_file"
+}
+
+report_preserved() {
+  report_event "Preserved Files" "" "Files Preserved" "$1" "ok"
+}
+
+tool_for_component() {
+  case "$1" in
+    caveman) printf '%s\n' "Caveman" ;;
+    rtk) printf '%s\n' "RTK" ;;
+    ignore-optimizer) printf '%s\n' "Optimize-AI" ;;
+    seeding) printf '%s\n' "Seed Project" ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+
+remove_template_path() {
+  local target="$1"
+  if [ "$dry_run" = "1" ]; then
+    report_event "Templates" "" "Files Removed" "$target" "ok"
+    return 0
+  fi
+  if [ -e "$target" ]; then
+    rm -rf "$target"
+    report_event "Templates" "" "Files Removed" "$target" "ok"
+  fi
+}
+
+report_uninstall_summary() {
+  [ -s "$uninstall_report_file" ] || return 0
+  if command -v node >/dev/null 2>&1; then
+    node - "$uninstall_report_file" <<'NODE'
+const fs = require("fs");
+const file = process.argv[2];
+const rows = fs.readFileSync(file, "utf8").trim().split(/\n/).filter(Boolean).map((line) => {
+  const [section, tool, category, item, status] = line.split("\t");
+  return { section, tool, category, item, status };
+});
+const symbol = (status) => status === "warn" ? "!" : "✓";
+const printRule = (char = "-") => console.log(char.repeat(50));
+const printSection = (name, char = "-") => { console.log(name); printRule(char); };
+const unique = (items) => [...new Set(items.filter(Boolean))];
+const suppressDescendants = (items) => {
+  const sorted = unique(items).sort((a, b) => a.length - b.length);
+  return sorted.filter((item, idx) => !sorted.slice(0, idx).some((parent) => item.startsWith(parent.replace(/\/$/, "") + "/")));
+};
+const printRows = (items) => {
+  for (const row of items) console.log(`${symbol(row.status)} ${row.item}`);
+};
+
+const instruction = rows.filter((r) => r.section === "Instruction Files");
+if (instruction.length) {
+  printSection("Instruction Files");
+  printRows(instruction);
+  console.log("");
+}
+
+const toolRows = rows.filter((r) => r.section === "Skills and Plugins");
+if (toolRows.length) {
+  printSection("Skills and Plugins", "=");
+  for (const tool of ["Caveman", "RTK", "Optimize-AI", "Seed Project"]) {
+    const owned = toolRows.filter((r) => r.tool === tool);
+    if (!owned.length) continue;
+    console.log(tool);
+    printRule("-");
+    for (const category of ["Directories Removed", "Files Removed", "Symlinks Removed", "Shell Commands Removed", "Aliases Removed", "PATH Entries Removed", "Environment Variables Removed", "Configuration Entries Removed"]) {
+      let entries = owned.filter((r) => r.category === category);
+      if (!entries.length) continue;
+      if (category === "Directories Removed" || category === "Files Removed") {
+        const suppressed = new Set(suppressDescendants(entries.map((r) => r.item)));
+        entries = entries.filter((r) => suppressed.has(r.item));
+      }
+      console.log(`${category} (${unique(entries.map((r) => r.item)).length})`);
+      for (const item of unique(entries.map((r) => r.item))) console.log(`✓ ${item}`);
+    }
+    console.log("Status");
+    console.log("✓ Successfully Removed");
+    console.log("");
+  }
+}
+
+const templates = rows.filter((r) => r.section === "Templates");
+if (templates.length) {
+  printSection("Templates");
+  printRows(templates);
+  console.log("");
+}
+
+const config = rows.filter((r) => r.section === "Configuration");
+if (config.length) {
+  printSection("Configuration");
+  printRows(config);
+  console.log("");
+}
+
+const verificationRows = rows.filter((r) => r.section === "Verification");
+const selectedTools = unique(toolRows.map((r) => r.tool));
+if (selectedTools.length || verificationRows.length) {
+  printSection("Verification", "=");
+  for (const tool of selectedTools) {
+    const issues = verificationRows.filter((r) => r.tool === tool);
+    console.log(tool);
+    if (!issues.length) {
+      console.log("✓ No managed artifacts remain");
+    } else {
+      for (const issue of issues) {
+        console.log("! Remaining Artifact");
+        console.log("Path:");
+        console.log(issue.item);
+        console.log("Reason:");
+        console.log("Managed artifact still exists after uninstall.");
+      }
+    }
+  }
+  console.log("");
+}
+
+const preserved = rows.filter((r) => r.section === "Preserved Files");
+if (preserved.length) {
+  printSection("Preserved Files");
+  for (const item of unique(preserved.map((r) => r.item))) console.log(`✓ ${item}`);
+  console.log("");
+}
+
+const count = (category) => unique(rows.filter((r) => r.category === category).map((r) => r.item)).length;
+printSection("Summary");
+console.log(`Tools Removed: ${selectedTools.length}`);
+console.log(`Directories Removed: ${count("Directories Removed")}`);
+console.log(`Files Removed: ${count("Files Removed")}`);
+console.log(`Symlinks Removed: ${count("Symlinks Removed")}`);
+console.log(`Shell Commands Removed: ${count("Shell Commands Removed")}`);
+console.log(`Files Updated: ${count("Files Updated") + count("Configuration Entries Removed")}`);
+console.log(`Files Preserved: ${count("Files Preserved")}`);
+console.log(`Verification Issues: ${verificationRows.length}`);
+NODE
+  fi
+}
+
 reset_file_blank() {
   local target="$1"
 
@@ -643,25 +909,116 @@ reset_file_blank() {
 
 remove_path() {
   local target="$1"
+  local category="Files Removed"
+  [ -d "$target" ] && category="Directories Removed"
 
   if [ "$dry_run" = "1" ]; then
-    printf 'dry-run: would remove %s\n' "$target"
+    if [ "$uninstall_active" = "1" ]; then
+      report_event "Skills and Plugins" "$current_tool" "$category" "$target" "ok"
+    else
+      printf 'dry-run: would remove %s\n' "$target"
+    fi
     return 0
   fi
 
   if [ -e "$target" ]; then
-    rm -f "$target"
-    printf 'removed %s\n' "$target"
+    rm -rf "$target"
+    if [ "$uninstall_active" = "1" ]; then
+      report_event "Skills and Plugins" "$current_tool" "$category" "$target" "ok"
+    else
+      printf 'removed %s\n' "$target"
+    fi
   else
-    printf 'already absent %s\n' "$target"
+    [ "$uninstall_active" = "1" ] || printf 'already absent %s\n' "$target"
   fi
+}
+
+selected_components() {
+  case "$uninstall_components" in
+    ""|all|"all available"|"all-available")
+      printf '%s\n' "global-instructions,project-templates,seeding,ignore-optimizer,rtk,caveman"
+      ;;
+    *) printf '%s\n' "$uninstall_components" ;;
+  esac
+}
+
+manifest_has_component() {
+  local component="$1"
+  [ -f "$manifest_path" ] || return 1
+  command -v node >/dev/null 2>&1 || return 1
+  node - "$manifest_path" "$component" <<'NODE'
+const fs = require("fs");
+const [manifestPath, component] = process.argv.slice(2);
+try {
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  process.exit(Array.isArray(manifest.artifacts) && manifest.artifacts.some((item) => item.component === component) ? 0 : 1);
+} catch {
+  process.exit(1);
+}
+NODE
+}
+
+manifest_artifacts_for_component() {
+  local component="$1"
+  node - "$manifest_path" "$component" <<'NODE'
+const fs = require("fs");
+const [manifestPath, component] = process.argv.slice(2);
+const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+for (const item of manifest.artifacts || []) {
+  if (item.component !== component) continue;
+  const key = item.details && item.details.key ? item.details.key : "";
+  const command = item.details && item.details.command ? item.details.command : "";
+  console.log([item.type || "", item.ownership || "", item.path || "", key, command].join("\t"));
+}
+NODE
+}
+
+uninstall_manifest_component() {
+  local component="$1"
+  local type ownership target key command
+
+  manifest_artifacts_for_component "$component" | while IFS="$(printf '\t')" read -r type ownership target key command; do
+    case "$type" in
+      file|global_instruction_file|project_template_file)
+        if [ "$ownership" = "installer-created" ]; then
+          if [ "$component" = "project-templates" ]; then
+            remove_template_path "$target"
+          else
+            current_tool="$(tool_for_component "$component")"
+            remove_path "$target"
+          fi
+        else
+          report_preserved "$target"
+        fi
+        ;;
+      directory)
+        :
+        ;;
+      settings_entry)
+        case "$component" in
+          seeding) remove_claude_seed_hook ;;
+          caveman) remove_caveman_claude_settings ;;
+        esac
+        ;;
+      generated_tool_reference)
+        case "$component" in
+          rtk) uninstall_rtk_components ;;
+          caveman) uninstall_caveman_components ;;
+        esac
+        ;;
+    esac
+  done
 }
 
 remove_claude_seed_hook() {
   local settings_path="$HOME/.claude/settings.json"
 
   if [ "$dry_run" = "1" ]; then
-    printf 'dry-run: would remove token-saver SessionStart hooks from %s\n' "$settings_path"
+    if [ "$uninstall_active" = "1" ]; then
+      report_event "Skills and Plugins" "Seed Project" "Configuration Entries Removed" "$settings_path hooks.SessionStart" "ok"
+    else
+      printf 'dry-run: would remove token-saver SessionStart hooks from %s\n' "$settings_path"
+    fi
     return 0
   fi
 
@@ -684,15 +1041,19 @@ if (data.hooks && Array.isArray(data.hooks.SessionStart)) {
     .filter((entry) => !Array.isArray(entry.hooks) || entry.hooks.length > 0);
 }
 fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2) + "\n");
-console.log(`removed token-saver SessionStart hooks from ${settingsPath}`);
 NODE
+  report_event "Skills and Plugins" "Seed Project" "Configuration Entries Removed" "$settings_path hooks.SessionStart" "ok"
 }
 
 remove_caveman_claude_settings() {
   local settings_path="$HOME/.claude/settings.json"
 
   if [ "$dry_run" = "1" ]; then
-    printf 'dry-run: would remove Caveman entries from %s\n' "$settings_path"
+    if [ "$uninstall_active" = "1" ]; then
+      report_event "Skills and Plugins" "Caveman" "Configuration Entries Removed" "$settings_path Caveman entries" "ok"
+    else
+      printf 'dry-run: would remove Caveman entries from %s\n' "$settings_path"
+    fi
     return 0
   fi
 
@@ -727,8 +1088,8 @@ for (const prop of ["mcpServers", "plugins", "enabledPlugins"]) {
   }
 }
 fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2) + "\n");
-console.log(`removed Caveman entries from ${settingsPath}`);
 NODE
+  report_event "Skills and Plugins" "Caveman" "Configuration Entries Removed" "$settings_path Caveman entries" "ok"
 }
 
 remove_caveman_codex_config() {
@@ -736,7 +1097,11 @@ remove_caveman_codex_config() {
   local temp skip=0 block=""
 
   if [ "$dry_run" = "1" ]; then
-    printf 'dry-run: would remove known Caveman entries from %s\n' "$config_path"
+    if [ "$uninstall_active" = "1" ]; then
+      report_event "Skills and Plugins" "Caveman" "Configuration Entries Removed" "$config_path Caveman entries" "ok"
+    else
+      printf 'dry-run: would remove known Caveman entries from %s\n' "$config_path"
+    fi
     return 0
   fi
 
@@ -763,12 +1128,13 @@ remove_caveman_codex_config() {
     printf '%s\n' "$line" >> "$temp"
   done < "$config_path"
   mv "$temp" "$config_path"
-  printf 'removed known Caveman entries from %s\n' "$config_path"
+  report_event "Skills and Plugins" "Caveman" "Configuration Entries Removed" "$config_path Caveman entries" "ok"
 }
 
 uninstall_rtk_components() {
   local old_ifs agent args
 
+  current_tool="RTK"
   detect_rtk_agents
   if command -v rtk >/dev/null 2>&1 || [ "$dry_run" = "1" ]; then
     old_ifs="$IFS"
@@ -779,51 +1145,92 @@ uninstall_rtk_components() {
       [ -n "$agent" ] || continue
       args="$(rtk_init_arg "$agent")"
       # shellcheck disable=SC2086
-      run_cmd rtk init --uninstall $args
+      run_optional_uninstall_cmd rtk init --uninstall $args
       IFS=","
     done
     IFS="$old_ifs"
   else
-    printf 'warning: rtk not found; skipping RTK uninstall commands\n' >&2
+    report_event "Verification" "RTK" "Verification Issues" "rtk command not found; skipped external uninstall" "warn"
   fi
   remove_path "$HOME/.codex/RTK.md"
   remove_path "$HOME/.claude/RTK.md"
+  remove_path "$HOME/.agents/rules/antigravity-rtk-rules.md"
 }
 
 uninstall_caveman_components() {
+  local skill
+
+  current_tool="Caveman"
   if command -v npx >/dev/null 2>&1 || [ "$dry_run" = "1" ]; then
-    run_cmd npx -y github:JuliusBrussee/caveman -- --uninstall --non-interactive
-    run_cmd npx skills remove JuliusBrussee/caveman --all
+    run_optional_uninstall_cmd npx -y github:JuliusBrussee/caveman -- --uninstall --non-interactive
+    run_optional_uninstall_cmd npx skills remove JuliusBrussee/caveman --all
   else
-    printf 'warning: npx not found; skipping Caveman uninstall commands\n' >&2
+    report_event "Verification" "Caveman" "Verification Issues" "npx not found; skipped external uninstall" "warn"
   fi
   if command -v gemini >/dev/null 2>&1 || [ "$dry_run" = "1" ]; then
-    run_cmd gemini extensions uninstall caveman
+    run_optional_uninstall_cmd gemini extensions uninstall caveman
   fi
   remove_path "$HOME/.config/caveman/config.json"
+  for skill in caveman caveman-help caveman-review caveman-compress caveman-stats caveman-commit; do
+    remove_path "$HOME/.agents/skills/$skill"
+  done
   remove_caveman_claude_settings
   remove_caveman_codex_config
 }
 
 uninstall_selected_components() {
+  local old_ifs component used_manifest=0
+
   if [ -z "$uninstall_components" ] && [ "$non_interactive" = "1" ]; then
     uninstall_components="all available"
   fi
 
+  if [ ! -f "$manifest_path" ] || ! command -v node >/dev/null 2>&1; then
+    report_event "Configuration" "" "Configuration Entries Removed" "Install manifest missing or unreadable; used legacy cleanup fallback" "warn"
+    legacy_uninstall_selected_components
+    return
+  fi
+
+  old_ifs="$IFS"
+  IFS=","
+  for component in $(selected_components); do
+    IFS="$old_ifs"
+    component="$(printf '%s' "$component" | xargs)"
+    [ -n "$component" ] || continue
+    current_tool="$(tool_for_component "$component")"
+    if manifest_has_component "$component"; then
+      used_manifest=1
+      uninstall_manifest_component "$component"
+    else
+      report_event "Configuration" "" "Configuration Entries Removed" "Manifest missing $component records; used legacy fallback" "warn"
+      uninstall_components="$component"
+      legacy_uninstall_selected_components
+    fi
+    IFS=","
+  done
+  IFS="$old_ifs"
+  [ "$used_manifest" = "1" ] && report_event "Configuration" "" "Configuration Entries Removed" "Used install manifest $manifest_path" "ok"
+}
+
+legacy_uninstall_selected_components() {
   if component_selected "global-instructions"; then
-    reset_file_blank "$HOME/.claude/CLAUDE.md"
-    reset_file_blank "$HOME/.codex/AGENTS.md"
+    report_event "Instruction Files" "" "Files Updated" "Preserved CLAUDE.md" "ok"
+    report_event "Instruction Files" "" "Files Updated" "Preserved AGENTS.md" "ok"
+    report_preserved "$HOME/.claude/CLAUDE.md"
+    report_preserved "$HOME/.codex/AGENTS.md"
   fi
   if component_selected "project-templates"; then
-    remove_path "$HOME/.claude/CLAUDE.project-template.md"
-    remove_path "$HOME/.codex/AGENTS.project-template.md"
+    remove_template_path "$HOME/.claude/CLAUDE.project-template.md"
+    remove_template_path "$HOME/.codex/AGENTS.project-template.md"
   fi
   if component_selected "seeding"; then
+    current_tool="Seed Project"
     remove_path "$HOME/.agents/scripts/seed-project-instructions.sh"
     remove_path "$HOME/.agents/scripts/seed-project-instructions.ps1"
     remove_claude_seed_hook
   fi
   if component_selected "ignore-optimizer"; then
+    current_tool="Optimize-AI"
     remove_path "$HOME/.agents/scripts/optimize-ai.sh"
     remove_path "$HOME/.agents/scripts/optimize-ai.ps1"
   fi
@@ -836,13 +1243,16 @@ uninstall_selected_components() {
 }
 
 if [ "$uninstall" = "1" ]; then
+  uninstall_active=1
+  uninstall_report_file="$(mktemp)"
   if [ -z "$uninstall_components" ] && [ "$non_interactive" = "0" ]; then
     uninstall_components="$(prompt_uninstall_components)"
   elif [ -z "$uninstall_components" ]; then
     uninstall_components="all available"
   fi
   uninstall_selected_components
-  say "uninstall complete"
+  report_uninstall_summary
+  rm -f "$uninstall_report_file"
   exit 0
 fi
 
@@ -896,7 +1306,7 @@ copy_global_instruction_file "$ROOT/templates/CLAUDE.global.md" "$HOME/.claude/C
 render_global_instruction_template "$ROOT/templates/AGENTS.global.md" "$HOME/.codex/AGENTS.md"
 copy_project_template_file "$ROOT/templates/CLAUDE.project-template.md" "$HOME/.claude/CLAUDE.project-template.md"
 copy_project_template_file "$ROOT/templates/AGENTS.project-template.md" "$HOME/.codex/AGENTS.project-template.md"
-copy_managed_file "$ROOT/scripts/optimize-ai.sh" "$HOME/.agents/scripts/optimize-ai.sh"
+copy_managed_file "$ROOT/scripts/optimize-ai.sh" "$HOME/.agents/scripts/optimize-ai.sh" "ignore-optimizer"
 render_template "$ROOT/scripts/seed-project-instructions.sh" "$HOME/.agents/scripts/seed-project-instructions.sh"
 
 if [ "$dry_run" != "1" ]; then

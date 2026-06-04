@@ -20,7 +20,11 @@ $ErrorActionPreference = "Stop"
 
 $Root = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 $HomeDir = if ($env:TOKEN_SAVER_HOME) { $env:TOKEN_SAVER_HOME } else { [Environment]::GetFolderPath("UserProfile") }
+$ManifestPath = if ($env:TOKEN_SAVER_MANIFEST) { $env:TOKEN_SAVER_MANIFEST } else { Join-Path $HomeDir ".agents/install_manifest.json" }
 $CavemanModes = @("lite", "full", "ultra", "wenyan-lite", "wenyan-full", "wenyan-ultra")
+$UninstallActive = $false
+$UninstallReport = @()
+$CurrentTool = ""
 if (-not $ProjectScope) {
   $ProjectScope = Join-Path $HomeDir "Documents"
 }
@@ -28,6 +32,117 @@ if (-not $ProjectScope) {
 function Write-Setup {
   param([string]$Message)
   Write-Host $Message
+}
+
+function Add-UninstallReport {
+  param(
+    [string]$Section,
+    [string]$Tool,
+    [string]$Category,
+    [string]$Item,
+    [string]$Status = "ok"
+  )
+
+  $script:UninstallReport += [pscustomobject]@{
+    Section = $Section
+    Tool = $Tool
+    Category = $Category
+    Item = $Item
+    Status = $Status
+  }
+}
+
+function Get-ToolName {
+  param([string]$Component)
+  switch ($Component) {
+    "caveman" { return "Caveman" }
+    "rtk" { return "RTK" }
+    "ignore-optimizer" { return "Optimize-AI" }
+    "seeding" { return "Seed Project" }
+    default { return $Component }
+  }
+}
+
+function Show-UninstallReport {
+  if ($script:UninstallReport.Count -eq 0) {
+    return
+  }
+
+  function Rule([string]$Char = "-") { Write-Host ($Char * 50) }
+  function Section([string]$Name, [string]$Char = "-") { Write-Host $Name; Rule $Char }
+  function Mark([string]$Status) { if ($Status -eq "warn") { return "!" }; return "✓" }
+  function UniqueItems($Rows) { @($Rows | ForEach-Object { $_.Item } | Where-Object { $_ } | Select-Object -Unique) }
+  function PrintRows($Rows) { foreach ($row in $Rows) { Write-Host "$(Mark $row.Status) $($row.Item)" } }
+
+  $instruction = @($script:UninstallReport | Where-Object Section -eq "Instruction Files")
+  if ($instruction.Count) { Section "Instruction Files"; PrintRows $instruction; Write-Host "" }
+
+  $toolRows = @($script:UninstallReport | Where-Object Section -eq "Skills and Plugins")
+  if ($toolRows.Count) {
+    Section "Skills and Plugins" "="
+    foreach ($tool in @("Caveman", "RTK", "Optimize-AI", "Seed Project")) {
+      $owned = @($toolRows | Where-Object Tool -eq $tool)
+      if (-not $owned.Count) { continue }
+      Write-Host $tool
+      Rule "-"
+      foreach ($category in @("Directories Removed", "Files Removed", "Symlinks Removed", "Shell Commands Removed", "Aliases Removed", "PATH Entries Removed", "Environment Variables Removed", "Configuration Entries Removed")) {
+        $entries = @($owned | Where-Object Category -eq $category)
+        if (-not $entries.Count) { continue }
+        $items = UniqueItems $entries
+        Write-Host "$category ($($items.Count))"
+        foreach ($item in $items) { Write-Host "✓ $item" }
+      }
+      Write-Host "Status"
+      Write-Host "✓ Successfully Removed"
+      Write-Host ""
+    }
+  }
+
+  $templates = @($script:UninstallReport | Where-Object Section -eq "Templates")
+  if ($templates.Count) { Section "Templates"; PrintRows $templates; Write-Host "" }
+
+  $config = @($script:UninstallReport | Where-Object Section -eq "Configuration")
+  if ($config.Count) { Section "Configuration"; PrintRows $config; Write-Host "" }
+
+  $verification = @($script:UninstallReport | Where-Object Section -eq "Verification")
+  $tools = @($toolRows | ForEach-Object { $_.Tool } | Where-Object { $_ } | Select-Object -Unique)
+  if ($tools.Count -or $verification.Count) {
+    Section "Verification" "="
+    foreach ($tool in $tools) {
+      $issues = @($verification | Where-Object Tool -eq $tool)
+      Write-Host $tool
+      if (-not $issues.Count) {
+        Write-Host "✓ No managed artifacts remain"
+      } else {
+        foreach ($issue in $issues) {
+          Write-Host "! Remaining Artifact"
+          Write-Host "Path:"
+          Write-Host $issue.Item
+          Write-Host "Reason:"
+          Write-Host "Managed artifact still exists after uninstall."
+        }
+      }
+    }
+    Write-Host ""
+  }
+
+  $preserved = @($script:UninstallReport | Where-Object Section -eq "Preserved Files")
+  if ($preserved.Count) {
+    Section "Preserved Files"
+    foreach ($item in UniqueItems $preserved) { Write-Host "✓ $item" }
+    Write-Host ""
+  }
+
+  function CountCategory([string]$Category) { @(UniqueItems (@($script:UninstallReport | Where-Object Category -eq $Category))).Count }
+  Section "Summary"
+  Write-Host "Tools Removed: $($tools.Count)"
+  Write-Host "Directories Removed: $(CountCategory "Directories Removed")"
+  Write-Host "Files Removed: $(CountCategory "Files Removed")"
+  Write-Host "Symlinks Removed: $(CountCategory "Symlinks Removed")"
+  Write-Host "Shell Commands Removed: $(CountCategory "Shell Commands Removed")"
+  Write-Host "Files Updated: $((CountCategory "Files Updated") + (CountCategory "Configuration Entries Removed"))"
+  Write-Host "Files Preserved: $(CountCategory "Files Preserved")"
+  Write-Host "Verification Issues: $($verification.Count)"
 }
 
 function Invoke-SetupCommand {
@@ -46,6 +161,90 @@ function Invoke-SetupCommand {
   if ($LASTEXITCODE -ne 0) {
     throw "command failed: $($display -join ' ')"
   }
+}
+
+function Invoke-OptionalUninstallCommand {
+  param(
+    [string]$FilePath,
+    [string[]]$Arguments = @()
+  )
+
+  $display = @($FilePath) + $Arguments
+  if ($DryRun) {
+    if ($UninstallActive) {
+      Add-UninstallReport -Section "Skills and Plugins" -Tool $CurrentTool -Category "Shell Commands Removed" -Item ($display -join ' ')
+    } else {
+      Write-Setup "dry-run: $($display -join ' ')"
+    }
+    return
+  }
+
+  & $FilePath @Arguments
+  if ($LASTEXITCODE -ne 0) {
+    if ($UninstallActive) {
+      Add-UninstallReport -Section "Verification" -Tool $CurrentTool -Category "Verification Issues" -Item ($display -join ' ') -Status "warn"
+    } else {
+      Write-Warning "uninstall command failed: $($display -join ' ')"
+    }
+  } elseif ($UninstallActive) {
+    Add-UninstallReport -Section "Skills and Plugins" -Tool $CurrentTool -Category "Shell Commands Removed" -Item ($display -join ' ')
+  }
+}
+
+function Add-ManifestArtifact {
+  param(
+    [string]$Type,
+    [string]$Component,
+    [string]$Ownership,
+    [string]$Action,
+    [string]$Path,
+    [hashtable]$Details = @{}
+  )
+
+  if ($DryRun) {
+    Write-Setup "dry-run: would record manifest artifact $Component $Type $Path"
+    return
+  }
+
+  $parent = Split-Path -Parent $ManifestPath
+  New-Item -ItemType Directory -Force -Path $parent | Out-Null
+  if (Test-Path $ManifestPath) {
+    $raw = Get-Content -Raw $ManifestPath
+    $manifest = if ([string]::IsNullOrWhiteSpace($raw)) { [pscustomobject]@{} } else { $raw | ConvertFrom-Json }
+  } else {
+    $manifest = [pscustomobject]@{}
+  }
+  if (-not $manifest.PSObject.Properties["schemaVersion"]) { $manifest | Add-Member -MemberType NoteProperty -Name schemaVersion -Value 1 }
+  if (-not $manifest.PSObject.Properties["managedBy"]) { $manifest | Add-Member -MemberType NoteProperty -Name managedBy -Value "token-saver-setup" }
+  if (-not $manifest.PSObject.Properties["artifacts"]) { $manifest | Add-Member -MemberType NoteProperty -Name artifacts -Value @() }
+  $manifest.schemaVersion = 1
+  $manifest.managedBy = "token-saver-setup"
+  if ($manifest.PSObject.Properties["updatedAt"]) { $manifest.updatedAt = (Get-Date).ToUniversalTime().ToString("o") } else { $manifest | Add-Member -MemberType NoteProperty -Name updatedAt -Value (Get-Date).ToUniversalTime().ToString("o") }
+
+  $detailObject = [pscustomobject]$Details
+  $id = @($Component, $Type, $Path, $Details["key"], $Details["command"]) -join ":"
+  $artifact = [pscustomobject]@{
+    id = $id
+    type = $Type
+    component = $Component
+    ownership = $Ownership
+    action = $Action
+    path = $Path
+    details = $detailObject
+    recordedAt = (Get-Date).ToUniversalTime().ToString("o")
+  }
+  $items = @($manifest.artifacts | Where-Object { $_.id -ne $id })
+  $manifest.artifacts = @($items) + $artifact
+  $manifest | ConvertTo-Json -Depth 20 | Set-Content -Encoding UTF8 $ManifestPath
+}
+
+function Add-ManifestDirectory {
+  param(
+    [string]$Path,
+    [string]$Component,
+    [string]$Ownership = "installer-created"
+  )
+  Add-ManifestArtifact -Type "directory" -Component $Component -Ownership $Ownership -Action "created-or-ensured" -Path $Path
 }
 
 function Read-YesNo {
@@ -114,7 +313,8 @@ function Assert-CavemanMode {
 function Copy-ManagedFile {
   param(
     [string]$Source,
-    [string]$Target
+    [string]$Target,
+    [string]$Component = "managed-file"
   )
 
   if ($DryRun) {
@@ -128,11 +328,18 @@ function Copy-ManagedFile {
     return
   }
 
+  $existed = Test-Path $Target
   $parent = Split-Path -Parent $Target
   New-Item -ItemType Directory -Force -Path $parent | Out-Null
 
   if ((-not (Test-Path $Target)) -or $Overwrite) {
+    Add-ManifestDirectory -Path $parent -Component $Component
     Copy-Item -Force $Source $Target
+    if ($existed) {
+      Add-ManifestArtifact -Type "file" -Component $Component -Ownership "user-owned" -Action "modified" -Path $Target
+    } else {
+      Add-ManifestArtifact -Type "file" -Component $Component -Ownership "installer-created" -Action "created" -Path $Target
+    }
     Write-Setup "installed $Target"
     return
   }
@@ -162,17 +369,26 @@ function Copy-GlobalInstructionFile {
     return
   }
 
+  $existed = Test-Path $Target
   $parent = Split-Path -Parent $Target
   New-Item -ItemType Directory -Force -Path $parent | Out-Null
 
   if (-not (Test-Path $Target)) {
+    Add-ManifestDirectory -Path $parent -Component "global-instructions"
     Copy-Item -Force $Source $Target
+    Add-ManifestArtifact -Type "global_instruction_file" -Component "global-instructions" -Ownership "installer-created" -Action "created" -Path $Target
     Write-Setup "installed $Target"
     return
   }
 
   if ($OverwriteGlobalInstructions) {
+    Add-ManifestDirectory -Path $parent -Component "global-instructions"
     Copy-Item -Force $Source $Target
+    if ($existed) {
+      Add-ManifestArtifact -Type "global_instruction_file" -Component "global-instructions" -Ownership "user-owned" -Action "modified" -Path $Target
+    } else {
+      Add-ManifestArtifact -Type "global_instruction_file" -Component "global-instructions" -Ownership "installer-created" -Action "created" -Path $Target
+    }
     Write-Setup "overwrote $Target"
     return
   }
@@ -197,17 +413,26 @@ function Copy-ProjectTemplateFile {
     return
   }
 
+  $existed = Test-Path $Target
   $parent = Split-Path -Parent $Target
   New-Item -ItemType Directory -Force -Path $parent | Out-Null
 
   if (-not (Test-Path $Target)) {
+    Add-ManifestDirectory -Path $parent -Component "project-templates"
     Copy-Item -Force $Source $Target
+    Add-ManifestArtifact -Type "project_template_file" -Component "project-templates" -Ownership "installer-created" -Action "created" -Path $Target
     Write-Setup "installed $Target"
     return
   }
 
   if ($OverwriteProjectTemplates -or $Overwrite) {
+    Add-ManifestDirectory -Path $parent -Component "project-templates"
     Copy-Item -Force $Source $Target
+    if ($existed) {
+      Add-ManifestArtifact -Type "project_template_file" -Component "project-templates" -Ownership "user-owned" -Action "modified" -Path $Target
+    } else {
+      Add-ManifestArtifact -Type "project_template_file" -Component "project-templates" -Ownership "installer-created" -Action "created" -Path $Target
+    }
     Write-Setup "overwrote $Target"
     return
   }
@@ -226,7 +451,7 @@ function Copy-RenderedFile {
     $content = Get-Content -Raw $Source
     $content = $content.Replace("{{HOME}}", $HomeDir).Replace("{{PROJECT_SCOPE}}", $ProjectScope)
     Set-Content -NoNewline -Encoding UTF8 -Path $temp -Value $content
-    Copy-ManagedFile -Source $temp -Target $Target
+    Copy-ManagedFile -Source $temp -Target $Target -Component "seeding"
   } finally {
     Remove-Item -Force $temp -ErrorAction SilentlyContinue
   }
@@ -301,6 +526,7 @@ function Ensure-ClaudeSessionHook {
   $data.hooks.SessionStart = $sessionStart
   $data | ConvertTo-Json -Depth 20 | Set-Content -Encoding UTF8 $settingsPath
   Write-Setup "added SessionStart hook to $settingsPath"
+  Add-ManifestArtifact -Type "settings_entry" -Component "seeding" -Ownership "user-owned" -Action "ensured" -Path $settingsPath -Details @{ key = "hooks.SessionStart"; command = "seed-project-instructions.ps1" }
 }
 
 function Install-RtkBinary {
@@ -458,7 +684,9 @@ function Initialize-RtkAgents {
     if (-not $cleanAgent) {
       continue
     }
-    Invoke-SetupCommand -FilePath "rtk" -Arguments (Get-RtkInitArgs -Agent $cleanAgent)
+    $initArgs = Get-RtkInitArgs -Agent $cleanAgent
+    Invoke-SetupCommand -FilePath "rtk" -Arguments $initArgs
+    Add-ManifestArtifact -Type "generated_tool_reference" -Component "rtk" -Ownership "external" -Action "initialized" -Path "rtk" -Details @{ agent = $cleanAgent; command = "rtk $($initArgs -join ' ')" }
   }
 }
 
@@ -556,6 +784,8 @@ function Install-CavemanTool {
   }
   $args = @("-y", "github:JuliusBrussee/caveman", "--") + $installerArgs
   Invoke-SetupCommand -FilePath "npx" -Arguments $args
+  Add-ManifestArtifact -Type "file" -Component "caveman" -Ownership "installer-created" -Action "created-or-modified" -Path (Join-Path $HomeDir ".config/caveman/config.json")
+  Add-ManifestArtifact -Type "generated_tool_reference" -Component "caveman" -Ownership "external" -Action "installed" -Path "npx" -Details @{ command = "npx $($args -join ' ')" }
   Install-CavemanAgentFallbacks
 }
 
@@ -586,16 +816,105 @@ function Reset-FileBlank {
 function Remove-ManagedPath {
   param([string]$Path)
 
+  $category = if (Test-Path $Path -PathType Container) { "Directories Removed" } else { "Files Removed" }
   if ($DryRun) {
-    Write-Setup "dry-run: would remove $Path"
+    if ($UninstallActive) {
+      Add-UninstallReport -Section "Skills and Plugins" -Tool $CurrentTool -Category $category -Item $Path
+    } else {
+      Write-Setup "dry-run: would remove $Path"
+    }
     return
   }
 
   if (Test-Path $Path) {
-    Remove-Item -Force $Path
-    Write-Setup "removed $Path"
+    Remove-Item -Recurse -Force $Path
+    if ($UninstallActive) {
+      Add-UninstallReport -Section "Skills and Plugins" -Tool $CurrentTool -Category $category -Item $Path
+    } else {
+      Write-Setup "removed $Path"
+    }
   } else {
-    Write-Setup "already absent $Path"
+    if (-not $UninstallActive) {
+      Write-Setup "already absent $Path"
+    }
+  }
+}
+
+function Remove-TemplatePath {
+  param([string]$Path)
+
+  if ($DryRun) {
+    Add-UninstallReport -Section "Templates" -Tool "" -Category "Files Removed" -Item $Path
+    return
+  }
+  if (Test-Path $Path) {
+    Remove-Item -Recurse -Force $Path
+    Add-UninstallReport -Section "Templates" -Tool "" -Category "Files Removed" -Item $Path
+  }
+}
+
+function Get-SelectedUninstallComponents {
+  if ([string]::IsNullOrWhiteSpace($UninstallComponents) -or $UninstallComponents -in @("all", "all available", "all-available")) {
+    return @("global-instructions", "project-templates", "seeding", "ignore-optimizer", "rtk", "caveman")
+  }
+  return @($UninstallComponents.Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+}
+
+function Get-Manifest {
+  if (-not (Test-Path $ManifestPath)) {
+    return $null
+  }
+  try {
+    $raw = Get-Content -Raw $ManifestPath
+    if ([string]::IsNullOrWhiteSpace($raw)) {
+      return $null
+    }
+    return $raw | ConvertFrom-Json
+  } catch {
+    return $null
+  }
+}
+
+function Test-ManifestComponent {
+  param(
+    [object]$Manifest,
+    [string]$Component
+  )
+  return @($Manifest.artifacts | Where-Object { $_.component -eq $Component }).Count -gt 0
+}
+
+function Uninstall-ManifestComponent {
+  param(
+    [object]$Manifest,
+    [string]$Component
+  )
+
+  foreach ($artifact in @($Manifest.artifacts | Where-Object { $_.component -eq $Component })) {
+    switch ($artifact.type) {
+      { $_ -in @("file", "global_instruction_file", "project_template_file") } {
+        if ($artifact.ownership -eq "installer-created") {
+          if ($Component -eq "project-templates") {
+            Remove-TemplatePath -Path $artifact.path
+          } else {
+            $script:CurrentTool = Get-ToolName $Component
+            Remove-ManagedPath -Path $artifact.path
+          }
+        } else {
+          Add-UninstallReport -Section "Preserved Files" -Tool "" -Category "Files Preserved" -Item $artifact.path
+        }
+      }
+      "directory" {
+        continue
+      }
+      "settings_entry" {
+        if ($Component -eq "seeding") { Remove-ClaudeSeedHook }
+        if ($Component -eq "caveman") { Remove-CavemanClaudeSettings }
+      }
+      "generated_tool_reference" {
+        if ($Component -eq "rtk") { Uninstall-RtkComponents }
+        if ($Component -eq "caveman") { Uninstall-CavemanComponents }
+      }
+    }
   }
 }
 
@@ -603,7 +922,11 @@ function Remove-ClaudeSeedHook {
   $settingsPath = Join-Path $HomeDir ".claude/settings.json"
 
   if ($DryRun) {
-    Write-Setup "dry-run: would remove token-saver SessionStart hooks from $settingsPath"
+    if ($UninstallActive) {
+      Add-UninstallReport -Section "Skills and Plugins" -Tool "Seed Project" -Category "Configuration Entries Removed" -Item "$settingsPath hooks.SessionStart"
+    } else {
+      Write-Setup "dry-run: would remove token-saver SessionStart hooks from $settingsPath"
+    }
     return
   }
   if (-not (Test-Path $settingsPath)) {
@@ -621,17 +944,21 @@ function Remove-ClaudeSeedHook {
         $entries += $entry
       }
     }
-    $data.hooks.SessionStart = $entries
+  $data.hooks.SessionStart = $entries
   }
   $data | ConvertTo-Json -Depth 20 | Set-Content -Encoding UTF8 $settingsPath
-  Write-Setup "removed token-saver SessionStart hooks from $settingsPath"
+  Add-UninstallReport -Section "Skills and Plugins" -Tool "Seed Project" -Category "Configuration Entries Removed" -Item "$settingsPath hooks.SessionStart"
 }
 
 function Remove-CavemanClaudeSettings {
   $settingsPath = Join-Path $HomeDir ".claude/settings.json"
 
   if ($DryRun) {
-    Write-Setup "dry-run: would remove Caveman entries from $settingsPath"
+    if ($UninstallActive) {
+      Add-UninstallReport -Section "Skills and Plugins" -Tool "Caveman" -Category "Configuration Entries Removed" -Item "$settingsPath Caveman entries"
+    } else {
+      Write-Setup "dry-run: would remove Caveman entries from $settingsPath"
+    }
     return
   }
   if (-not (Test-Path $settingsPath)) {
@@ -667,14 +994,18 @@ function Remove-CavemanClaudeSettings {
     }
   }
   $data | ConvertTo-Json -Depth 20 | Set-Content -Encoding UTF8 $settingsPath
-  Write-Setup "removed Caveman entries from $settingsPath"
+  Add-UninstallReport -Section "Skills and Plugins" -Tool "Caveman" -Category "Configuration Entries Removed" -Item "$settingsPath Caveman entries"
 }
 
 function Remove-CavemanCodexConfig {
   $configPath = Join-Path $HomeDir ".codex/config.toml"
 
   if ($DryRun) {
-    Write-Setup "dry-run: would remove known Caveman entries from $configPath"
+    if ($UninstallActive) {
+      Add-UninstallReport -Section "Skills and Plugins" -Tool "Caveman" -Category "Configuration Entries Removed" -Item "$configPath Caveman entries"
+    } else {
+      Write-Setup "dry-run: would remove known Caveman entries from $configPath"
+    }
     return
   }
   if (-not (Test-Path $configPath)) {
@@ -700,10 +1031,11 @@ function Remove-CavemanCodexConfig {
     $out.Add($line)
   }
   Set-Content -Encoding UTF8 -Path $configPath -Value $out
-  Write-Setup "removed known Caveman entries from $configPath"
+  Add-UninstallReport -Section "Skills and Plugins" -Tool "Caveman" -Category "Configuration Entries Removed" -Item "$configPath Caveman entries"
 }
 
 function Uninstall-RtkComponents {
+  $script:CurrentTool = "RTK"
   Detect-RtkAgents
   foreach ($agent in $RtkAgents.Split(",")) {
     $cleanAgent = $agent.Trim()
@@ -712,24 +1044,29 @@ function Uninstall-RtkComponents {
     }
     if ((Get-Command rtk -ErrorAction SilentlyContinue) -or $DryRun) {
       $args = @("init", "--uninstall") + @((Get-RtkInitArgs -Agent $cleanAgent)[1..((Get-RtkInitArgs -Agent $cleanAgent).Count - 1)])
-      Invoke-SetupCommand -FilePath "rtk" -Arguments $args
+      Invoke-OptionalUninstallCommand -FilePath "rtk" -Arguments $args
     }
   }
   Remove-ManagedPath -Path (Join-Path $HomeDir ".codex/RTK.md")
   Remove-ManagedPath -Path (Join-Path $HomeDir ".claude/RTK.md")
+  Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/rules/antigravity-rtk-rules.md")
 }
 
 function Uninstall-CavemanComponents {
+  $script:CurrentTool = "Caveman"
   if ((Get-Command npx -ErrorAction SilentlyContinue) -or $DryRun) {
-    Invoke-SetupCommand -FilePath "npx" -Arguments @("-y", "github:JuliusBrussee/caveman", "--", "--uninstall", "--non-interactive")
-    Invoke-SetupCommand -FilePath "npx" -Arguments @("skills", "remove", "JuliusBrussee/caveman", "--all")
+    Invoke-OptionalUninstallCommand -FilePath "npx" -Arguments @("-y", "github:JuliusBrussee/caveman", "--", "--uninstall", "--non-interactive")
+    Invoke-OptionalUninstallCommand -FilePath "npx" -Arguments @("skills", "remove", "JuliusBrussee/caveman", "--all")
   } else {
-    Write-Warning "npx not found; skipping Caveman uninstall commands"
+    Add-UninstallReport -Section "Verification" -Tool "Caveman" -Category "Verification Issues" -Item "npx not found; skipped external uninstall" -Status "warn"
   }
   if ((Get-Command gemini -ErrorAction SilentlyContinue) -or $DryRun) {
-    Invoke-SetupCommand -FilePath "gemini" -Arguments @("extensions", "uninstall", "caveman")
+    Invoke-OptionalUninstallCommand -FilePath "gemini" -Arguments @("extensions", "uninstall", "caveman")
   }
   Remove-ManagedPath -Path (Join-Path $HomeDir ".config/caveman/config.json")
+  foreach ($skill in @("caveman", "caveman-help", "caveman-review", "caveman-compress", "caveman-stats", "caveman-commit")) {
+    Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/skills/$skill")
+  }
   Remove-CavemanClaudeSettings
   Remove-CavemanCodexConfig
 }
@@ -738,20 +1075,51 @@ function Invoke-Uninstall {
   if ([string]::IsNullOrWhiteSpace($script:UninstallComponents) -or $script:UninstallComponents -in @("all", "all available", "all-available")) {
     $script:UninstallComponents = "all available"
   }
+  $manifest = Get-Manifest
+  if (-not $manifest) {
+    Add-UninstallReport -Section "Configuration" -Tool "" -Category "Configuration Entries Removed" -Item "Install manifest missing or unreadable; used legacy cleanup fallback" -Status "warn"
+    Invoke-LegacyUninstall
+    return
+  }
+
+  $usedManifest = $false
+  foreach ($component in Get-SelectedUninstallComponents) {
+    $script:CurrentTool = Get-ToolName $component
+    if (Test-ManifestComponent -Manifest $manifest -Component $component) {
+      $usedManifest = $true
+      Uninstall-ManifestComponent -Manifest $manifest -Component $component
+    } else {
+      Add-UninstallReport -Section "Configuration" -Tool "" -Category "Configuration Entries Removed" -Item "Manifest missing $component records; used legacy fallback" -Status "warn"
+      $oldComponents = $script:UninstallComponents
+      $script:UninstallComponents = $component
+      Invoke-LegacyUninstall
+      $script:UninstallComponents = $oldComponents
+    }
+  }
+  if ($usedManifest) {
+    Add-UninstallReport -Section "Configuration" -Tool "" -Category "Configuration Entries Removed" -Item "Used install manifest $ManifestPath"
+  }
+}
+
+function Invoke-LegacyUninstall {
   if (Test-UninstallComponent "global-instructions") {
-    Reset-FileBlank -Path (Join-Path $HomeDir ".claude/CLAUDE.md")
-    Reset-FileBlank -Path (Join-Path $HomeDir ".codex/AGENTS.md")
+    Add-UninstallReport -Section "Instruction Files" -Tool "" -Category "Files Updated" -Item "Preserved CLAUDE.md"
+    Add-UninstallReport -Section "Instruction Files" -Tool "" -Category "Files Updated" -Item "Preserved AGENTS.md"
+    Add-UninstallReport -Section "Preserved Files" -Tool "" -Category "Files Preserved" -Item (Join-Path $HomeDir ".claude/CLAUDE.md")
+    Add-UninstallReport -Section "Preserved Files" -Tool "" -Category "Files Preserved" -Item (Join-Path $HomeDir ".codex/AGENTS.md")
   }
   if (Test-UninstallComponent "project-templates") {
-    Remove-ManagedPath -Path (Join-Path $HomeDir ".claude/CLAUDE.project-template.md")
-    Remove-ManagedPath -Path (Join-Path $HomeDir ".codex/AGENTS.project-template.md")
+    Remove-TemplatePath -Path (Join-Path $HomeDir ".claude/CLAUDE.project-template.md")
+    Remove-TemplatePath -Path (Join-Path $HomeDir ".codex/AGENTS.project-template.md")
   }
   if (Test-UninstallComponent "seeding") {
+    $script:CurrentTool = "Seed Project"
     Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.sh")
     Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.ps1")
     Remove-ClaudeSeedHook
   }
   if (Test-UninstallComponent "ignore-optimizer") {
+    $script:CurrentTool = "Optimize-AI"
     Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/scripts/optimize-ai.sh")
     Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/scripts/optimize-ai.ps1")
   }
@@ -764,6 +1132,7 @@ function Invoke-Uninstall {
 }
 
 if ($Uninstall) {
+  $UninstallActive = $true
   if (-not $UninstallComponents -and -not $NonInteractive) {
     $UninstallComponents = Prompt-UninstallComponents
   } elseif (-not $UninstallComponents) {
@@ -777,7 +1146,7 @@ if ($Uninstall) {
   }
 
   Invoke-Uninstall
-  Write-Setup "uninstall complete"
+  Show-UninstallReport
   $global:LASTEXITCODE = 0
   exit 0
 }
@@ -823,7 +1192,7 @@ Copy-GlobalInstructionFile -Source (Join-Path $Root "templates/CLAUDE.global.md"
 Copy-RenderedGlobalInstructionFile -Source (Join-Path $Root "templates/AGENTS.global.md") -Target (Join-Path $HomeDir ".codex/AGENTS.md")
 Copy-ProjectTemplateFile -Source (Join-Path $Root "templates/CLAUDE.project-template.md") -Target (Join-Path $HomeDir ".claude/CLAUDE.project-template.md")
 Copy-ProjectTemplateFile -Source (Join-Path $Root "templates/AGENTS.project-template.md") -Target (Join-Path $HomeDir ".codex/AGENTS.project-template.md")
-Copy-ManagedFile -Source (Join-Path $Root "scripts/optimize-ai.ps1") -Target (Join-Path $HomeDir ".agents/scripts/optimize-ai.ps1")
+Copy-ManagedFile -Source (Join-Path $Root "scripts/optimize-ai.ps1") -Target (Join-Path $HomeDir ".agents/scripts/optimize-ai.ps1") -Component "ignore-optimizer"
 Copy-RenderedFile -Source (Join-Path $Root "scripts/seed-project-instructions.ps1") -Target (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.ps1")
 Copy-RenderedFile -Source (Join-Path $Root "scripts/seed-project-instructions.sh") -Target (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.sh")
 

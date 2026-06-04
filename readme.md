@@ -142,6 +142,8 @@ This repo includes the files needed to install and maintain the instruction setu
 Installer behavior:
 
 - Creates missing target files.
+- Writes a machine-readable manifest to `~/.agents/install_manifest.json`.
+- Records managed created or modified files, directories, settings entries, generated tool references, and installer-owned versus user-owned artifacts.
 - Skips existing global Claude/Codex instruction files unless the global-instruction overwrite option is selected.
 - Skips existing managed files when they differ unless an overwrite option is selected.
 - Installs the seeding scripts to `~/.agents/scripts/`.
@@ -154,8 +156,12 @@ Installer behavior:
 
 Uninstall behavior:
 
+- Uses `~/.agents/install_manifest.json` as the source of truth when available.
+- Deletes files only when the manifest records them as installer-created full files.
+- Preserves user-owned `CLAUDE.md`, `AGENTS.md`, settings files, and other user-owned files unless a removable managed section is recorded.
+- Falls back to legacy cleanup rules when the manifest is missing or has no records for a selected component, and reports that fallback.
 - Prompts for components with `global-instructions`, `project-templates`, `seeding`, `ignore-optimizer`, `rtk`, `caveman`, or `all available`.
-- `global-instructions` blanks `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`.
+- `global-instructions` removes manifest-owned instruction files, or preserves user-owned instruction files.
 - `project-templates` removes `~/.claude/CLAUDE.project-template.md` and `~/.codex/AGENTS.project-template.md`.
 - `seeding` removes token-saver seeding scripts and matching Claude `SessionStart` hooks.
 - `ignore-optimizer` removes token-saver optimizer scripts.
