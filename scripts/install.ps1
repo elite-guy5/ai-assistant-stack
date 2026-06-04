@@ -87,9 +87,20 @@ function Show-UninstallReport {
       if (-not $owned.Count) { continue }
       Write-Host $tool
       Rule "-"
+      $removedDirs = @(UniqueItems (@($owned | Where-Object Category -eq "Directories Removed")))
       foreach ($category in @("Directories Removed", "Files Removed", "Symlinks Removed", "Shell Commands Removed", "Aliases Removed", "PATH Entries Removed", "Environment Variables Removed", "Configuration Entries Removed")) {
         $entries = @($owned | Where-Object Category -eq $category)
         if (-not $entries.Count) { continue }
+        if ($category -eq "Files Removed" -and $removedDirs.Count) {
+          $entries = @($entries | Where-Object {
+            $file = $_.Item
+            -not @($removedDirs | Where-Object {
+              $dir = $_.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+              $file.StartsWith($dir + [IO.Path]::DirectorySeparatorChar) -or $file.StartsWith($dir + [IO.Path]::AltDirectorySeparatorChar)
+            }).Count
+          })
+          if (-not $entries.Count) { continue }
+        }
         $items = UniqueItems $entries
         Write-Host "$category ($($items.Count))"
         foreach ($item in $items) { Write-Host "✓ $item" }
@@ -286,18 +297,24 @@ function Read-TextDefault {
 }
 
 function Prompt-UninstallComponents {
+  $selected = @()
+
+  if (Read-YesNo "Reset all instruction files?" $false) {
+    $selected += "reset-global-instructions"
+    $selected += "project-instructions"
+  } elseif (Read-YesNo "Reset only project instruction sections?" $false) {
+    $selected += "project-instructions"
+  } else {
+    $selected += "global-instructions"
+  }
+
   $components = @(
-    'global-instructions',
-    'reset-global-instructions',
-    'project-instructions',
     'project-templates',
     'seeding',
     'ignore-optimizer',
     'rtk',
     'caveman'
   )
-  $selected = @()
-
   foreach ($component in $components) {
     if (Read-YesNo "Remove $component?" $false) {
       $selected += $component
@@ -831,6 +848,14 @@ function Remove-ManagedPath {
   }
 }
 
+function Remove-MatchingManagedPaths {
+  param([string]$Pattern)
+
+  foreach ($path in Get-ChildItem -Force -Path $Pattern -ErrorAction SilentlyContinue) {
+    Remove-ManagedPath -Path $path.FullName
+  }
+}
+
 function Remove-TemplatePath {
   param([string]$Path)
 
@@ -841,6 +866,14 @@ function Remove-TemplatePath {
   if (Test-Path $Path) {
     Remove-Item -Recurse -Force $Path
     Add-UninstallReport -Section "Templates" -Tool "" -Category "Files Removed" -Item $Path
+  }
+}
+
+function Remove-MatchingTemplatePaths {
+  param([string]$Pattern)
+
+  foreach ($path in Get-ChildItem -Force -Path $Pattern -ErrorAction SilentlyContinue) {
+    Remove-TemplatePath -Path $path.FullName
   }
 }
 
@@ -1102,6 +1135,7 @@ function Uninstall-RtkComponents {
   Remove-ManagedPath -Path (Join-Path $HomeDir ".codex/RTK.md")
   Remove-ManagedPath -Path (Join-Path $HomeDir ".claude/RTK.md")
   Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/rules/antigravity-rtk-rules.md")
+  Remove-MatchingManagedPaths -Pattern (Join-Path $HomeDir ".agents/rules/*rtk*")
 }
 
 function Uninstall-CavemanComponents {
@@ -1116,9 +1150,14 @@ function Uninstall-CavemanComponents {
     Invoke-OptionalUninstallCommand -FilePath "gemini" -Arguments @("extensions", "uninstall", "caveman")
   }
   Remove-ManagedPath -Path (Join-Path $HomeDir ".config/caveman/config.json")
+  Remove-ManagedPath -Path (Join-Path $HomeDir ".config/caveman")
+  Remove-ManagedPath -Path (Join-Path $HomeDir ".claude/plugins/cache/caveman")
+  Remove-ManagedPath -Path (Join-Path $HomeDir ".claude/plugins/marketplaces/caveman")
   foreach ($skill in @("caveman", "caveman-help", "caveman-review", "caveman-compress", "caveman-stats", "caveman-commit")) {
     Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/skills/$skill")
+    Remove-ManagedPath -Path (Join-Path $HomeDir ".claude/skills/$skill")
   }
+  Remove-MatchingManagedPaths -Pattern (Join-Path $HomeDir ".claude/projects/*caveman*")
   Remove-CavemanClaudeSettings
   Remove-CavemanCodexConfig
 }
@@ -1169,17 +1208,23 @@ function Invoke-LegacyUninstall {
   if (Test-UninstallComponent "project-templates") {
     Remove-TemplatePath -Path (Join-Path $HomeDir ".claude/CLAUDE.project-template.md")
     Remove-TemplatePath -Path (Join-Path $HomeDir ".codex/AGENTS.project-template.md")
+    Remove-MatchingTemplatePaths -Pattern (Join-Path $HomeDir ".claude/CLAUDE.project-template.md.new")
+    Remove-MatchingTemplatePaths -Pattern (Join-Path $HomeDir ".codex/AGENTS.project-template.md.new")
   }
   if (Test-UninstallComponent "seeding") {
     $script:CurrentTool = "Seed Project"
     Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.sh")
     Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.ps1")
+    Remove-MatchingManagedPaths -Pattern (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.sh.new")
+    Remove-MatchingManagedPaths -Pattern (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.ps1.new")
     Remove-ClaudeSeedHook
   }
   if (Test-UninstallComponent "ignore-optimizer") {
     $script:CurrentTool = "Optimize-AI"
     Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/scripts/optimize-ai.sh")
     Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/scripts/optimize-ai.ps1")
+    Remove-MatchingManagedPaths -Pattern (Join-Path $HomeDir ".agents/scripts/optimize-ai.sh.new")
+    Remove-MatchingManagedPaths -Pattern (Join-Path $HomeDir ".agents/scripts/optimize-ai.ps1.new")
   }
   if (Test-UninstallComponent "rtk") {
     Uninstall-RtkComponents

@@ -745,7 +745,16 @@ component_selected() {
 
 prompt_uninstall_components() {
   local component selected=""
-  for component in global-instructions reset-global-instructions project-instructions project-templates seeding ignore-optimizer rtk caveman; do
+
+  if prompt_yes_no "Reset all instruction files?" "no"; then
+    selected="reset-global-instructions,project-instructions"
+  elif prompt_yes_no "Reset only project instruction sections?" "no"; then
+    selected="project-instructions"
+  else
+    selected="global-instructions"
+  fi
+
+  for component in project-templates seeding ignore-optimizer rtk caveman; do
     if prompt_yes_no "Remove ${component//-/ }?" "no"; then
       selected="${selected:+$selected,}$component"
     fi
@@ -795,6 +804,18 @@ remove_template_path() {
     rm -rf "$target"
     report_event "Templates" "" "Files Removed" "$target" "ok"
   fi
+}
+
+remove_template_glob() {
+  local pattern="$1"
+  local old_nullglob path
+
+  old_nullglob="$(shopt -p nullglob || true)"
+  shopt -s nullglob
+  for path in $pattern; do
+    remove_template_path "$path"
+  done
+  eval "$old_nullglob" 2>/dev/null || true
 }
 
 remove_project_instruction_sections() {
@@ -899,12 +920,15 @@ if (toolRows.length) {
     if (!owned.length) continue;
     console.log(tool);
     printRule("-");
+    const removedDirs = suppressDescendants(owned.filter((r) => r.category === "Directories Removed").map((r) => r.item));
     for (const category of ["Directories Removed", "Files Removed", "Symlinks Removed", "Shell Commands Removed", "Aliases Removed", "PATH Entries Removed", "Environment Variables Removed", "Configuration Entries Removed"]) {
       let entries = owned.filter((r) => r.category === category);
       if (!entries.length) continue;
-      if (category === "Directories Removed" || category === "Files Removed") {
-        const suppressed = new Set(suppressDescendants(entries.map((r) => r.item)));
+      if (category === "Directories Removed") {
+        const suppressed = new Set(removedDirs);
         entries = entries.filter((r) => suppressed.has(r.item));
+      } else if (category === "Files Removed") {
+        entries = entries.filter((r) => !removedDirs.some((dir) => r.item.startsWith(dir.replace(/\/$/, "") + "/")));
       }
       console.log(`${category} (${unique(entries.map((r) => r.item)).length})`);
       for (const item of unique(entries.map((r) => r.item))) console.log(`✓ ${item}`);
@@ -996,6 +1020,18 @@ remove_path() {
   else
     [ "$uninstall_active" = "1" ] || printf 'already absent %s\n' "$target"
   fi
+}
+
+remove_glob_paths() {
+  local pattern="$1"
+  local old_nullglob path
+
+  old_nullglob="$(shopt -p nullglob || true)"
+  shopt -s nullglob
+  for path in $pattern; do
+    remove_path "$path"
+  done
+  eval "$old_nullglob" 2>/dev/null || true
 }
 
 selected_components() {
@@ -1223,6 +1259,7 @@ uninstall_rtk_components() {
   remove_path "$HOME/.codex/RTK.md"
   remove_path "$HOME/.claude/RTK.md"
   remove_path "$HOME/.agents/rules/antigravity-rtk-rules.md"
+  remove_glob_paths "$HOME/.agents/rules/*rtk*"
 }
 
 uninstall_caveman_components() {
@@ -1239,9 +1276,14 @@ uninstall_caveman_components() {
     run_optional_uninstall_cmd gemini extensions uninstall caveman
   fi
   remove_path "$HOME/.config/caveman/config.json"
+  remove_path "$HOME/.config/caveman"
+  remove_path "$HOME/.claude/plugins/cache/caveman"
+  remove_path "$HOME/.claude/plugins/marketplaces/caveman"
   for skill in caveman caveman-help caveman-review caveman-compress caveman-stats caveman-commit; do
     remove_path "$HOME/.agents/skills/$skill"
+    remove_path "$HOME/.claude/skills/$skill"
   done
+  remove_glob_paths "$HOME/.claude/projects/*caveman*"
   remove_caveman_claude_settings
   remove_caveman_codex_config
 }
@@ -1296,17 +1338,23 @@ legacy_uninstall_selected_components() {
   if component_selected "project-templates"; then
     remove_template_path "$HOME/.claude/CLAUDE.project-template.md"
     remove_template_path "$HOME/.codex/AGENTS.project-template.md"
+    remove_template_glob "$HOME/.claude/CLAUDE.project-template.md.new"
+    remove_template_glob "$HOME/.codex/AGENTS.project-template.md.new"
   fi
   if component_selected "seeding"; then
     current_tool="Seed Project"
     remove_path "$HOME/.agents/scripts/seed-project-instructions.sh"
     remove_path "$HOME/.agents/scripts/seed-project-instructions.ps1"
+    remove_glob_paths "$HOME/.agents/scripts/seed-project-instructions.sh.new"
+    remove_glob_paths "$HOME/.agents/scripts/seed-project-instructions.ps1.new"
     remove_claude_seed_hook
   fi
   if component_selected "ignore-optimizer"; then
     current_tool="Optimize-AI"
     remove_path "$HOME/.agents/scripts/optimize-ai.sh"
     remove_path "$HOME/.agents/scripts/optimize-ai.ps1"
+    remove_glob_paths "$HOME/.agents/scripts/optimize-ai.sh.new"
+    remove_glob_paths "$HOME/.agents/scripts/optimize-ai.ps1.new"
   fi
   if component_selected "rtk"; then
     uninstall_rtk_components
