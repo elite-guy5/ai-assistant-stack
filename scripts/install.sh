@@ -603,14 +603,8 @@ component_selected() {
   local wanted="$1"
   local old_ifs component
 
-  case "$uninstall_components" in
-    ""|all|"all available"|"all-available")
-      return 0
-      ;;
-  esac
-
   old_ifs="$IFS"
-  IFS=","
+  IFS="," 
   for component in $uninstall_components; do
     IFS="$old_ifs"
     component="$(printf '%s' "$component" | xargs)"
@@ -618,14 +612,20 @@ component_selected() {
       IFS="$old_ifs"
       return 0
     fi
-    IFS=","
+    IFS="," 
   done
   IFS="$old_ifs"
   return 1
 }
 
-reset_file_blank() {
-  local target="$1"
+prompt_uninstall_components() {
+  local component selected=""
+  for component in global-instructions project-templates seeding ignore-optimizer rtk caveman; do
+    if prompt_yes_no "Remove ${component//-/ }?" "no"; then
+      selected="${selected:+$selected,}$component"
+    fi
+  done
+  printf '%s' "$selected"
 
   if [ "$dry_run" = "1" ]; then
     printf 'dry-run: would blank %s\n' "$target"
@@ -802,9 +802,9 @@ uninstall_caveman_components() {
 }
 
 uninstall_selected_components() {
-  case "$uninstall_components" in
-    ""|all|"all available"|"all-available") uninstall_components="all available" ;;
-  esac
+  if [ -z "$uninstall_components" ] && [ "$non_interactive" = "1" ]; then
+    uninstall_components="all available"
+  fi
 
   component_selected "global-instructions" && {
     reset_file_blank "$HOME/.claude/CLAUDE.md"
@@ -828,7 +828,11 @@ uninstall_selected_components() {
 }
 
 if [ "$uninstall" = "1" ]; then
-  uninstall_components="$(prompt_text "Components to uninstall, comma-separated or 'all available' (global-instructions, project-templates, seeding, ignore-optimizer, rtk, caveman, all available)" "${uninstall_components:-all available}")"
+  if [ -z "$uninstall_components" ] && [ "$non_interactive" = "0" ]; then
+    uninstall_components="$(prompt_uninstall_components)"
+  elif [ -z "$uninstall_components" ]; then
+    uninstall_components="all available"
+  fi
   uninstall_selected_components
   say "uninstall complete"
   exit 0

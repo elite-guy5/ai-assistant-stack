@@ -83,6 +83,26 @@ function Read-TextDefault {
   return $answer
 }
 
+function Prompt-UninstallComponents {
+  $components = @(
+    'global-instructions',
+    'project-templates',
+    'seeding',
+    'ignore-optimizer',
+    'rtk',
+    'caveman'
+  )
+  $selected = @()
+
+  foreach ($component in $components) {
+    if (Read-YesNo "Remove $component?" $false) {
+      $selected += $component
+    }
+  }
+
+  return ($selected -join ',')
+}
+
 function Assert-CavemanMode {
   param([string]$Mode)
 
@@ -744,12 +764,18 @@ function Invoke-Uninstall {
 }
 
 if ($Uninstall) {
-  if (-not $NonInteractive) {
-    $UninstallComponents = Read-TextDefault -Prompt "Components to uninstall, comma-separated or 'all available' (global-instructions, project-templates, seeding, ignore-optimizer, rtk, caveman, all available)" -Default $(if ($UninstallComponents) { $UninstallComponents } else { "all available" })
-  }
-  if ([string]::IsNullOrWhiteSpace($UninstallComponents)) {
+  if (-not $UninstallComponents -and -not $NonInteractive) {
+    $UninstallComponents = Prompt-UninstallComponents
+  } elseif (-not $UninstallComponents) {
     $UninstallComponents = "all available"
   }
+
+  if ([string]::IsNullOrWhiteSpace($UninstallComponents)) {
+    Write-Setup "no uninstall components selected"
+    $global:LASTEXITCODE = 0
+    exit 0
+  }
+
   Invoke-Uninstall
   Write-Setup "uninstall complete"
   $global:LASTEXITCODE = 0
