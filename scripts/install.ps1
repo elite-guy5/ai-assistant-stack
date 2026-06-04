@@ -54,7 +54,7 @@ function Read-YesNo {
     return $Default
   }
 
-  $label = if ($Default) { "yes" } else { "no" }
+  $label = if ($Default) { "y" } else { "n" }
   $answer = Read-Host "$Prompt [$label]"
   if ([string]::IsNullOrWhiteSpace($answer)) {
     return $Default

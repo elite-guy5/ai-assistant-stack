@@ -99,15 +99,22 @@ prompt_yes_no() {
   local prompt="$1"
   local default="$2"
   local answer
+  local default_label
 
   if [ "$non_interactive" = "1" ]; then
     [ "$default" = "yes" ] && return 0 || return 1
   fi
 
+  if [ "$default" = "yes" ]; then
+    default_label="y"
+  else
+    default_label="n"
+  fi
+
   if [ -t 0 ]; then
-    read -r -p "$prompt [$default]: " answer
+    read -r -p "$prompt [$default_label]: " answer
   elif [ -r /dev/tty ]; then
-    printf '%s [%s]: ' "$prompt" "$default" > /dev/tty
+    printf '%s [%s]: ' "$prompt" "$default_label" > /dev/tty
     read -r answer < /dev/tty
   else
     answer="$default"
@@ -115,6 +122,7 @@ prompt_yes_no() {
   answer="${answer:-$default}"
   case "$answer" in
     y|Y|yes|YES|Yes) return 0 ;;
+    n|N|no|NO|No) return 1 ;;
     *) return 1 ;;
   esac
 }
