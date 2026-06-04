@@ -179,11 +179,12 @@ function Invoke-OptionalUninstallCommand {
     return
   }
 
-  & $FilePath @Arguments
+  $output = & $FilePath @Arguments 2>&1
   if ($LASTEXITCODE -ne 0) {
     if ($UninstallActive) {
       Add-UninstallReport -Section "Verification" -Tool $CurrentTool -Category "Verification Issues" -Item ($display -join ' ') -Status "warn"
     } else {
+      $output | Write-Host
       Write-Warning "uninstall command failed: $($display -join ' ')"
     }
   } elseif ($UninstallActive) {
@@ -799,20 +800,6 @@ function Test-UninstallComponent {
   return @($UninstallComponents.Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -contains $Component
 }
 
-function Reset-FileBlank {
-  param([string]$Path)
-
-  if ($DryRun) {
-    Write-Setup "dry-run: would blank $Path"
-    return
-  }
-
-  $parent = Split-Path -Parent $Path
-  New-Item -ItemType Directory -Force -Path $parent | Out-Null
-  Set-Content -NoNewline -Encoding UTF8 -Path $Path -Value ""
-  Write-Setup "blanked $Path"
-}
-
 function Remove-ManagedPath {
   param([string]$Path)
 
@@ -892,7 +879,10 @@ function Uninstall-ManifestComponent {
   foreach ($artifact in @($Manifest.artifacts | Where-Object { $_.component -eq $Component })) {
     switch ($artifact.type) {
       { $_ -in @("file", "global_instruction_file", "project_template_file") } {
-        if ($artifact.ownership -eq "installer-created") {
+        if ($Component -eq "global-instructions") {
+          Add-UninstallReport -Section "Instruction Files" -Tool "" -Category "Files Updated" -Item "Preserved $(Split-Path -Leaf $artifact.path)"
+          Add-UninstallReport -Section "Preserved Files" -Tool "" -Category "Files Preserved" -Item $artifact.path
+        } elseif ($artifact.ownership -eq "installer-created") {
           if ($Component -eq "project-templates") {
             Remove-TemplatePath -Path $artifact.path
           } else {

@@ -117,6 +117,8 @@ run_cmd() {
 }
 
 run_optional_uninstall_cmd() {
+  local output status
+
   if [ "$dry_run" = "1" ]; then
     if [ "$uninstall_active" = "1" ]; then
       report_event "Skills and Plugins" "$current_tool" "Shell Commands Removed" "$*" "ok"
@@ -125,11 +127,19 @@ run_optional_uninstall_cmd() {
     fi
     return 0
   fi
-  if "$@"; then
+  output="$(mktemp)"
+  if "$@" >"$output" 2>&1; then
     [ "$uninstall_active" = "1" ] && report_event "Skills and Plugins" "$current_tool" "Shell Commands Removed" "$*" "ok"
   else
-    [ "$uninstall_active" = "1" ] && report_event "Verification" "$current_tool" "Verification Issues" "$*" "warn" || printf 'warning: uninstall command failed: %s\n' "$*" >&2
+    status=$?
+    if [ "$uninstall_active" = "1" ]; then
+      report_event "Verification" "$current_tool" "Verification Issues" "$* (exit $status)" "warn"
+    else
+      cat "$output" >&2
+      printf 'warning: uninstall command failed: %s\n' "$*" >&2
+    fi
   fi
+  rm -f "$output"
 }
 
 record_manifest() {
@@ -894,19 +904,6 @@ NODE
   fi
 }
 
-reset_file_blank() {
-  local target="$1"
-
-  if [ "$dry_run" = "1" ]; then
-    printf 'dry-run: would blank %s\n' "$target"
-    return 0
-  fi
-
-  mkdir -p "$(dirname "$target")"
-  : > "$target"
-  printf 'blanked %s\n' "$target"
-}
-
 remove_path() {
   local target="$1"
   local category="Files Removed"
@@ -980,7 +977,10 @@ uninstall_manifest_component() {
   manifest_artifacts_for_component "$component" | while IFS="$(printf '\t')" read -r type ownership target key command; do
     case "$type" in
       file|global_instruction_file|project_template_file)
-        if [ "$ownership" = "installer-created" ]; then
+        if [ "$component" = "global-instructions" ]; then
+          report_event "Instruction Files" "" "Files Updated" "Preserved $(basename "$target")" "ok"
+          report_preserved "$target"
+        elif [ "$ownership" = "installer-created" ]; then
           if [ "$component" = "project-templates" ]; then
             remove_template_path "$target"
           else
