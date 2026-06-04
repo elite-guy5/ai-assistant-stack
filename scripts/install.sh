@@ -626,6 +626,10 @@ prompt_uninstall_components() {
     fi
   done
   printf '%s' "$selected"
+}
+
+reset_file_blank() {
+  local target="$1"
 
   if [ "$dry_run" = "1" ]; then
     printf 'dry-run: would blank %s\n' "$target"
@@ -806,25 +810,29 @@ uninstall_selected_components() {
     uninstall_components="all available"
   fi
 
-  component_selected "global-instructions" && {
+  if component_selected "global-instructions"; then
     reset_file_blank "$HOME/.claude/CLAUDE.md"
     reset_file_blank "$HOME/.codex/AGENTS.md"
-  }
-  component_selected "project-templates" && {
+  fi
+  if component_selected "project-templates"; then
     remove_path "$HOME/.claude/CLAUDE.project-template.md"
     remove_path "$HOME/.codex/AGENTS.project-template.md"
-  }
-  component_selected "seeding" && {
+  fi
+  if component_selected "seeding"; then
     remove_path "$HOME/.agents/scripts/seed-project-instructions.sh"
     remove_path "$HOME/.agents/scripts/seed-project-instructions.ps1"
     remove_claude_seed_hook
-  }
-  component_selected "ignore-optimizer" && {
+  fi
+  if component_selected "ignore-optimizer"; then
     remove_path "$HOME/.agents/scripts/optimize-ai.sh"
     remove_path "$HOME/.agents/scripts/optimize-ai.ps1"
-  }
-  component_selected "rtk" && uninstall_rtk_components
-  component_selected "caveman" && uninstall_caveman_components
+  fi
+  if component_selected "rtk"; then
+    uninstall_rtk_components
+  fi
+  if component_selected "caveman"; then
+    uninstall_caveman_components
+  fi
 }
 
 if [ "$uninstall" = "1" ]; then
