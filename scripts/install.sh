@@ -293,6 +293,79 @@ initialize_rtk_agents() {
   IFS="$old_ifs"
 }
 
+rtk_agent_enabled() {
+  local wanted="$1"
+  local old_ifs agent
+
+  old_ifs="$IFS"
+  IFS=","
+  for agent in $rtk_agents; do
+    IFS="$old_ifs"
+    agent="$(printf '%s' "$agent" | tr -d '[:space:]')"
+    if [ "$agent" = "$wanted" ]; then
+      IFS="$old_ifs"
+      return 0
+    fi
+    IFS=","
+  done
+  IFS="$old_ifs"
+  return 1
+}
+
+require_file_contains() {
+  local path="$1"
+  local pattern="$2"
+  local label="$3"
+
+  if [ ! -f "$path" ]; then
+    printf 'warning: missing %s: %s\n' "$label" "$path" >&2
+    return 1
+  fi
+
+  if ! grep -Eq "$pattern" "$path"; then
+    printf 'warning: %s does not contain required RTK rule: %s\n' "$label" "$path" >&2
+    return 1
+  fi
+
+  return 0
+}
+
+verify_rtk_setup() {
+  local failures=0
+
+  [ "$install_rtk" = "1" ] || return 0
+
+  if [ "$dry_run" = "1" ]; then
+    say "dry-run: would verify RTK binary and assistant instruction wiring"
+    return 0
+  fi
+
+  if ! command -v rtk >/dev/null 2>&1; then
+    printf 'warning: rtk is not available on PATH after install/init\n' >&2
+    failures=$((failures + 1))
+  elif ! rtk --version >/dev/null 2>&1; then
+    printf 'warning: rtk is installed but failed verification: rtk --version\n' >&2
+    failures=$((failures + 1))
+  fi
+
+  if rtk_agent_enabled "codex"; then
+    require_file_contains "$HOME/.codex/AGENTS.md" "RTK\\.md" "Codex AGENTS.md" || failures=$((failures + 1))
+    require_file_contains "$HOME/.codex/RTK.md" 'Always prefix shell commands with `rtk`' "Codex RTK.md" || failures=$((failures + 1))
+  fi
+
+  if rtk_agent_enabled "claude"; then
+    require_file_contains "$HOME/.claude/CLAUDE.md" "RTK\\.md" "Claude CLAUDE.md" || failures=$((failures + 1))
+    require_file_contains "$HOME/.claude/RTK.md" "Always prefix shell commands|automatically rewritten|Hook-Based Usage" "Claude RTK.md" || failures=$((failures + 1))
+  fi
+
+  if [ "$failures" -gt 0 ]; then
+    printf 'error: RTK setup verification failed; rerun with --overwrite or inspect the .new instruction files\n' >&2
+    return 1
+  fi
+
+  say "verified RTK setup"
+}
+
 install_caveman_tool() {
   local args
 
@@ -329,6 +402,7 @@ fi
 
 merge_claude_session_hook
 initialize_rtk_agents
+verify_rtk_setup
 install_caveman_tool
 
 say "setup complete"
