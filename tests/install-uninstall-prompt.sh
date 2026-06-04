@@ -17,7 +17,9 @@ expect_script="$tmp/uninstall.exp"
 cat > "$expect_script" <<'EOF'
 set timeout 10
 spawn bash scripts/install.sh --dry-run --uninstall
-expect -exact {Remove global instructions? (y/n) [n]: }
+expect -exact {Reset all instruction files? (y/n) [n]: }
+send "n\r"
+expect -exact {Reset only project instruction sections? (y/n) [n]: }
 send "n\r"
 expect -exact {Remove project templates? (y/n) [n]: }
 send "n\r"

@@ -767,6 +767,27 @@ section_line() {
   printf '%*s\n' 50 "" | tr ' ' "${2:--}"
 }
 
+progress_bar() {
+  local current="$1"
+  local total="$2"
+  local width="30"
+  local filled empty
+  filled=$(( current * width / total ))
+  empty=$(( width - filled ))
+  printf '%*s' "$filled" "" | tr ' ' '#'
+  printf '%*s' "$empty" "" | tr ' ' '-'
+}
+
+progress_line() {
+  local prefix="$1"
+  local current="$2"
+  local total="$3"
+  local message="$4"
+  local bar
+  bar="$(progress_bar "$current" "$total")"
+  printf '%s [%s] %s/%s %s\n' "$prefix" "$bar" "$current" "$total" "$message"
+}
+
 report_event() {
   local section="$1"
   local tool="$2"
@@ -1169,7 +1190,10 @@ const fs = require("fs");
 const settingsPath = process.argv[2];
 const raw = fs.readFileSync(settingsPath, "utf8").trim();
 const data = raw ? JSON.parse(raw) : {};
-const hasCaveman = (value) => JSON.stringify(value || "").toLowerCase().includes("caveman");
+const hasCavemanOrCavecrew = (value) => {
+  const text = JSON.stringify(value || "").toLowerCase();
+  return text.includes("caveman") || text.includes("cavecrew");
+};
 
 if (data.hooks && typeof data.hooks === "object") {
   for (const key of Object.keys(data.hooks)) {
@@ -1177,17 +1201,17 @@ if (data.hooks && typeof data.hooks === "object") {
       data.hooks[key] = data.hooks[key]
         .map((entry) => ({
           ...entry,
-          hooks: Array.isArray(entry.hooks) ? entry.hooks.filter((hook) => !hasCaveman(hook)) : entry.hooks,
+          hooks: Array.isArray(entry.hooks) ? entry.hooks.filter((hook) => !hasCavemanOrCavecrew(hook)) : entry.hooks,
         }))
         .filter((entry) => !Array.isArray(entry.hooks) || entry.hooks.length > 0);
     }
   }
 }
-if (hasCaveman(data.statusLine)) delete data.statusLine;
+if (hasCavemanOrCavecrew(data.statusLine)) delete data.statusLine;
 for (const prop of ["mcpServers", "plugins", "enabledPlugins"]) {
   if (data[prop] && typeof data[prop] === "object") {
     for (const key of Object.keys(data[prop])) {
-      if (key.toLowerCase().includes("caveman") || hasCaveman(data[prop][key])) delete data[prop][key];
+      if (key.toLowerCase().includes("caveman") || key.toLowerCase().includes("cavecrew") || hasCavemanOrCavecrew(data[prop][key])) delete data[prop][key];
     }
   }
 }
@@ -1213,7 +1237,7 @@ remove_caveman_codex_config() {
   temp="$(mktemp)"
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
-      "[mcp_servers.fs_shrunk]"|"[hooks.state./Users/burljohnson/.agents/skills/i-caveman/SKILL.md]"*)
+      "[mcp_servers.fs_shrunk]"|"[hooks.state./Users/burljohnson/.agents/skills/i-caveman/SKILL.md]"|"[hooks.state./Users/burljohnson/.agents/skills/cavecrew/SKILL.md]"|"[hooks.state.*cavecrew]*")
         skip=1
         block="$line"
         continue
@@ -1227,7 +1251,7 @@ remove_caveman_codex_config() {
       continue
     fi
     case "$line" in
-      *caveman*|*Caveman*) continue ;;
+      *caveman*|*Caveman*|*cavecrew*|*Cavecrew*|*mcps*|*MCPs*) continue ;;
     esac
     printf '%s\n' "$line" >> "$temp"
   done < "$config_path"
@@ -1283,17 +1307,25 @@ uninstall_caveman_components() {
     remove_path "$HOME/.agents/skills/$skill"
     remove_path "$HOME/.claude/skills/$skill"
   done
+  remove_path "$HOME/.agents/skills/cavecrew"
+  remove_path "$HOME/.claude/skills/cavecrew"
+  remove_glob_paths "$HOME/.agents/skills/*cavecrew*"
+  remove_glob_paths "$HOME/.claude/skills/*cavecrew*"
   remove_glob_paths "$HOME/.claude/projects/*caveman*"
   remove_caveman_claude_settings
   remove_caveman_codex_config
 }
 
 uninstall_selected_components() {
-  local old_ifs component used_manifest=0
+  local old_ifs component used_manifest=0 total=0 current=0
 
   if [ -z "$uninstall_components" ] && [ "$non_interactive" = "1" ]; then
     uninstall_components="all available"
   fi
+
+  for component in $(printf '%s\n' "$(selected_components)" | tr ',' '\n'); do
+    total=$((total + 1))
+  done
 
   if [ ! -f "$manifest_path" ] || ! command -v node >/dev/null 2>&1; then
     report_event "Configuration" "" "Configuration Entries Removed" "Install manifest missing or unreadable; used legacy cleanup fallback" "warn"
@@ -1302,12 +1334,13 @@ uninstall_selected_components() {
   fi
 
   old_ifs="$IFS"
-  IFS=","
+  IFS="," 
   for component in $(selected_components); do
     IFS="$old_ifs"
     component="$(printf '%s' "$component" | xargs)"
     [ -n "$component" ] || continue
-    current_tool="$(tool_for_component "$component")"
+    current=$((current + 1))
+    progress_line "Uninstall" "$current" "$total" "${component//-/ }"
     if manifest_has_component "$component"; then
       used_manifest=1
       uninstall_manifest_component "$component"
@@ -1323,7 +1356,14 @@ uninstall_selected_components() {
 }
 
 legacy_uninstall_selected_components() {
+  local total=0 current=0
+  for component in $(printf '%s\n' "$(selected_components)" | tr ',' '\n'); do
+    total=$((total + 1))
+  done
+
   if component_selected "global-instructions"; then
+    current=$((current + 1))
+    progress_line "Uninstall" "$current" "$total" "global instructions"
     report_event "Instruction Files" "" "Files Updated" "Preserved CLAUDE.md" "ok"
     report_event "Instruction Files" "" "Files Updated" "Preserved AGENTS.md" "ok"
     report_preserved "$HOME/.claude/CLAUDE.md"
@@ -1374,6 +1414,7 @@ if [ "$uninstall" = "1" ]; then
   fi
   uninstall_selected_components
   report_uninstall_summary
+  say "uninstall complete"
   rm -f "$uninstall_report_file"
   exit 0
 fi
@@ -1424,11 +1465,27 @@ if [ "$install_caveman" = "1" ]; then
   validate_caveman_mode "$caveman_mode"
 fi
 
+install_steps=5
+[ "$install_rtk" != "0" ] && install_steps=$((install_steps + 2))
+[ "$install_caveman" != "0" ] && install_steps=$((install_steps + 1))
+install_step=0
+
+install_step=$((install_step + 1))
+progress_line "Install" "$install_step" "$install_steps" "global instructions"
 copy_global_instruction_file "$ROOT/templates/CLAUDE.global.md" "$HOME/.claude/CLAUDE.md"
+
+install_step=$((install_step + 1))
+progress_line "Install" "$install_step" "$install_steps" "project templates"
 render_global_instruction_template "$ROOT/templates/AGENTS.global.md" "$HOME/.codex/AGENTS.md"
 copy_project_template_file "$ROOT/templates/CLAUDE.project-template.md" "$HOME/.claude/CLAUDE.project-template.md"
 copy_project_template_file "$ROOT/templates/AGENTS.project-template.md" "$HOME/.codex/AGENTS.project-template.md"
+
+install_step=$((install_step + 1))
+progress_line "Install" "$install_step" "$install_steps" "optimize-ai files"
 copy_managed_file "$ROOT/scripts/optimize-ai.sh" "$HOME/.agents/scripts/optimize-ai.sh" "ignore-optimizer"
+
+install_step=$((install_step + 1))
+progress_line "Install" "$install_step" "$install_steps" "seed project scripts"
 render_template "$ROOT/scripts/seed-project-instructions.sh" "$HOME/.agents/scripts/seed-project-instructions.sh"
 
 if [ "$dry_run" != "1" ]; then
@@ -1436,9 +1493,26 @@ if [ "$dry_run" != "1" ]; then
   chmod +x "$HOME/.agents/scripts/seed-project-instructions.sh"
 fi
 
+install_step=$((install_step + 1))
+progress_line "Install" "$install_step" "$install_steps" "session hook"
 merge_claude_session_hook
+
+if [ "$install_rtk" != "0" ]; then
+  install_step=$((install_step + 1))
+  progress_line "Install" "$install_step" "$install_steps" "RTK initialization"
+fi
 initialize_rtk_agents
+
+if [ "$install_rtk" != "0" ]; then
+  install_step=$((install_step + 1))
+  progress_line "Install" "$install_step" "$install_steps" "RTK verification"
+fi
 verify_rtk_setup
+
+if [ "$install_caveman" != "0" ]; then
+  install_step=$((install_step + 1))
+  progress_line "Install" "$install_step" "$install_steps" "Caveman install"
+fi
 install_caveman_tool
 
 say "setup complete"

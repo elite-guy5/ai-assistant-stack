@@ -34,6 +34,30 @@ function Write-Setup {
   Write-Host $Message
 }
 
+function Get-ProgressBar {
+  param(
+    [int]$Current,
+    [int]$Total,
+    [int]$Width = 30
+  )
+  $filled = [math]::Floor(($Current * $Width) / $Total)
+  if ($filled -lt 0) { $filled = 0 }
+  if ($filled -gt $Width) { $filled = $Width }
+  $empty = $Width - $filled
+  return ('#' * $filled) + ('-' * $empty)
+}
+
+function Write-StepProgress {
+  param(
+    [string]$Phase,
+    [int]$Current,
+    [int]$Total,
+    [string]$Message
+  )
+  $bar = Get-ProgressBar -Current $Current -Total $Total
+  Write-Host "$Phase [$bar] $Current/$Total $Message"
+}
+
 function Add-UninstallReport {
   param(
     [string]$Section,
@@ -1056,7 +1080,7 @@ function Remove-CavemanClaudeSettings {
     foreach ($hookName in @($data.hooks.PSObject.Properties.Name)) {
       $entries = @()
       foreach ($entry in @($data.hooks.$hookName)) {
-        $hooks = @($entry.hooks | Where-Object { ($_ | ConvertTo-Json -Depth 20) -notmatch "caveman" })
+        $hooks = @($entry.hooks | Where-Object { ($_ | ConvertTo-Json -Depth 20) -notmatch "caveman|cavecrew" })
         if ($hooks.Count -gt 0) {
           $entry.hooks = $hooks
           $entries += $entry
@@ -1065,14 +1089,14 @@ function Remove-CavemanClaudeSettings {
       $data.hooks.$hookName = $entries
     }
   }
-  if ($data.PSObject.Properties["statusLine"] -and (($data.statusLine | ConvertTo-Json -Depth 20) -match "caveman")) {
+  if ($data.PSObject.Properties["statusLine"] -and (($data.statusLine | ConvertTo-Json -Depth 20) -match "caveman|cavecrew")) {
     $data.PSObject.Properties.Remove("statusLine")
   }
   foreach ($prop in @("mcpServers", "plugins", "enabledPlugins")) {
     if ($data.PSObject.Properties[$prop]) {
       foreach ($name in @($data.$prop.PSObject.Properties.Name)) {
         $value = $data.$prop.$name | ConvertTo-Json -Depth 20
-        if ($name -match "caveman" -or $value -match "caveman") {
+        if ($name -match "caveman|cavecrew" -or $value -match "caveman|cavecrew") {
           $data.$prop.PSObject.Properties.Remove($name)
         }
       }
@@ -1100,7 +1124,7 @@ function Remove-CavemanCodexConfig {
   $out = New-Object System.Collections.Generic.List[string]
   $skip = $false
   foreach ($line in Get-Content $configPath) {
-    if ($line -eq "[mcp_servers.fs_shrunk]" -or $line -like "[hooks.state.*caveman*") {
+    if ($line -eq "[mcp_servers.fs_shrunk]" -or $line -like "[hooks.state.*caveman*" -or $line -like "[hooks.state.*cavecrew*") {
       $skip = $true
       continue
     }
@@ -1110,7 +1134,7 @@ function Remove-CavemanCodexConfig {
     if ($skip) {
       continue
     }
-    if ($line -match "caveman") {
+    if ($line -match "caveman|cavecrew|mcps") {
       continue
     }
     $out.Add($line)
@@ -1157,6 +1181,10 @@ function Uninstall-CavemanComponents {
     Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/skills/$skill")
     Remove-ManagedPath -Path (Join-Path $HomeDir ".claude/skills/$skill")
   }
+  Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/skills/cavecrew")
+  Remove-ManagedPath -Path (Join-Path $HomeDir ".claude/skills/cavecrew")
+  Remove-MatchingManagedPaths -Pattern (Join-Path $HomeDir ".agents/skills/*cavecrew*")
+  Remove-MatchingManagedPaths -Pattern (Join-Path $HomeDir ".claude/skills/*cavecrew*")
   Remove-MatchingManagedPaths -Pattern (Join-Path $HomeDir ".claude/projects/*caveman*")
   Remove-CavemanClaudeSettings
   Remove-CavemanCodexConfig
@@ -1174,7 +1202,12 @@ function Invoke-Uninstall {
   }
 
   $usedManifest = $false
-  foreach ($component in Get-SelectedUninstallComponents) {
+  $components = Get-SelectedUninstallComponents
+  $total = $components.Count
+  $current = 0
+  foreach ($component in $components) {
+    $current = $current + 1
+    Write-StepProgress -Phase "Uninstall" -Current $current -Total $total -Message $component
     $script:CurrentTool = Get-ToolName $component
     if (Test-ManifestComponent -Manifest $manifest -Component $component) {
       $usedManifest = $true
@@ -1193,25 +1226,38 @@ function Invoke-Uninstall {
 }
 
 function Invoke-LegacyUninstall {
+  $components = Get-SelectedUninstallComponents
+  $total = $components.Count
+  $current = 0
   if (Test-UninstallComponent "global-instructions") {
+    $current = $current + 1
+    Write-StepProgress -Phase "Uninstall" -Current $current -Total $total -Message "global-instructions"
     Add-UninstallReport -Section "Instruction Files" -Tool "" -Category "Files Updated" -Item "Preserved CLAUDE.md"
     Add-UninstallReport -Section "Instruction Files" -Tool "" -Category "Files Updated" -Item "Preserved AGENTS.md"
     Add-UninstallReport -Section "Preserved Files" -Tool "" -Category "Files Preserved" -Item (Join-Path $HomeDir ".claude/CLAUDE.md")
     Add-UninstallReport -Section "Preserved Files" -Tool "" -Category "Files Preserved" -Item (Join-Path $HomeDir ".codex/AGENTS.md")
   }
   if (Test-UninstallComponent "reset-global-instructions") {
+    $current = $current + 1
+    Write-StepProgress -Phase "Uninstall" -Current $current -Total $total -Message "reset-global-instructions"
     Reset-GlobalInstructionFiles
   }
   if (Test-UninstallComponent "project-instructions") {
+    $current = $current + 1
+    Write-StepProgress -Phase "Uninstall" -Current $current -Total $total -Message "project-instructions"
     Remove-ProjectInstructionSections
   }
   if (Test-UninstallComponent "project-templates") {
+    $current = $current + 1
+    Write-StepProgress -Phase "Uninstall" -Current $current -Total $total -Message "project-templates"
     Remove-TemplatePath -Path (Join-Path $HomeDir ".claude/CLAUDE.project-template.md")
     Remove-TemplatePath -Path (Join-Path $HomeDir ".codex/AGENTS.project-template.md")
     Remove-MatchingTemplatePaths -Pattern (Join-Path $HomeDir ".claude/CLAUDE.project-template.md.new")
     Remove-MatchingTemplatePaths -Pattern (Join-Path $HomeDir ".codex/AGENTS.project-template.md.new")
   }
   if (Test-UninstallComponent "seeding") {
+    $current = $current + 1
+    Write-StepProgress -Phase "Uninstall" -Current $current -Total $total -Message "seeding"
     $script:CurrentTool = "Seed Project"
     Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.sh")
     Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.ps1")
@@ -1220,6 +1266,8 @@ function Invoke-LegacyUninstall {
     Remove-ClaudeSeedHook
   }
   if (Test-UninstallComponent "ignore-optimizer") {
+    $current = $current + 1
+    Write-StepProgress -Phase "Uninstall" -Current $current -Total $total -Message "ignore-optimizer"
     $script:CurrentTool = "Optimize-AI"
     Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/scripts/optimize-ai.sh")
     Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/scripts/optimize-ai.ps1")
@@ -1227,9 +1275,13 @@ function Invoke-LegacyUninstall {
     Remove-MatchingManagedPaths -Pattern (Join-Path $HomeDir ".agents/scripts/optimize-ai.ps1.new")
   }
   if (Test-UninstallComponent "rtk") {
+    $current = $current + 1
+    Write-StepProgress -Phase "Uninstall" -Current $current -Total $total -Message "rtk"
     Uninstall-RtkComponents
   }
   if (Test-UninstallComponent "caveman") {
+    $current = $current + 1
+    Write-StepProgress -Phase "Uninstall" -Current $current -Total $total -Message "caveman"
     Uninstall-CavemanComponents
   }
 }
@@ -1291,17 +1343,53 @@ if ($RtkAgents -in @("all", "all available", "all-available")) {
   $RtkMode = "auto"
 }
 
+$installSteps = 5
+if (-not $SkipRtk) { $installSteps += 2 }
+if (-not $SkipCaveman) { $installSteps += 1 }
+$installStep = 0
+
+$installStep += 1
+Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "global instructions"
 Copy-GlobalInstructionFile -Source (Join-Path $Root "templates/CLAUDE.global.md") -Target (Join-Path $HomeDir ".claude/CLAUDE.md")
+
+$installStep += 1
+Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "render global instructions"
 Copy-RenderedGlobalInstructionFile -Source (Join-Path $Root "templates/AGENTS.global.md") -Target (Join-Path $HomeDir ".codex/AGENTS.md")
+
+$installStep += 1
+Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "project templates"
 Copy-ProjectTemplateFile -Source (Join-Path $Root "templates/CLAUDE.project-template.md") -Target (Join-Path $HomeDir ".claude/CLAUDE.project-template.md")
 Copy-ProjectTemplateFile -Source (Join-Path $Root "templates/AGENTS.project-template.md") -Target (Join-Path $HomeDir ".codex/AGENTS.project-template.md")
+
+$installStep += 1
+Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "optimize-ai files"
 Copy-ManagedFile -Source (Join-Path $Root "scripts/optimize-ai.ps1") -Target (Join-Path $HomeDir ".agents/scripts/optimize-ai.ps1") -Component "ignore-optimizer"
+
+$installStep += 1
+Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "seed project scripts"
 Copy-RenderedFile -Source (Join-Path $Root "scripts/seed-project-instructions.ps1") -Target (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.ps1")
 Copy-RenderedFile -Source (Join-Path $Root "scripts/seed-project-instructions.sh") -Target (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.sh")
 
+$installStep += 1
+Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "session hook"
 Ensure-ClaudeSessionHook
+
+if (-not $SkipRtk) {
+  $installStep += 1
+  Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "RTK initialization"
+}
 Initialize-RtkAgents
+
+if (-not $SkipRtk) {
+  $installStep += 1
+  Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "RTK verification"
+}
 Verify-RtkSetup
+
+if (-not $SkipCaveman) {
+  $installStep += 1
+  Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "Caveman install"
+}
 Install-CavemanTool
 
 Write-Setup "setup complete"
