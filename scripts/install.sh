@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 non_interactive=0
 dry_run=0
 overwrite="${OVERWRITE:-0}"
+overwrite_global_instructions=0
 project_scope="${PROJECT_SCOPE:-$HOME/Documents/git}"
 install_rtk=""
 install_caveman=""
@@ -22,6 +23,8 @@ Options:
   --dry-run                Print actions without changing files or installing tools
   --project-scope <path>   Default project root for instruction seeding
   --overwrite              Replace existing managed files instead of writing .new files
+  --overwrite-global-instructions
+                           Replace existing ~/.claude/CLAUDE.md and ~/.codex/AGENTS.md
   --skip-rtk               Do not install or initialize RTK
   --skip-caveman           Do not install Caveman
   --rtk-agents <list>      Comma-separated RTK agents to initialize (default: claude,codex)
@@ -37,6 +40,7 @@ while [ "$#" -gt 0 ]; do
     --non-interactive) non_interactive=1 ;;
     --dry-run) dry_run=1 ;;
     --overwrite) overwrite=1 ;;
+    --overwrite-global-instructions) overwrite_global_instructions=1 ;;
     --skip-rtk) install_rtk=0 ;;
     --skip-caveman) install_caveman=0 ;;
     --project-scope)
@@ -124,6 +128,10 @@ prompt_text() {
 
 project_scope="$(prompt_text "Project scope for instruction seeding" "$project_scope")"
 
+if prompt_yes_no "Overwrite existing global Claude/Codex instruction files?" "no"; then
+  overwrite_global_instructions=1
+fi
+
 if [ -z "$install_rtk" ]; then
   if prompt_yes_no "Install and initialize RTK?" "yes"; then
     install_rtk=1
@@ -182,6 +190,38 @@ copy_managed_file() {
   printf 'left existing %s unchanged; wrote %s.new\n' "$target" "$target"
 }
 
+copy_global_instruction_file() {
+  local source="$1"
+  local target="$2"
+
+  if [ "$dry_run" = "1" ]; then
+    if [ ! -e "$target" ]; then
+      printf 'dry-run: would install %s\n' "$target"
+    elif [ "$overwrite_global_instructions" = "1" ]; then
+      printf 'dry-run: would overwrite %s\n' "$target"
+    else
+      printf 'dry-run: would skip existing global instruction file %s\n' "$target"
+    fi
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$target")"
+
+  if [ ! -e "$target" ]; then
+    cp "$source" "$target"
+    printf 'installed %s\n' "$target"
+    return 0
+  fi
+
+  if [ "$overwrite_global_instructions" = "1" ]; then
+    cp "$source" "$target"
+    printf 'overwrote %s\n' "$target"
+    return 0
+  fi
+
+  printf 'skipped existing global instruction file %s\n' "$target"
+}
+
 render_template() {
   local source="$1"
   local target="$2"
@@ -195,6 +235,22 @@ render_template() {
     -e "s/{{PROJECT_SCOPE}}/$scope_replacement/g" \
     "$source" > "$temp"
   copy_managed_file "$temp" "$target"
+  rm -f "$temp"
+}
+
+render_global_instruction_template() {
+  local source="$1"
+  local target="$2"
+  local temp home_replacement scope_replacement
+
+  temp="$(mktemp)"
+  home_replacement="$(printf '%s' "$HOME" | sed 's/[&/\]/\\&/g')"
+  scope_replacement="$(printf '%s' "$project_scope" | sed 's/[&/\]/\\&/g')"
+  sed \
+    -e "s/{{HOME}}/$home_replacement/g" \
+    -e "s/{{PROJECT_SCOPE}}/$scope_replacement/g" \
+    "$source" > "$temp"
+  copy_global_instruction_file "$temp" "$target"
   rm -f "$temp"
 }
 
@@ -443,7 +499,7 @@ verify_rtk_setup() {
   fi
 
   if [ "$failures" -gt 0 ]; then
-    printf 'error: RTK setup verification failed; rerun with --overwrite or inspect the .new instruction files\n' >&2
+    printf 'error: RTK setup verification failed; rerun with --overwrite-global-instructions or inspect existing global instruction files\n' >&2
     return 1
   fi
 
@@ -494,8 +550,8 @@ install_caveman_tool() {
   install_caveman_agent_fallbacks
 }
 
-copy_managed_file "$ROOT/templates/CLAUDE.global.md" "$HOME/.claude/CLAUDE.md"
-render_template "$ROOT/templates/AGENTS.global.md" "$HOME/.codex/AGENTS.md"
+copy_global_instruction_file "$ROOT/templates/CLAUDE.global.md" "$HOME/.claude/CLAUDE.md"
+render_global_instruction_template "$ROOT/templates/AGENTS.global.md" "$HOME/.codex/AGENTS.md"
 copy_managed_file "$ROOT/templates/CLAUDE.project-template.md" "$HOME/.claude/CLAUDE.project-template.md"
 copy_managed_file "$ROOT/templates/AGENTS.project-template.md" "$HOME/.codex/AGENTS.project-template.md"
 copy_managed_file "$ROOT/scripts/optimize-ai.sh" "$HOME/.agents/scripts/optimize-ai.sh"

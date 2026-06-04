@@ -57,6 +57,7 @@ Installer flags:
 - `--dry-run` / `-DryRun` - preview actions.
 - `--project-scope <path>` / `-ProjectScope <path>` - set the default project root for seeding.
 - `--overwrite` / `-Overwrite` - replace managed files instead of writing `.new`.
+- `--overwrite-global-instructions` / `-OverwriteGlobalInstructions` - replace existing `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`; default is to skip existing global instruction files.
 - `--skip-rtk` / `-SkipRtk` - skip RTK install/init.
 - `--skip-caveman` / `-SkipCaveman` - skip Caveman install.
 - `--rtk-agents <list>` / `-RtkAgents <list>` - comma-separated RTK agents.
@@ -119,6 +120,7 @@ This repo includes the files needed to install and maintain the instruction setu
 Installer behavior:
 
 - Creates missing target files.
+- Skips existing global Claude/Codex instruction files unless the global-instruction overwrite option is selected.
 - Leaves existing files unchanged when they differ and writes `<target>.new` for review.
 - Installs the seeding scripts to `~/.agents/scripts/`.
 - Installs the AI ignore optimizer scripts to `~/.agents/scripts/`.

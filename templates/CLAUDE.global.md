@@ -3,7 +3,7 @@
 ### Response Style
 
 - Respond in a **professional and neutral tone**.
-- Avoid unnecessary friendliness or casual language unless explicitly asked for emotional support or personal advice.
+- Avoid unnecessary friendliness or casual language unless I explicitly ask for emotional support or personal advice.
 - Provide **concise responses** that get to the point quickly while still including enough explanation to understand the reasoning.
 - Organize responses using **clear sections and bullet points** so information is easy to scan.
 - Present the **main conclusion first**, followed by a **brief explanation of the reasoning**.
@@ -23,7 +23,7 @@
 ### Skill Usage
 
 - Superpowers skills should only be invoked automatically for software development work: writing or editing code, implementing features, fixing bugs, refactoring, testing, code review, or creating/editing skills.
-- Do not invoke Superpowers automatically for ordinary questions, explanations, configuration checks, local machine troubleshooting, install verification, process inspection, or other non-development tasks unless explicitly asked for Superpowers.
+- Do not invoke Superpowers automatically for ordinary questions, explanations, configuration checks, local machine troubleshooting, install verification, process inspection, or other non-development tasks unless I explicitly ask for Superpowers.
 
 ### Token-Saver File Boundaries
 
@@ -48,11 +48,11 @@ Skip files over 100KB unless required.
 Before implementing:
 
 - State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them. Don't pick silently.
+- If multiple interpretations exist, present them - don't pick silently.
 - If a simpler approach exists, say so. Push back when warranted.
 - If something is unclear, stop. Name what's confusing. Ask.
 
-Exception: when the cause is clear from logs, errors, or failing tests, fix it directly. Ask only when the cause is genuinely ambiguous.
+Exception (autonomous fixing): when the cause is clear from logs, errors, or failing tests, just fix it - no hand-holding. Ask only when the cause is genuinely ambiguous.
 
 ### 2. Simplicity First
 
@@ -64,25 +64,47 @@ Exception: when the cause is clear from logs, errors, or failing tests, fix it d
 - No error handling for impossible scenarios.
 - If you write 200 lines and it could be 50, rewrite it.
 
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
 ### 3. Surgical Changes
 
 **Touch only what you must. Clean up only your own mess.**
 
-- Don't improve adjacent code, comments, or formatting.
+When editing existing code:
+
+- Don't "improve" adjacent code, comments, or formatting.
 - Don't refactor things that aren't broken.
-- Match existing style.
-- If you notice unrelated dead code, mention it. Don't delete it.
-- Remove imports, variables, or functions that your changes made unused.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+
+- Remove imports/variables/functions that YOUR changes made unused.
 - Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
 
 ### 4. Goal-Driven Execution
 
 **Define success criteria. Loop until verified.**
 
-- Add validation by writing tests for invalid inputs, then making them pass.
-- Fix bugs by writing a test that reproduces the bug, then making it pass.
-- Refactor by ensuring tests pass before and after.
-- Never mark a task complete without proving it works through tests, logs, or behavior checks.
+Transform tasks into verifiable goals:
+
+- "Add validation" -> "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" -> "Write a test that reproduces it, then make it pass"
+- "Refactor X" -> "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+
+```text
+1. [Step] -> verify: [check]
+2. [Step] -> verify: [check]
+3. [Step] -> verify: [check]
+```
+
+Never mark a task complete without proving it works: run tests, check logs, or diff behavior between main and your change. Ask: "Would a staff engineer approve this?"
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
 ### 5. Plan Mode
 
@@ -96,26 +118,33 @@ Exception: when the cause is clear from logs, errors, or failing tests, fix it d
 - Use subagents when they reduce main-context noise or enable parallel investigation.
 - Offload research, exploration, and parallel analysis when useful.
 - Keep one focused task per subagent.
+- For complex problems, use parallel subagents where the tasks are independent.
 
-### 7. Demand Elegance
+### 7. Demand Elegance (gated)
 
-- For non-trivial changes, pause and ask whether there is a simpler or cleaner way.
-- If a fix feels hacky, propose the cleaner alternative.
-- Do not auto-refactor beyond the request.
+- For non-trivial changes: pause and ask "is there a more elegant way?"
+- If a fix feels hacky, propose the elegant alternative.
+- Gate: do not auto-refactor beyond the request. Propose; implement only the in-scope path unless told otherwise. This respects Surgical Changes.
+- Skip entirely for simple, obvious fixes - don't over-engineer.
 
 ### 8. Memory & Knowledge
 
-Layered by audience. Do not duplicate a fact across layers.
+Layered by audience. Do not duplicate a fact across layers. Canonical home per category:
 
-- **Agent recall:** use native memory for durable behavior corrections, user preferences, and reference pointers.
+- **Agent recall (auto-injected)** -> Claude native memory (`~/.claude/projects/<project>/memory/`):
+  - `feedback`: how I should work / corrections. Include **Why:** and **How to apply:**.
+  - `user`: identity, preferences.
+  - `reference`: pointers to vault notes or external docs.
 - **Obsidian knowledge:** use the Obsidian vault for long-form decisions, playbooks, people, vendors, projects, and wiki notes.
-- **Session journal:** rely on automatic session logs or remember-style tooling. Don't hand-curate it.
+  - Markdown + `[[wikilinks]]`. Reach via filesystem on demand. Never auto-load the whole vault.
+  - When a vault note matters for recall, add a native `reference` memory pointing to its path.
+- **Session journal (auto)** -> Remember plugin (`.remember/`). Don't hand-curate.
 
 Self-improvement loop after a user correction:
 
 1. Generalizable behavior pattern -> native feedback memory.
-2. Domain knowledge -> write or update an Obsidian note when relevant.
-3. Do not create separate lessons files.
+2. Domain knowledge -> write/update a note in the Obsidian vault when relevant.
+3. Do not create separate lessons files. Try kuzu-memory when available.
 
 ---
 

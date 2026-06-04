@@ -3,6 +3,7 @@ param(
   [switch]$NonInteractive,
   [switch]$DryRun,
   [switch]$Overwrite,
+  [switch]$OverwriteGlobalInstructions,
   [string]$ProjectScope,
   [switch]$SkipRtk,
   [switch]$SkipCaveman,
@@ -113,6 +114,41 @@ function Copy-ManagedFile {
   Write-Setup "left existing $Target unchanged; wrote $Target.new"
 }
 
+function Copy-GlobalInstructionFile {
+  param(
+    [string]$Source,
+    [string]$Target
+  )
+
+  if ($DryRun) {
+    if (-not (Test-Path $Target)) {
+      Write-Setup "dry-run: would install $Target"
+    } elseif ($OverwriteGlobalInstructions) {
+      Write-Setup "dry-run: would overwrite $Target"
+    } else {
+      Write-Setup "dry-run: would skip existing global instruction file $Target"
+    }
+    return
+  }
+
+  $parent = Split-Path -Parent $Target
+  New-Item -ItemType Directory -Force -Path $parent | Out-Null
+
+  if (-not (Test-Path $Target)) {
+    Copy-Item -Force $Source $Target
+    Write-Setup "installed $Target"
+    return
+  }
+
+  if ($OverwriteGlobalInstructions) {
+    Copy-Item -Force $Source $Target
+    Write-Setup "overwrote $Target"
+    return
+  }
+
+  Write-Setup "skipped existing global instruction file $Target"
+}
+
 function Copy-RenderedFile {
   param(
     [string]$Source,
@@ -125,6 +161,23 @@ function Copy-RenderedFile {
     $content = $content.Replace("{{HOME}}", $HomeDir).Replace("{{PROJECT_SCOPE}}", $ProjectScope)
     Set-Content -NoNewline -Encoding UTF8 -Path $temp -Value $content
     Copy-ManagedFile -Source $temp -Target $Target
+  } finally {
+    Remove-Item -Force $temp -ErrorAction SilentlyContinue
+  }
+}
+
+function Copy-RenderedGlobalInstructionFile {
+  param(
+    [string]$Source,
+    [string]$Target
+  )
+
+  $temp = New-TemporaryFile
+  try {
+    $content = Get-Content -Raw $Source
+    $content = $content.Replace("{{HOME}}", $HomeDir).Replace("{{PROJECT_SCOPE}}", $ProjectScope)
+    Set-Content -NoNewline -Encoding UTF8 -Path $temp -Value $content
+    Copy-GlobalInstructionFile -Source $temp -Target $Target
   } finally {
     Remove-Item -Force $temp -ErrorAction SilentlyContinue
   }
@@ -376,7 +429,7 @@ function Verify-RtkSetup {
   }
 
   if ($failures -gt 0) {
-    throw "RTK setup verification failed; rerun with -Overwrite or inspect the .new instruction files"
+    throw "RTK setup verification failed; rerun with -OverwriteGlobalInstructions or inspect existing global instruction files"
   }
 
   Write-Setup "verified RTK setup"
@@ -442,6 +495,9 @@ function Install-CavemanTool {
 
 if (-not $NonInteractive) {
   $ProjectScope = Read-TextDefault -Prompt "Project scope for instruction seeding" -Default $ProjectScope
+  if (-not $OverwriteGlobalInstructions) {
+    $OverwriteGlobalInstructions = Read-YesNo -Prompt "Overwrite existing global Claude/Codex instruction files?" -Default $false
+  }
   if (-not $SkipRtk) {
     $SkipRtk = -not (Read-YesNo -Prompt "Install and initialize RTK?" -Default $true)
   }
@@ -458,8 +514,8 @@ if (-not $NonInteractive) {
   }
 }
 
-Copy-ManagedFile -Source (Join-Path $Root "templates/CLAUDE.global.md") -Target (Join-Path $HomeDir ".claude/CLAUDE.md")
-Copy-RenderedFile -Source (Join-Path $Root "templates/AGENTS.global.md") -Target (Join-Path $HomeDir ".codex/AGENTS.md")
+Copy-GlobalInstructionFile -Source (Join-Path $Root "templates/CLAUDE.global.md") -Target (Join-Path $HomeDir ".claude/CLAUDE.md")
+Copy-RenderedGlobalInstructionFile -Source (Join-Path $Root "templates/AGENTS.global.md") -Target (Join-Path $HomeDir ".codex/AGENTS.md")
 Copy-ManagedFile -Source (Join-Path $Root "templates/CLAUDE.project-template.md") -Target (Join-Path $HomeDir ".claude/CLAUDE.project-template.md")
 Copy-ManagedFile -Source (Join-Path $Root "templates/AGENTS.project-template.md") -Target (Join-Path $HomeDir ".codex/AGENTS.project-template.md")
 Copy-ManagedFile -Source (Join-Path $Root "scripts/optimize-ai.ps1") -Target (Join-Path $HomeDir ".agents/scripts/optimize-ai.ps1")
