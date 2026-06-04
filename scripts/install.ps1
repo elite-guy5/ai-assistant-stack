@@ -24,6 +24,8 @@ $ManifestPath = if ($env:TOKEN_SAVER_MANIFEST) { $env:TOKEN_SAVER_MANIFEST } els
 $CavemanModes = @("lite", "full", "ultra", "wenyan-lite", "wenyan-full", "wenyan-ultra")
 $UninstallActive = $false
 $UninstallReport = @()
+$InstallActive = $false
+$InstallReport = @()
 $CurrentTool = ""
 if (-not $ProjectScope) {
   $ProjectScope = Join-Path $HomeDir "Documents"
@@ -76,6 +78,28 @@ function Add-UninstallReport {
   }
 }
 
+function Add-InstallReport {
+  param(
+    [string]$Section,
+    [string]$Tool,
+    [string]$Category,
+    [string]$Item,
+    [string]$Status = "ok"
+  )
+
+  if (-not $script:InstallActive) {
+    return
+  }
+
+  $script:InstallReport += [pscustomobject]@{
+    Section = $Section
+    Tool = $Tool
+    Category = $Category
+    Item = $Item
+    Status = $Status
+  }
+}
+
 function Get-ToolName {
   param([string]$Component)
   switch ($Component) {
@@ -87,6 +111,78 @@ function Get-ToolName {
     "reset-global-instructions" { return "Instruction Files" }
     default { return $Component }
   }
+}
+
+function Add-InstallFileReport {
+  param(
+    [string]$Component,
+    [string]$Category,
+    [string]$Item
+  )
+
+  switch ($Component) {
+    "global-instructions" { Add-InstallReport -Section "Instruction Files" -Tool "" -Category $Category -Item $Item }
+    "project-templates" { Add-InstallReport -Section "Templates" -Tool "" -Category $Category -Item $Item }
+    default { Add-InstallReport -Section "Skills and Plugins" -Tool (Get-ToolName $Component) -Category $Category -Item $Item }
+  }
+}
+
+function Show-InstallReport {
+  if ($script:InstallReport.Count -eq 0) {
+    return
+  }
+
+  function Rule([string]$Char = "-") { Write-Host ($Char * 50) }
+  function Section([string]$Name, [string]$Char = "-") { Write-Host $Name; Rule $Char }
+  function Mark([string]$Status) { if ($Status -eq "warn") { return "!" }; return "✓" }
+  function UniqueItems($Rows) { @($Rows | ForEach-Object { $_.Item } | Where-Object { $_ } | Select-Object -Unique) }
+  function PrintRows($Rows) { foreach ($row in $Rows) { Write-Host "$(Mark $row.Status) $($row.Item)" } }
+  function PrintCategoryRows($Rows) {
+    foreach ($category in @($Rows | ForEach-Object { $_.Category } | Where-Object { $_ } | Select-Object -Unique)) {
+      $entries = @($Rows | Where-Object Category -eq $category)
+      $items = UniqueItems $entries
+      Write-Host "$category ($($items.Count))"
+      PrintRows $entries
+    }
+  }
+
+  $instruction = @($script:InstallReport | Where-Object Section -eq "Instruction Files")
+  if ($instruction.Count) { Section "Instruction Files"; PrintCategoryRows $instruction; Write-Host "" }
+
+  $toolRows = @($script:InstallReport | Where-Object Section -eq "Skills and Plugins")
+  if ($toolRows.Count) {
+    Section "Skills and Plugins" "="
+    foreach ($tool in @("Caveman", "RTK", "Optimize-AI", "Seed Project")) {
+      $owned = @($toolRows | Where-Object Tool -eq $tool)
+      if (-not $owned.Count) { continue }
+      Write-Host $tool
+      Rule "-"
+      PrintCategoryRows $owned
+      Write-Host "Status"
+      Write-Host "✓ Successfully Installed"
+      Write-Host ""
+    }
+  }
+
+  $templates = @($script:InstallReport | Where-Object Section -eq "Templates")
+  if ($templates.Count) { Section "Templates"; PrintCategoryRows $templates; Write-Host "" }
+
+  $config = @($script:InstallReport | Where-Object Section -eq "Configuration")
+  if ($config.Count) { Section "Configuration"; PrintRows $config; Write-Host "" }
+
+  $verification = @($script:InstallReport | Where-Object Section -eq "Verification")
+  if ($verification.Count) { Section "Verification" "="; PrintRows $verification; Write-Host "" }
+  $verificationIssues = @($verification | Where-Object { $_.Status -eq "warn" -or $_.Category -eq "Verification Issues" })
+
+  function CountCategory([string]$Category) { @(UniqueItems (@($script:InstallReport | Where-Object Category -eq $Category))).Count }
+  Section "Summary"
+  Write-Host "Files Installed: $(CountCategory "Files Installed")"
+  Write-Host "Files Overwritten: $(CountCategory "Files Overwritten")"
+  Write-Host "Files Already Current: $(CountCategory "Files Already Current")"
+  Write-Host "Files Skipped: $(CountCategory "Files Skipped")"
+  Write-Host "Shell Commands Run: $(CountCategory "Shell Commands Run")"
+  Write-Host "Configuration Entries Updated: $(CountCategory "Configuration Entries Updated")"
+  Write-Host "Verification Issues: $($verificationIssues.Count)"
 }
 
 function Show-UninstallReport {
@@ -190,7 +286,7 @@ function Invoke-SetupCommand {
 
   $display = @($FilePath) + $Arguments
   if ($DryRun) {
-    Write-Setup "dry-run: $($display -join ' ')"
+    Add-InstallReport -Section "Skills and Plugins" -Tool $CurrentTool -Category "Shell Commands Run" -Item "dry-run: $($display -join ' ')"
     return
   }
 
@@ -198,6 +294,7 @@ function Invoke-SetupCommand {
   if ($LASTEXITCODE -ne 0) {
     throw "command failed: $($display -join ' ')"
   }
+  Add-InstallReport -Section "Skills and Plugins" -Tool $CurrentTool -Category "Shell Commands Run" -Item ($display -join ' ')
 }
 
 function Invoke-OptionalUninstallCommand {
@@ -240,7 +337,7 @@ function Add-ManifestArtifact {
   )
 
   if ($DryRun) {
-    Write-Setup "dry-run: would record manifest artifact $Component $Type $Path"
+    Add-InstallReport -Section "Configuration" -Tool "" -Category "Configuration Entries Updated" -Item "dry-run: would record manifest artifact $Component $Type $Path"
     return
   }
 
@@ -365,11 +462,11 @@ function Copy-ManagedFile {
 
   if ($DryRun) {
     if ((-not (Test-Path $Target)) -or $Overwrite) {
-      Write-Setup "dry-run: would install $Target"
+      Add-InstallFileReport -Component $Component -Category "Files Installed" -Item "dry-run: would install $Target"
     } elseif ((Get-FileHash $Source).Hash -eq (Get-FileHash $Target).Hash) {
-      Write-Setup "dry-run: already current $Target"
+      Add-InstallFileReport -Component $Component -Category "Files Already Current" -Item "dry-run: already current $Target"
     } else {
-      Write-Setup "dry-run: would skip existing managed file $Target"
+      Add-InstallFileReport -Component $Component -Category "Files Skipped" -Item "dry-run: would skip existing managed file $Target"
     }
     return
   }
@@ -386,16 +483,16 @@ function Copy-ManagedFile {
     } else {
       Add-ManifestArtifact -Type "file" -Component $Component -Ownership "installer-created" -Action "created" -Path $Target
     }
-    Write-Setup "installed $Target"
+    Add-InstallFileReport -Component $Component -Category "Files Installed" -Item "installed $Target"
     return
   }
 
   if ((Get-FileHash $Source).Hash -eq (Get-FileHash $Target).Hash) {
-    Write-Setup "already current $Target"
+    Add-InstallFileReport -Component $Component -Category "Files Already Current" -Item "already current $Target"
     return
   }
 
-  Write-Setup "skipped existing managed file $Target"
+  Add-InstallFileReport -Component $Component -Category "Files Skipped" -Item "skipped existing managed file $Target"
 }
 
 function Copy-GlobalInstructionFile {
@@ -406,11 +503,11 @@ function Copy-GlobalInstructionFile {
 
   if ($DryRun) {
     if (-not (Test-Path $Target)) {
-      Write-Setup "dry-run: would install $Target"
+      Add-InstallFileReport -Component "global-instructions" -Category "Files Installed" -Item "dry-run: would install $Target"
     } elseif ($OverwriteGlobalInstructions) {
-      Write-Setup "dry-run: would overwrite $Target"
+      Add-InstallFileReport -Component "global-instructions" -Category "Files Overwritten" -Item "dry-run: would overwrite $Target"
     } else {
-      Write-Setup "dry-run: would skip existing global instruction file $Target"
+      Add-InstallFileReport -Component "global-instructions" -Category "Files Skipped" -Item "dry-run: would skip existing global instruction file $Target"
     }
     return
   }
@@ -423,7 +520,7 @@ function Copy-GlobalInstructionFile {
     Add-ManifestDirectory -Path $parent -Component "global-instructions"
     Copy-Item -Force $Source $Target
     Add-ManifestArtifact -Type "global_instruction_file" -Component "global-instructions" -Ownership "installer-created" -Action "created" -Path $Target
-    Write-Setup "installed $Target"
+    Add-InstallFileReport -Component "global-instructions" -Category "Files Installed" -Item "installed $Target"
     return
   }
 
@@ -435,11 +532,11 @@ function Copy-GlobalInstructionFile {
     } else {
       Add-ManifestArtifact -Type "global_instruction_file" -Component "global-instructions" -Ownership "installer-created" -Action "created" -Path $Target
     }
-    Write-Setup "overwrote $Target"
+    Add-InstallFileReport -Component "global-instructions" -Category "Files Overwritten" -Item "overwrote $Target"
     return
   }
 
-  Write-Setup "skipped existing global instruction file $Target"
+  Add-InstallFileReport -Component "global-instructions" -Category "Files Skipped" -Item "skipped existing global instruction file $Target"
 }
 
 function Copy-ProjectTemplateFile {
@@ -450,11 +547,11 @@ function Copy-ProjectTemplateFile {
 
   if ($DryRun) {
     if (-not (Test-Path $Target)) {
-      Write-Setup "dry-run: would install $Target"
+      Add-InstallFileReport -Component "project-templates" -Category "Files Installed" -Item "dry-run: would install $Target"
     } elseif ($OverwriteProjectTemplates -or $Overwrite) {
-      Write-Setup "dry-run: would overwrite $Target"
+      Add-InstallFileReport -Component "project-templates" -Category "Files Overwritten" -Item "dry-run: would overwrite $Target"
     } else {
-      Write-Setup "dry-run: would skip existing project instruction template file $Target"
+      Add-InstallFileReport -Component "project-templates" -Category "Files Skipped" -Item "dry-run: would skip existing project instruction template file $Target"
     }
     return
   }
@@ -467,7 +564,7 @@ function Copy-ProjectTemplateFile {
     Add-ManifestDirectory -Path $parent -Component "project-templates"
     Copy-Item -Force $Source $Target
     Add-ManifestArtifact -Type "project_template_file" -Component "project-templates" -Ownership "installer-created" -Action "created" -Path $Target
-    Write-Setup "installed $Target"
+    Add-InstallFileReport -Component "project-templates" -Category "Files Installed" -Item "installed $Target"
     return
   }
 
@@ -479,11 +576,11 @@ function Copy-ProjectTemplateFile {
     } else {
       Add-ManifestArtifact -Type "project_template_file" -Component "project-templates" -Ownership "installer-created" -Action "created" -Path $Target
     }
-    Write-Setup "overwrote $Target"
+    Add-InstallFileReport -Component "project-templates" -Category "Files Overwritten" -Item "overwrote $Target"
     return
   }
 
-  Write-Setup "skipped existing project instruction template file $Target"
+  Add-InstallFileReport -Component "project-templates" -Category "Files Skipped" -Item "skipped existing project instruction template file $Target"
 }
 
 function Copy-RenderedFile {
@@ -527,7 +624,7 @@ function Ensure-ClaudeSessionHook {
   $hook = [ordered]@{ type = "command"; command = $command; timeout = 5 }
 
   if ($DryRun) {
-    Write-Setup "dry-run: would ensure Claude SessionStart hook in $settingsPath"
+    Add-InstallReport -Section "Skills and Plugins" -Tool "Seed Project" -Category "Configuration Entries Updated" -Item "dry-run: would ensure Claude SessionStart hook in $settingsPath"
     return
   }
 
@@ -563,7 +660,7 @@ function Ensure-ClaudeSessionHook {
   }
 
   if ($exists) {
-    Write-Setup "already has SessionStart hook in $settingsPath"
+    Add-InstallReport -Section "Skills and Plugins" -Tool "Seed Project" -Category "Configuration Entries Updated" -Item "already has SessionStart hook in $settingsPath"
     return
   }
 
@@ -571,7 +668,7 @@ function Ensure-ClaudeSessionHook {
   $sessionStart += [pscustomobject]@{ hooks = @([pscustomobject]$hook) }
   $data.hooks.SessionStart = $sessionStart
   $data | ConvertTo-Json -Depth 20 | Set-Content -Encoding UTF8 $settingsPath
-  Write-Setup "added SessionStart hook to $settingsPath"
+  Add-InstallReport -Section "Skills and Plugins" -Tool "Seed Project" -Category "Configuration Entries Updated" -Item "added SessionStart hook to $settingsPath"
   Add-ManifestArtifact -Type "settings_entry" -Component "seeding" -Ownership "user-owned" -Action "ensured" -Path $settingsPath -Details @{ key = "hooks.SessionStart"; command = "seed-project-instructions.ps1" }
 }
 
@@ -591,7 +688,7 @@ function Ensure-RtkClaudeHook {
   }
 
   if ($DryRun) {
-    Write-Setup "dry-run: would ensure RTK Claude hook in $settingsPath"
+    Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Updated" -Item "dry-run: would ensure RTK Claude hook in $settingsPath"
     Add-ManifestArtifact -Type "settings_entry" -Component "rtk" -Ownership "user-owned" -Action "added" -Path $settingsPath -Details $details
     return
   }
@@ -637,7 +734,7 @@ function Ensure-RtkClaudeHook {
   }
 
   if ($alreadyExists) {
-    Write-Setup "already configured RTK Claude hook in $settingsPath"
+    Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Updated" -Item "already configured RTK Claude hook in $settingsPath"
     Add-ManifestArtifact -Type "settings_entry" -Component "rtk" -Ownership "user-owned" -Action "already_existed" -Path $settingsPath -Details $details
     return
   }
@@ -661,14 +758,14 @@ function Ensure-RtkClaudeHook {
   Set-Content -Encoding UTF8 -Path $temp -Value $json
   Move-Item -Force $temp $settingsPath
 
-  Write-Setup "Registered Claude Code hook"
-  Write-Setup "Updated $settingsPath"
+  Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Updated" -Item "Registered Claude Code hook"
+  Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Updated" -Item "Updated $settingsPath"
   Add-ManifestArtifact -Type "settings_entry" -Component "rtk" -Ownership "user-owned" -Action "added" -Path $settingsPath -Details $details
 }
 
 function Install-RtkBinary {
   if (Get-Command rtk -ErrorAction SilentlyContinue) {
-    Write-Setup "rtk already installed: $((Get-Command rtk).Source)"
+    Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Files Already Current" -Item "rtk already installed: $((Get-Command rtk).Source)"
     return
   }
 
@@ -677,8 +774,8 @@ function Install-RtkBinary {
   $extractDir = Join-Path ([IO.Path]::GetTempPath()) ("rtk-windows-" + [Guid]::NewGuid().ToString("N"))
 
   if ($DryRun) {
-    Write-Setup "dry-run: would download the latest rtk-x86_64-pc-windows-msvc.zip release asset"
-    Write-Setup "dry-run: would extract rtk.exe to $binDir"
+    Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Files Installed" -Item "dry-run: would download the latest rtk-x86_64-pc-windows-msvc.zip release asset"
+    Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Files Installed" -Item "dry-run: would extract rtk.exe to $binDir"
     return
   }
 
@@ -705,7 +802,7 @@ function Install-RtkBinary {
     $newPath = if ([string]::IsNullOrWhiteSpace($currentUserPath)) { $binDir } else { "$currentUserPath;$binDir" }
     [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
     $env:Path = "$env:Path;$binDir"
-    Write-Setup "added $binDir to user PATH"
+    Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Updated" -Item "added $binDir to user PATH"
   }
 }
 
@@ -805,6 +902,7 @@ function Initialize-RtkAgents {
     return
   }
 
+  $script:CurrentTool = "RTK"
   Install-RtkBinary
   Detect-RtkAgents
   if (([Environment]::OSVersion.Platform -eq "Win32NT") -and (-not $env:WSL_DISTRO_NAME)) {
@@ -830,6 +928,7 @@ function Initialize-RtkAgents {
         $output | Write-Host
         throw "command failed: rtk $($initArgs -join ' ')"
       }
+      Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Shell Commands Run" -Item "rtk $($initArgs -join ' ')"
     }
     Add-ManifestArtifact -Type "generated_tool_reference" -Component "rtk" -Ownership "external" -Action "initialized" -Path "rtk" -Details @{ agent = $cleanAgent; command = "rtk $($initArgs -join ' ')" }
   }
@@ -841,7 +940,7 @@ function Verify-RtkSetup {
   }
 
   if ($DryRun) {
-    Write-Setup "dry-run: would verify RTK binary and assistant instruction wiring"
+    Add-InstallReport -Section "Verification" -Tool "RTK" -Category "Verification Checks" -Item "dry-run: would verify RTK binary and assistant instruction wiring"
     return
   }
 
@@ -871,10 +970,11 @@ function Verify-RtkSetup {
     throw "RTK setup verification failed; rerun with -OverwriteGlobalInstructions or inspect existing global instruction files"
   }
 
-  Write-Setup "verified RTK setup"
+  Add-InstallReport -Section "Verification" -Tool "RTK" -Category "Verification Checks" -Item "verified RTK setup"
 }
 
 function Install-CavemanAgentFallbacks {
+  $script:CurrentTool = "Caveman"
   if (Get-Command gemini -ErrorAction SilentlyContinue) {
     Invoke-SetupCommand -FilePath "gemini" -Arguments @("extensions", "install", "https://github.com/JuliusBrussee/caveman")
   }
@@ -900,17 +1000,19 @@ function Install-CavemanTool {
     return
   }
 
+  $script:CurrentTool = "Caveman"
   if (-not (Get-Command npx -ErrorAction SilentlyContinue) -and -not $DryRun) {
     Write-Warning "npx is required to install Caveman; skipping"
     return
   }
 
   if ($DryRun) {
-    Write-Setup "dry-run: would write caveman default mode $CavemanMode"
+    Add-InstallReport -Section "Skills and Plugins" -Tool "Caveman" -Category "Configuration Entries Updated" -Item "dry-run: would write caveman default mode $CavemanMode"
   } else {
     $configDir = Join-Path $HomeDir ".config/caveman"
     New-Item -ItemType Directory -Force -Path $configDir | Out-Null
     [pscustomobject]@{ defaultMode = $CavemanMode } | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 (Join-Path $configDir "config.json")
+    Add-InstallReport -Section "Skills and Plugins" -Tool "Caveman" -Category "Configuration Entries Updated" -Item "wrote caveman default mode $CavemanMode"
   }
 
   $installerArgs = @("--all")
@@ -1487,10 +1589,11 @@ if ($RtkAgents -in @("all", "all available", "all-available")) {
   $RtkMode = "auto"
 }
 
-$installSteps = 5
+$installSteps = 6
 if (-not $SkipRtk) { $installSteps += 3 }
 if (-not $SkipCaveman) { $installSteps += 1 }
 $installStep = 0
+$InstallActive = $true
 
 $installStep += 1
 Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "global instructions"
@@ -1542,5 +1645,6 @@ if (-not $SkipCaveman) {
 }
 Install-CavemanTool
 
+Show-InstallReport
 Write-Setup "setup complete"
 $global:LASTEXITCODE = 0

@@ -20,6 +20,8 @@ caveman_modes="lite,full,ultra,wenyan-lite,wenyan-full,wenyan-ultra"
 manifest_path="${TOKEN_SAVER_MANIFEST:-$HOME/.agents/install_manifest.json}"
 uninstall_active=0
 uninstall_report_file=""
+install_active=0
+install_report_file=""
 current_tool=""
 
 usage() {
@@ -111,10 +113,17 @@ say() {
 
 run_cmd() {
   if [ "$dry_run" = "1" ]; then
-    printf 'dry-run: %s\n' "$*"
+    if [ "$install_active" = "1" ]; then
+      install_event "Skills and Plugins" "$current_tool" "Shell Commands Run" "dry-run: $*" "ok"
+    else
+      printf 'dry-run: %s\n' "$*"
+    fi
     return 0
   fi
   "$@"
+  if [ "$install_active" = "1" ]; then
+    install_event "Skills and Plugins" "$current_tool" "Shell Commands Run" "$*" "ok"
+  fi
 }
 
 run_optional_uninstall_cmd() {
@@ -152,7 +161,11 @@ record_manifest() {
   local details="${6:-{}}"
 
   if [ "$dry_run" = "1" ]; then
-    printf 'dry-run: would record manifest artifact %s %s %s\n' "$component" "$type" "$path"
+    if [ "$install_active" = "1" ]; then
+      install_event "Configuration" "" "Configuration Entries Updated" "dry-run: would record manifest artifact $component $type $path" "ok"
+    else
+      printf 'dry-run: would record manifest artifact %s %s %s\n' "$component" "$type" "$path"
+    fi
     return 0
   fi
 
@@ -281,11 +294,11 @@ copy_managed_file() {
 
   if [ "$dry_run" = "1" ]; then
     if [ ! -e "$target" ] || [ "$overwrite" = "1" ]; then
-      printf 'dry-run: would install %s\n' "$target"
+      install_file_event "$component" "Files Installed" "dry-run: would install $target"
     elif cmp -s "$source" "$target"; then
-      printf 'dry-run: already current %s\n' "$target"
+      install_file_event "$component" "Files Already Current" "dry-run: already current $target"
     else
-      printf 'dry-run: would skip existing managed file %s\n' "$target"
+      install_file_event "$component" "Files Skipped" "dry-run: would skip existing managed file $target"
     fi
     return 0
   fi
@@ -301,16 +314,16 @@ copy_managed_file() {
     else
       record_manifest "file" "$component" "installer-created" "created" "$target"
     fi
-    printf 'installed %s\n' "$target"
+    install_file_event "$component" "Files Installed" "installed $target"
     return 0
   fi
 
   if cmp -s "$source" "$target"; then
-    printf 'already current %s\n' "$target"
+    install_file_event "$component" "Files Already Current" "already current $target"
     return 0
   fi
 
-  printf 'skipped existing managed file %s\n' "$target"
+  install_file_event "$component" "Files Skipped" "skipped existing managed file $target"
 }
 
 copy_global_instruction_file() {
@@ -320,11 +333,11 @@ copy_global_instruction_file() {
 
   if [ "$dry_run" = "1" ]; then
     if [ ! -e "$target" ]; then
-      printf 'dry-run: would install %s\n' "$target"
+      install_file_event "global-instructions" "Files Installed" "dry-run: would install $target"
     elif [ "$overwrite_global_instructions" = "1" ]; then
-      printf 'dry-run: would overwrite %s\n' "$target"
+      install_file_event "global-instructions" "Files Overwritten" "dry-run: would overwrite $target"
     else
-      printf 'dry-run: would skip existing global instruction file %s\n' "$target"
+      install_file_event "global-instructions" "Files Skipped" "dry-run: would skip existing global instruction file $target"
     fi
     return 0
   fi
@@ -336,7 +349,7 @@ copy_global_instruction_file() {
     record_directory "$(dirname "$target")" "global-instructions" "installer-created"
     cp "$source" "$target"
     record_manifest "global_instruction_file" "global-instructions" "installer-created" "created" "$target"
-    printf 'installed %s\n' "$target"
+    install_file_event "global-instructions" "Files Installed" "installed $target"
     return 0
   fi
 
@@ -348,11 +361,11 @@ copy_global_instruction_file() {
     else
       record_manifest "global_instruction_file" "global-instructions" "installer-created" "created" "$target"
     fi
-    printf 'overwrote %s\n' "$target"
+    install_file_event "global-instructions" "Files Overwritten" "overwrote $target"
     return 0
   fi
 
-  printf 'skipped existing global instruction file %s\n' "$target"
+  install_file_event "global-instructions" "Files Skipped" "skipped existing global instruction file $target"
 }
 
 copy_project_template_file() {
@@ -362,11 +375,11 @@ copy_project_template_file() {
 
   if [ "$dry_run" = "1" ]; then
     if [ ! -e "$target" ]; then
-      printf 'dry-run: would install %s\n' "$target"
+      install_file_event "project-templates" "Files Installed" "dry-run: would install $target"
     elif [ "$overwrite_project_templates" = "1" ] || [ "$overwrite" = "1" ]; then
-      printf 'dry-run: would overwrite %s\n' "$target"
+      install_file_event "project-templates" "Files Overwritten" "dry-run: would overwrite $target"
     else
-      printf 'dry-run: would skip existing project instruction template file %s\n' "$target"
+      install_file_event "project-templates" "Files Skipped" "dry-run: would skip existing project instruction template file $target"
     fi
     return 0
   fi
@@ -378,7 +391,7 @@ copy_project_template_file() {
     record_directory "$(dirname "$target")" "project-templates" "installer-created"
     cp "$source" "$target"
     record_manifest "project_template_file" "project-templates" "installer-created" "created" "$target"
-    printf 'installed %s\n' "$target"
+    install_file_event "project-templates" "Files Installed" "installed $target"
     return 0
   fi
 
@@ -390,11 +403,11 @@ copy_project_template_file() {
     else
       record_manifest "project_template_file" "project-templates" "installer-created" "created" "$target"
     fi
-    printf 'overwrote %s\n' "$target"
+    install_file_event "project-templates" "Files Overwritten" "overwrote $target"
     return 0
   fi
 
-  printf 'skipped existing project instruction template file %s\n' "$target"
+  install_file_event "project-templates" "Files Skipped" "skipped existing project instruction template file $target"
 }
 
 render_template() {
@@ -431,9 +444,10 @@ render_global_instruction_template() {
 
 merge_claude_session_hook() {
   local settings_path="$HOME/.claude/settings.json"
+  local action
 
   if [ "$dry_run" = "1" ]; then
-    printf 'dry-run: would ensure Claude SessionStart hook in %s\n' "$settings_path"
+    install_event "Skills and Plugins" "Seed Project" "Configuration Entries Updated" "dry-run: would ensure Claude SessionStart hook in $settings_path" "ok"
     return 0
   fi
 
@@ -443,7 +457,8 @@ merge_claude_session_hook() {
   fi
 
   mkdir -p "$(dirname "$settings_path")"
-  node - "$settings_path" <<'NODE'
+  action="$(
+    node - "$settings_path" <<'NODE'
 const fs = require("fs");
 const path = require("path");
 
@@ -491,6 +506,8 @@ if (exists) {
   console.log(`added SessionStart hook to ${settingsPath}`);
 }
 NODE
+  )"
+  install_event "Skills and Plugins" "Seed Project" "Configuration Entries Updated" "$action" "ok"
   record_manifest "settings_entry" "seeding" "user-owned" "ensured" "$settings_path" '{"key":"hooks.SessionStart","command":"seed-project-instructions.sh"}'
 }
 
@@ -502,7 +519,7 @@ ensure_rtk_claude_hook() {
   rtk_agent_enabled "claude" || return 0
 
   if [ "$dry_run" = "1" ]; then
-    printf 'dry-run: would ensure RTK Claude hook in %s\n' "$settings_path"
+    install_event "Skills and Plugins" "RTK" "Configuration Entries Updated" "dry-run: would ensure RTK Claude hook in $settings_path" "ok"
     record_manifest "settings_entry" "rtk" "user-owned" "added" "$settings_path" '{"key":"hooks.PreToolUse","command":"rtk hook claude","managedEntry":"RTK Claude hook","uninstallBehavior":"remove only the RTK hook entry, preserve the file"}'
     return 0
   fi
@@ -567,12 +584,12 @@ NODE
 
   case "$action" in
     already_existed)
-      say "already configured RTK Claude hook in $settings_path"
+      install_event "Skills and Plugins" "RTK" "Configuration Entries Updated" "already configured RTK Claude hook in $settings_path" "ok"
       record_manifest "settings_entry" "rtk" "user-owned" "already_existed" "$settings_path" '{"key":"hooks.PreToolUse","command":"rtk hook claude","managedEntry":"RTK Claude hook","uninstallBehavior":"remove only the RTK hook entry, preserve the file"}'
       ;;
     added)
-      say "Registered Claude Code hook"
-      say "Updated $settings_path"
+      install_event "Skills and Plugins" "RTK" "Configuration Entries Updated" "Registered Claude Code hook" "ok"
+      install_event "Skills and Plugins" "RTK" "Configuration Entries Updated" "Updated $settings_path" "ok"
       record_manifest "settings_entry" "rtk" "user-owned" "added" "$settings_path" '{"key":"hooks.PreToolUse","command":"rtk hook claude","managedEntry":"RTK Claude hook","uninstallBehavior":"remove only the RTK hook entry, preserve the file"}'
       ;;
     *)
@@ -584,7 +601,7 @@ NODE
 
 install_rtk_binary() {
   if command -v rtk >/dev/null 2>&1; then
-    say "rtk already installed: $(command -v rtk)"
+    install_event "Skills and Plugins" "RTK" "Files Already Current" "rtk already installed: $(command -v rtk)" "ok"
     return 0
   fi
 
@@ -595,9 +612,10 @@ install_rtk_binary() {
 
   if command -v curl >/dev/null 2>&1; then
     if [ "$dry_run" = "1" ]; then
-      say "dry-run: curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh"
+      install_event "Skills and Plugins" "RTK" "Shell Commands Run" "dry-run: curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh" "ok"
     else
       curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh
+      install_event "Skills and Plugins" "RTK" "Shell Commands Run" "curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh" "ok"
     fi
     return 0
   fi
@@ -685,6 +703,7 @@ initialize_rtk_agents() {
   local old_ifs agent args output status
 
   [ "$install_rtk" = "1" ] || return 0
+  current_tool="RTK"
   install_rtk_binary
   detect_rtk_agents
 
@@ -765,7 +784,7 @@ verify_rtk_setup() {
   [ "$install_rtk" = "1" ] || return 0
 
   if [ "$dry_run" = "1" ]; then
-    say "dry-run: would verify RTK binary and assistant instruction wiring"
+    install_event "Verification" "RTK" "Verification Checks" "dry-run: would verify RTK binary and assistant instruction wiring" "ok"
     return 0
   fi
 
@@ -792,10 +811,11 @@ verify_rtk_setup() {
     return 1
   fi
 
-  say "verified RTK setup"
+  install_event "Verification" "RTK" "Verification Checks" "verified RTK setup" "ok"
 }
 
 install_caveman_agent_fallbacks() {
+  current_tool="Caveman"
   command -v gemini >/dev/null 2>&1 && run_cmd gemini extensions install https://github.com/JuliusBrussee/caveman
   detect_command_or_dir codex "$HOME/.codex" && run_cmd npx skills add JuliusBrussee/caveman -a codex
   detect_command_or_dir cursor "$HOME/.cursor" && run_cmd npx skills add JuliusBrussee/caveman -a cursor
@@ -810,6 +830,7 @@ install_caveman_tool() {
   local args
 
   [ "$install_caveman" = "1" ] || return 0
+  current_tool="Caveman"
 
   if ! command -v npx >/dev/null 2>&1 && [ "$dry_run" != "1" ]; then
     printf 'warning: npx is required to install Caveman; skipping\n' >&2
@@ -817,10 +838,11 @@ install_caveman_tool() {
   fi
 
   if [ "$dry_run" = "1" ]; then
-    say "dry-run: would write caveman default mode $caveman_mode"
+    install_event "Skills and Plugins" "Caveman" "Configuration Entries Updated" "dry-run: would write caveman default mode $caveman_mode" "ok"
   else
     mkdir -p "$HOME/.config/caveman"
     printf '{\n  "defaultMode": "%s"\n}\n' "$caveman_mode" > "$HOME/.config/caveman/config.json"
+    install_event "Skills and Plugins" "Caveman" "Configuration Entries Updated" "wrote caveman default mode $caveman_mode" "ok"
   fi
 
   args="$caveman_args"
@@ -918,6 +940,35 @@ report_event() {
 
   [ -n "$uninstall_report_file" ] || return 0
   printf '%s\t%s\t%s\t%s\t%s\n' "$section" "$tool" "$category" "$item" "$status" >> "$uninstall_report_file"
+}
+
+install_event() {
+  local section="$1"
+  local tool="$2"
+  local category="$3"
+  local item="$4"
+  local status="${5:-ok}"
+
+  [ -n "$install_report_file" ] || return 0
+  printf '%s\t%s\t%s\t%s\t%s\n' "$section" "$tool" "$category" "$item" "$status" >> "$install_report_file"
+}
+
+install_file_event() {
+  local component="$1"
+  local category="$2"
+  local item="$3"
+
+  case "$component" in
+    global-instructions)
+      install_event "Instruction Files" "" "$category" "$item" "ok"
+      ;;
+    project-templates)
+      install_event "Templates" "" "$category" "$item" "ok"
+      ;;
+    *)
+      install_event "Skills and Plugins" "$(tool_for_component "$component")" "$category" "$item" "ok"
+      ;;
+  esac
 }
 
 report_preserved() {
@@ -1023,6 +1074,95 @@ reset_global_instruction_files() {
     report_event "Instruction Files" "" "Files Updated" "Reset $file" "ok"
     report_preserved "$file"
   done
+}
+
+report_install_summary() {
+  [ -s "$install_report_file" ] || return 0
+  if command -v node >/dev/null 2>&1; then
+    node - "$install_report_file" <<'NODE'
+const fs = require("fs");
+const file = process.argv[2];
+const rows = fs.readFileSync(file, "utf8").trim().split(/\n/).filter(Boolean).map((line) => {
+  const [section, tool, category, item, status] = line.split("\t");
+  return { section, tool, category, item, status };
+});
+const symbol = (status) => status === "warn" ? "!" : "✓";
+const printRule = (char = "-") => console.log(char.repeat(50));
+const printSection = (name, char = "-") => { console.log(name); printRule(char); };
+const unique = (items) => [...new Set(items.filter(Boolean))];
+const printRows = (items) => {
+  for (const row of items) console.log(`${symbol(row.status)} ${row.item}`);
+};
+
+const instruction = rows.filter((r) => r.section === "Instruction Files");
+if (instruction.length) {
+  printSection("Instruction Files");
+  for (const category of unique(instruction.map((r) => r.category))) {
+    const entries = instruction.filter((r) => r.category === category);
+    console.log(`${category} (${unique(entries.map((r) => r.item)).length})`);
+    printRows(entries);
+  }
+  console.log("");
+}
+
+const toolRows = rows.filter((r) => r.section === "Skills and Plugins");
+if (toolRows.length) {
+  printSection("Skills and Plugins", "=");
+  for (const tool of ["Caveman", "RTK", "Optimize-AI", "Seed Project"]) {
+    const owned = toolRows.filter((r) => r.tool === tool);
+    if (!owned.length) continue;
+    console.log(tool);
+    printRule("-");
+    for (const category of unique(owned.map((r) => r.category))) {
+      const entries = owned.filter((r) => r.category === category);
+      console.log(`${category} (${unique(entries.map((r) => r.item)).length})`);
+      printRows(entries);
+    }
+    console.log("Status");
+    console.log("✓ Successfully Installed");
+    console.log("");
+  }
+}
+
+const templates = rows.filter((r) => r.section === "Templates");
+if (templates.length) {
+  printSection("Templates");
+  for (const category of unique(templates.map((r) => r.category))) {
+    const entries = templates.filter((r) => r.category === category);
+    console.log(`${category} (${unique(entries.map((r) => r.item)).length})`);
+    printRows(entries);
+  }
+  console.log("");
+}
+
+const config = rows.filter((r) => r.section === "Configuration");
+if (config.length) {
+  printSection("Configuration");
+  printRows(config);
+  console.log("");
+}
+
+const verification = rows.filter((r) => r.section === "Verification");
+const verificationIssues = verification.filter((r) => r.status === "warn" || r.category === "Verification Issues");
+if (verification.length) {
+  printSection("Verification", "=");
+  printRows(verification);
+  console.log("");
+}
+
+const count = (category) => unique(rows.filter((r) => r.category === category).map((r) => r.item)).length;
+printSection("Summary");
+console.log(`Files Installed: ${count("Files Installed")}`);
+console.log(`Files Overwritten: ${count("Files Overwritten")}`);
+console.log(`Files Already Current: ${count("Files Already Current")}`);
+console.log(`Files Skipped: ${count("Files Skipped")}`);
+console.log(`Shell Commands Run: ${count("Shell Commands Run")}`);
+console.log(`Configuration Entries Updated: ${count("Configuration Entries Updated")}`);
+console.log(`Verification Issues: ${verificationIssues.length}`);
+NODE
+  else
+    cat "$install_report_file"
+  fi
 }
 
 report_uninstall_summary() {
@@ -1638,6 +1778,8 @@ install_steps=5
 [ "$install_rtk" != "0" ] && install_steps=$((install_steps + 3))
 [ "$install_caveman" != "0" ] && install_steps=$((install_steps + 1))
 install_step=0
+install_active=1
+install_report_file="$(mktemp)"
 
 install_step=$((install_step + 1))
 progress_line "Install" "$install_step" "$install_steps" "global instructions"
@@ -1690,4 +1832,6 @@ if [ "$install_caveman" != "0" ]; then
 fi
 install_caveman_tool
 
+report_install_summary
 say "setup complete"
+rm -f "$install_report_file"

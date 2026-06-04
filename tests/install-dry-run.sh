@@ -35,6 +35,13 @@ printf '%s\n' "$output" | grep -Fq 'dry-run: npx -y github:JuliusBrussee/caveman
 printf '%s\n' "$output" | grep -Fq 'dry-run: gemini extensions install https://github.com/JuliusBrussee/caveman'
 printf '%s\n' "$output" | grep -Fq 'dry-run: npx skills add JuliusBrussee/caveman -a codex'
 printf '%s\n' "$output" | grep -Fq 'dry-run: npx skills add JuliusBrussee/caveman -a cursor'
+printf '%s\n' "$output" | grep -Fq 'Instruction Files'
+printf '%s\n' "$output" | grep -Fq 'Skills and Plugins'
+printf '%s\n' "$output" | grep -Fq 'Files Skipped'
+printf '%s\n' "$output" | grep -Fq 'Shell Commands Run'
+printf '%s\n' "$output" | grep -Fq 'Summary'
+printf '%s\n' "$output" | grep -Fq 'Files Skipped:'
+printf '%s\n' "$output" | grep -Fq 'Shell Commands Run:'
 
 skip_output="$(
   bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --skip-rtk --skip-caveman
@@ -59,6 +66,13 @@ if command -v pwsh >/dev/null 2>&1; then
   printf '%s\n' "$ps_output" | grep -Fq 'dry-run: gemini extensions install https://github.com/JuliusBrussee/caveman'
   printf '%s\n' "$ps_output" | grep -Fq 'dry-run: npx skills add JuliusBrussee/caveman -a codex'
   printf '%s\n' "$ps_output" | grep -Fq 'dry-run: npx skills add JuliusBrussee/caveman -a cursor'
+  printf '%s\n' "$ps_output" | grep -Fq 'Instruction Files'
+  printf '%s\n' "$ps_output" | grep -Fq 'Skills and Plugins'
+  printf '%s\n' "$ps_output" | grep -Fq 'Files Skipped'
+  printf '%s\n' "$ps_output" | grep -Fq 'Shell Commands Run'
+  printf '%s\n' "$ps_output" | grep -Fq 'Summary'
+  printf '%s\n' "$ps_output" | grep -Fq 'Files Skipped:'
+  printf '%s\n' "$ps_output" | grep -Fq 'Shell Commands Run:'
 
   ps_skip_output="$(
     pwsh -NoProfile -File "$ROOT/scripts/install.ps1" -DryRun -NonInteractive -SkipRtk -SkipCaveman
