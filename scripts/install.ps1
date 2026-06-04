@@ -17,8 +17,9 @@ $ErrorActionPreference = "Stop"
 
 $Root = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 $HomeDir = if ($env:TOKEN_SAVER_HOME) { $env:TOKEN_SAVER_HOME } else { [Environment]::GetFolderPath("UserProfile") }
+$CavemanModes = @("lite", "full", "ultra", "wenyan-lite", "wenyan-full", "wenyan-ultra")
 if (-not $ProjectScope) {
-  $ProjectScope = Join-Path (Join-Path $HomeDir "Documents") "git"
+  $ProjectScope = Join-Path $HomeDir "Documents"
 }
 
 function Write-Setup {
@@ -55,7 +56,7 @@ function Read-YesNo {
   }
 
   $label = if ($Default) { "y" } else { "n" }
-  $answer = Read-Host "$Prompt [$label]"
+  $answer = Read-Host "$Prompt (y/n) [$label]"
   if ([string]::IsNullOrWhiteSpace($answer)) {
     return $Default
   }
@@ -77,6 +78,14 @@ function Read-TextDefault {
     return $Default
   }
   return $answer
+}
+
+function Assert-CavemanMode {
+  param([string]$Mode)
+
+  if ($CavemanModes -notcontains $Mode) {
+    throw "invalid Caveman mode: $Mode. Valid Caveman modes: $($CavemanModes -join ',')"
+  }
 }
 
 function Copy-ManagedFile {
@@ -494,7 +503,7 @@ function Install-CavemanTool {
 }
 
 if (-not $NonInteractive) {
-  $ProjectScope = Read-TextDefault -Prompt "Project scope for instruction seeding" -Default $ProjectScope
+  $ProjectScope = Read-TextDefault -Prompt "Enter project directory for project seeding instructions" -Default $ProjectScope
   if (-not $OverwriteGlobalInstructions) {
     $OverwriteGlobalInstructions = Read-YesNo -Prompt "Overwrite existing global Claude/Codex instruction files?" -Default $false
   }
@@ -502,16 +511,29 @@ if (-not $NonInteractive) {
     $SkipRtk = -not (Read-YesNo -Prompt "Install and initialize RTK?" -Default $true)
   }
   if (-not $SkipRtk) {
-    $RtkAgents = Read-TextDefault -Prompt "RTK agents to initialize, comma-separated" -Default $RtkAgents
+    $RtkAgents = Read-TextDefault -Prompt "RTK agents to initialize, comma-separated or 'all available'" -Default $RtkAgents
+    if ($RtkAgents -in @("all", "all available", "all-available")) {
+      $RtkAgents = ""
+      $RtkMode = "auto"
+    }
     $RtkMode = Read-TextDefault -Prompt "RTK setup mode" -Default $RtkMode
   }
   if (-not $SkipCaveman) {
     $SkipCaveman = -not (Read-YesNo -Prompt "Install Caveman?" -Default $true)
   }
   if (-not $SkipCaveman) {
-    $CavemanMode = Read-TextDefault -Prompt "Persistent Caveman default mode" -Default $CavemanMode
+    $CavemanMode = Read-TextDefault -Prompt "Caveman mode to use ($($CavemanModes -join ','))" -Default $CavemanMode
     $CavemanArgs = Read-TextDefault -Prompt "Extra Caveman args (examples: --all, --minimal, --only claude, --no-hooks)" -Default $CavemanArgs
   }
+}
+
+if (-not $SkipCaveman) {
+  Assert-CavemanMode -Mode $CavemanMode
+}
+
+if ($RtkAgents -in @("all", "all available", "all-available")) {
+  $RtkAgents = ""
+  $RtkMode = "auto"
 }
 
 Copy-GlobalInstructionFile -Source (Join-Path $Root "templates/CLAUDE.global.md") -Target (Join-Path $HomeDir ".claude/CLAUDE.md")

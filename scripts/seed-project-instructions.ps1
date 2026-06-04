@@ -6,7 +6,7 @@ param(
 $HomeDir = if ($env:TOKEN_SAVER_HOME) { $env:TOKEN_SAVER_HOME } else { [Environment]::GetFolderPath("UserProfile") }
 $DefaultProjectScope = "{{PROJECT_SCOPE}}"
 if ($DefaultProjectScope -like "{{*}}") {
-  $DefaultProjectScope = Join-Path (Join-Path $HomeDir "Documents") "git"
+  $DefaultProjectScope = Join-Path $HomeDir "Documents"
 }
 
 $Scope = if ($env:PROJECT_SCOPE) { $env:PROJECT_SCOPE } else { $DefaultProjectScope }

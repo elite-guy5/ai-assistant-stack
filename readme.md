@@ -19,13 +19,13 @@ irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/
 
 The installer prompts for:
 
-- Whether to overwrite existing global Claude/Codex instruction files. Default: no.
-- Project scope for instruction seeding. Default: `~/Documents/git`.
-- Whether to install and initialize RTK. Default: yes.
-- RTK agents to initialize. Default: `claude,codex`.
+- Whether to overwrite existing global Claude/Codex instruction files. Options: `y` / `n`. Default: `n`.
+- Project directory for project seeding instructions. Default: `~/Documents`.
+- Whether to install and initialize RTK. Options: `y` / `n`. Default: `y`.
+- RTK agents to initialize. Enter a comma-separated list or `all available`. Default: `claude,codex`.
 - RTK setup mode. Default: `auto`, which adds detected installed agents.
-- Whether to install Caveman. Default: yes.
-- Persistent Caveman default mode. Default: `ultra`.
+- Whether to install Caveman. Options: `y` / `n`. Default: `y`.
+- Caveman mode to use. Options: `lite`, `full`, `ultra`, `wenyan-lite`, `wenyan-full`, `wenyan-ultra`. Default: `ultra`.
 - Optional Caveman flags. Default: none.
 
 Useful non-interactive examples:
@@ -56,7 +56,7 @@ Installer flags:
 
 - `--non-interactive` / `-NonInteractive` - use defaults and do not prompt.
 - `--dry-run` / `-DryRun` - preview actions.
-- `--project-scope <path>` / `-ProjectScope <path>` - set the default project root for seeding.
+- `--project-scope <path>` / `-ProjectScope <path>` - set the project directory for project seeding instructions.
 - `--overwrite` / `-Overwrite` - replace managed files instead of writing `.new`.
 - `--overwrite-global-instructions` / `-OverwriteGlobalInstructions` - replace existing `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`; default is to skip existing global instruction files.
 - `--skip-rtk` / `-SkipRtk` - skip RTK install/init.
@@ -64,7 +64,7 @@ Installer flags:
 - `--rtk-agents <list>` / `-RtkAgents <list>` - comma-separated RTK agents.
 - `--rtk-mode <mode>` / `-RtkMode <mode>` - RTK setup mode, default `auto`.
 - `--caveman-args <args>` / `-CavemanArgs <args>` - pass extra flags to Caveman.
-- `--caveman-mode <mode>` / `-CavemanMode <mode>` - persistent Caveman default mode, default `ultra`.
+- `--caveman-mode <mode>` / `-CavemanMode <mode>` - Caveman mode to use: `lite`, `full`, `ultra`, `wenyan-lite`, `wenyan-full`, or `wenyan-ultra`; default `ultra`.
 
 # Recommended Layered Configuration
 
@@ -133,7 +133,7 @@ Installer behavior:
 
 # AI Ignore Optimization
 
-The seeding hook runs the optimizer for first-level projects inside your configured project scope. You can also run it manually from a project root:
+The seeding hook runs the optimizer for first-level projects inside your configured project directory. You can also run it manually from a project root:
 
 ~~~sh
 bash ~/.agents/scripts/optimize-ai.sh
@@ -255,7 +255,7 @@ GitHub Link: [GitHub: juliusbrussee/caveman](https://github.com/juliusbrussee/ca
 
 Adds a `/caveman` slash command that forces Claude Code into a minimal, verbose-free response mode. Reduces output bloat in long sessions.
 
-The installer writes `~/.config/caveman/config.json` with `defaultMode` set to `ultra`, runs the upstream unified Caveman installer with `--all`, and adds per-agent fallback installs for detected non-Claude agents where needed. Some agents still require per-session activation if their native integration does not support always-on hooks.
+The installer prompts for the Caveman mode, writes `~/.config/caveman/config.json` with `defaultMode` set to that value, runs the upstream unified Caveman installer with `--all`, and adds per-agent fallback installs for detected non-Claude agents where needed. Some agents still require per-session activation if their native integration does not support always-on hooks.
 
 ### Manual install
 
@@ -366,10 +366,10 @@ Installed script:
 
 Behavior:
 
-- Only runs for projects under `~/Documents/git` by default.
-- Override the project scope with `PROJECT_SCOPE=/path/to/projects`.
+- Only runs for projects under `~/Documents` by default.
+- Override the project directory with `PROJECT_SCOPE=/path/to/projects`.
 - Ignores hidden top-level folders.
-- Detects the first project directory below the configured project scope.
+- Detects the first project directory below the configured project directory.
 - Creates `CLAUDE.md` from `~/.claude/CLAUDE.project-template.md` if missing.
 - Creates `AGENTS.md` from `~/.codex/AGENTS.project-template.md` if missing.
 - Does not overwrite existing project instruction files.
@@ -398,5 +398,5 @@ Claude Code hook entry in `~/.claude/settings.json`. Standalone repo snippets ar
 Manual test:
 
 ~~~sh
-DRY_RUN=1 bash ~/.agents/scripts/seed-project-instructions.sh ~/Documents/git/example-project
+DRY_RUN=1 bash ~/.agents/scripts/seed-project-instructions.sh ~/Documents/example-project
 ~~~

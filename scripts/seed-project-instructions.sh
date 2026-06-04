@@ -3,7 +3,7 @@ set -euo pipefail
 
 DEFAULT_PROJECT_SCOPE="{{PROJECT_SCOPE}}"
 case "$DEFAULT_PROJECT_SCOPE" in
-  "{{"*"}}") DEFAULT_PROJECT_SCOPE="$HOME/Documents/git" ;;
+  "{{"*"}}") DEFAULT_PROJECT_SCOPE="$HOME/Documents" ;;
 esac
 
 SCOPE="${PROJECT_SCOPE:-$DEFAULT_PROJECT_SCOPE}"

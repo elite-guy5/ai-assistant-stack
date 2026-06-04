@@ -6,13 +6,14 @@ non_interactive=0
 dry_run=0
 overwrite="${OVERWRITE:-0}"
 overwrite_global_instructions=0
-project_scope="${PROJECT_SCOPE:-$HOME/Documents/git}"
+project_scope="${PROJECT_SCOPE:-$HOME/Documents}"
 install_rtk=""
 install_caveman=""
 rtk_agents="claude,codex"
 rtk_mode="auto"
 caveman_args=""
 caveman_mode="ultra"
+caveman_modes="lite,full,ultra,wenyan-lite,wenyan-full,wenyan-ultra"
 
 usage() {
   cat <<'EOF'
@@ -21,7 +22,7 @@ Usage: bash scripts/install.sh [options]
 Options:
   --non-interactive        Use defaults and do not prompt
   --dry-run                Print actions without changing files or installing tools
-  --project-scope <path>   Default project root for instruction seeding
+  --project-scope <path>   Project directory for project seeding instructions
   --overwrite              Replace existing managed files instead of writing .new files
   --overwrite-global-instructions
                            Replace existing ~/.claude/CLAUDE.md and ~/.codex/AGENTS.md
@@ -112,9 +113,9 @@ prompt_yes_no() {
   fi
 
   if [ -t 0 ]; then
-    read -r -p "$prompt [$default_label]: " answer
+    read -r -p "$prompt (y/n) [$default_label]: " answer
   elif [ -r /dev/tty ]; then
-    printf '%s [%s]: ' "$prompt" "$default_label" > /dev/tty
+    printf '%s (y/n) [%s]: ' "$prompt" "$default_label" > /dev/tty
     read -r answer < /dev/tty
   else
     answer="$default"
@@ -148,7 +149,18 @@ prompt_text() {
   printf '%s\n' "${answer:-$default}"
 }
 
-project_scope="$(prompt_text "Project scope for instruction seeding" "$project_scope")"
+validate_caveman_mode() {
+  case "$1" in
+    lite|full|ultra|wenyan-lite|wenyan-full|wenyan-ultra) return 0 ;;
+    *)
+      printf 'error: invalid Caveman mode: %s\n' "$1" >&2
+      printf 'valid Caveman modes: %s\n' "$caveman_modes" >&2
+      return 1
+      ;;
+  esac
+}
+
+project_scope="$(prompt_text "Enter project directory for project seeding instructions" "$project_scope")"
 
 if prompt_yes_no "Overwrite existing global Claude/Codex instruction files?" "no"; then
   overwrite_global_instructions=1
@@ -163,7 +175,13 @@ if [ -z "$install_rtk" ]; then
 fi
 
 if [ "$install_rtk" = "1" ]; then
-  rtk_agents="$(prompt_text "RTK agents to initialize, comma-separated" "$rtk_agents")"
+  rtk_agents="$(prompt_text "RTK agents to initialize, comma-separated or 'all available'" "$rtk_agents")"
+  case "$rtk_agents" in
+    all|"all available"|"all-available")
+      rtk_agents=""
+      rtk_mode="auto"
+      ;;
+  esac
   rtk_mode="$(prompt_text "RTK setup mode" "$rtk_mode")"
 fi
 
@@ -176,8 +194,12 @@ if [ -z "$install_caveman" ]; then
 fi
 
 if [ "$install_caveman" = "1" ] && [ "$non_interactive" != "1" ]; then
-  caveman_mode="$(prompt_text "Persistent Caveman default mode" "$caveman_mode")"
+  caveman_mode="$(prompt_text "Caveman mode to use ($caveman_modes)" "$caveman_mode")"
   caveman_args="$(prompt_text "Extra Caveman args (examples: --all, --minimal, --only claude, --no-hooks)" "$caveman_args")"
+fi
+
+if [ "$install_caveman" = "1" ]; then
+  validate_caveman_mode "$caveman_mode"
 fi
 
 copy_managed_file() {
