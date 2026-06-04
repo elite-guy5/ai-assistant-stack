@@ -56,3 +56,8 @@ function Copy-IfMissing {
 
 Copy-IfMissing -Template $ClaudeTemplate -Target (Join-Path $project "CLAUDE.md")
 Copy-IfMissing -Template $CodexTemplate -Target (Join-Path $project "AGENTS.md")
+
+$optimizer = Join-Path $PSScriptRoot "optimize-ai.ps1"
+if (Test-Path -PathType Leaf $optimizer) {
+  & $optimizer -Project $project
+}

@@ -3,7 +3,7 @@ This document walks you through configuring an optimized AI coding environment. 
 
 # One-Command Install
 
-Run the installer for your platform. It downloads this repo, asks which optional tools to install, then installs the shared instruction templates and project seeding hook.
+Run the installer for your platform. It downloads this repo, asks which optional tools to install, then installs the shared instruction templates, project seeding hook, and AI ignore optimizer.
 
 **macOS / Linux / WSL**
 
@@ -83,6 +83,11 @@ Layer 4 - Project Instruction Seeding
   └── Creates project-local CLAUDE.md and AGENTS.md when missing
       Runs from a Claude Code SessionStart hook
       Uses templates instead of hand-copying instructions per repo
+
+Layer 5 - AI Ignore Boundaries
+  └── Keeps token-heavy and sensitive files out of agent context by default
+      Maintains .gitignore, .codexignore, and .claude/settings.local.json
+      Blocks secrets, lockfiles, logs, coverage, build output, dependencies, local databases, and AI-only binary assets
 ~~~
 
 **Key principle:** Configure hooks at the shell level rather than relying on natural language prompts to instruct the agent to "compress output." Prompt-level instructions consume tokens and achieve only 70–85% compliance. Shell hooks achieve 100% coverage with zero token overhead.
@@ -98,6 +103,8 @@ This repo includes the files needed to install and maintain the instruction setu
 - `scripts/install.ps1` - native Windows PowerShell installer.
 - `scripts/seed-project-instructions.sh` - shell project seeding hook.
 - `scripts/seed-project-instructions.ps1` - PowerShell project seeding hook.
+- `scripts/optimize-ai.sh` - shell project ignore optimizer for `.gitignore`, `.codexignore`, and `.claude/settings.local.json`.
+- `scripts/optimize-ai.ps1` - PowerShell project ignore optimizer.
 - `templates/CLAUDE.global.md` - global Claude Code instruction template.
 - `templates/AGENTS.global.md` - global Codex instruction template.
 - `templates/CLAUDE.project-template.md` - project-local Claude Code template.
@@ -110,8 +117,33 @@ Installer behavior:
 - Creates missing target files.
 - Leaves existing files unchanged when they differ and writes `<target>.new` for review.
 - Installs the seeding scripts to `~/.agents/scripts/`.
+- Installs the AI ignore optimizer scripts to `~/.agents/scripts/`.
 - Adds the Claude Code `SessionStart` hook if it is missing.
+- When a project is seeded, updates `.gitignore`, `.codexignore`, and `.claude/settings.local.json` with token-bloat exclusions.
 - Use `--overwrite` only when you intentionally want to replace existing target files.
+
+# AI Ignore Optimization
+
+The seeding hook runs the optimizer for first-level projects inside your configured project scope. You can also run it manually from a project root:
+
+~~~sh
+bash ~/.agents/scripts/optimize-ai.sh
+~~~
+
+~~~powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\.agents\scripts\optimize-ai.ps1
+~~~
+
+The optimizer adds managed blocks for:
+
+- Secrets: `.env`, `.env.*`.
+- Lockfiles: `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `poetry.lock`.
+- Build and cache output: `dist/`, `build/`, `out/`, `.next/`, `.nuxt/`.
+- Dependencies and virtual environments: `node_modules/`, `vendor/`, `.venv/`, `venv/`.
+- Logs, coverage, and local data: `*.log`, `coverage/`, `.nyc_output/`, `*.db`, `*.sqlite`, `*.sqlite3`.
+- AI-only binary and media exclusions in `.codexignore`: images, archives, audio, video, and PDFs.
+
+The `.gitignore` block intentionally avoids broad image, PDF, and media patterns because many repositories need source assets committed. Those file types are added to `.codexignore` instead so agents avoid reading them while Git can still track intentional assets.
 
 # Pre-Reqs
 Assuming you have your AI tool installed, you will need Node.js if you choose to install Caveman because the Caveman installer uses `npx`. Python is not required by this repo's installer. Open your terminal in your home directory, usually `~` on macOS/Linux/WSL or `%USERPROFILE%` on Windows.

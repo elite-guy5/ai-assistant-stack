@@ -319,9 +319,11 @@ copy_managed_file "$ROOT/templates/CLAUDE.global.md" "$HOME/.claude/CLAUDE.md"
 render_template "$ROOT/templates/AGENTS.global.md" "$HOME/.codex/AGENTS.md"
 copy_managed_file "$ROOT/templates/CLAUDE.project-template.md" "$HOME/.claude/CLAUDE.project-template.md"
 copy_managed_file "$ROOT/templates/AGENTS.project-template.md" "$HOME/.codex/AGENTS.project-template.md"
+copy_managed_file "$ROOT/scripts/optimize-ai.sh" "$HOME/.agents/scripts/optimize-ai.sh"
 render_template "$ROOT/scripts/seed-project-instructions.sh" "$HOME/.agents/scripts/seed-project-instructions.sh"
 
 if [ "$dry_run" != "1" ]; then
+  chmod +x "$HOME/.agents/scripts/optimize-ai.sh"
   chmod +x "$HOME/.agents/scripts/seed-project-instructions.sh"
 fi
 

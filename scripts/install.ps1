@@ -302,6 +302,7 @@ Copy-ManagedFile -Source (Join-Path $Root "templates/CLAUDE.global.md") -Target 
 Copy-RenderedFile -Source (Join-Path $Root "templates/AGENTS.global.md") -Target (Join-Path $HomeDir ".codex/AGENTS.md")
 Copy-ManagedFile -Source (Join-Path $Root "templates/CLAUDE.project-template.md") -Target (Join-Path $HomeDir ".claude/CLAUDE.project-template.md")
 Copy-ManagedFile -Source (Join-Path $Root "templates/AGENTS.project-template.md") -Target (Join-Path $HomeDir ".codex/AGENTS.project-template.md")
+Copy-ManagedFile -Source (Join-Path $Root "scripts/optimize-ai.ps1") -Target (Join-Path $HomeDir ".agents/scripts/optimize-ai.ps1")
 Copy-RenderedFile -Source (Join-Path $Root "scripts/seed-project-instructions.ps1") -Target (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.ps1")
 Copy-RenderedFile -Source (Join-Path $Root "scripts/seed-project-instructions.sh") -Target (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.sh")
 

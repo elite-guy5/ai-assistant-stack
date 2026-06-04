@@ -1,0 +1,14 @@
+node_modules/
+.venv/
+env/
+vendor/
+dist/
+build/
+out/
+.next/
+target/
+*.log
+*.db
+.cache/
+AGENTS.md
+CLAUDE.md

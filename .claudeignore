@@ -1,0 +1,15 @@
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+node_modules/
+.venv/
+env/
+vendor/
+dist/
+build/
+out/
+.next/
+target/
+*.log
+*.db
+.cache/

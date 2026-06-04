@@ -45,3 +45,8 @@ copy_if_missing() {
 
 copy_if_missing "$CLAUDE_TEMPLATE" "$project/CLAUDE.md"
 copy_if_missing "$CODEX_TEMPLATE" "$project/AGENTS.md"
+
+optimizer="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/optimize-ai.sh"
+if [ -f "$optimizer" ]; then
+  bash "$optimizer" "$project"
+fi

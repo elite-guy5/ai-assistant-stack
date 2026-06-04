@@ -20,6 +20,12 @@ Project-specific instructions. Inherits global behavior from `~/.codex/AGENTS.md
 - <repo-specific style, patterns, dirs the global rules don't cover>
 - <repo-specific gotchas - keep them here, not in global memory>
 
+## Token-Saver File Boundaries
+
+- Keep generated files, secrets, logs, coverage, dependency folders, local databases, and binary assets out of agent context by default.
+- Project seeding maintains `.gitignore`, `.codexignore`, and `.claude/settings.local.json` with common token-bloat exclusions.
+- If this repo needs narrower or broader exclusions, update the local ignore files rather than weakening the global behavior.
+
 ## Development Workflow
 
 This repo defers to the **Superpowers** workflow when relevant to software development work. Default process, in order:

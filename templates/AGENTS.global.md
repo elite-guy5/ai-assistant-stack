@@ -29,6 +29,14 @@
 - Superpowers skills should only be invoked automatically for software development work: writing or editing code, implementing features, fixing bugs, refactoring, testing, code review, or creating/editing skills.
 - Do not invoke Superpowers automatically for ordinary questions, explanations, configuration checks, local machine troubleshooting, install verification, process inspection, or other non-development tasks unless explicitly asked for Superpowers.
 
+### Token-Saver File Boundaries
+
+- Prefer targeted `rg`, `sed`, `git diff`, and package-manager metadata commands over opening large generated files.
+- Do not read lockfiles, dependency folders, build outputs, coverage dumps, logs, local databases, or binary assets unless the user explicitly asks or the task cannot be completed without them.
+- Treat `.env` and `.env.*` as secrets. Do not open, summarize, or copy their contents.
+- Project seeding maintains `.gitignore`, `.codexignore`, and `.claude/settings.local.json` token-bloat exclusions for common generated files and secrets.
+- If an ignored file is truly required, explain why and read the smallest targeted excerpt possible.
+
 ## Software Development Guidelines
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
