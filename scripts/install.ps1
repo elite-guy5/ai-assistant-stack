@@ -101,7 +101,7 @@ function Copy-ManagedFile {
     } elseif ((Get-FileHash $Source).Hash -eq (Get-FileHash $Target).Hash) {
       Write-Setup "dry-run: already current $Target"
     } else {
-      Write-Setup "dry-run: would leave $Target unchanged and write $Target.new"
+      Write-Setup "dry-run: would skip existing managed file $Target"
     }
     return
   }
@@ -120,8 +120,7 @@ function Copy-ManagedFile {
     return
   }
 
-  Copy-Item -Force $Source "$Target.new"
-  Write-Setup "left existing $Target unchanged; wrote $Target.new"
+  Write-Setup "skipped existing managed file $Target"
 }
 
 function Copy-GlobalInstructionFile {

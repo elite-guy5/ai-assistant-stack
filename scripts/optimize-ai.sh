@@ -104,7 +104,7 @@ copy_or_new() {
     elif cmp -s "$source" "$target"; then
       printf 'dry-run: already current %s\n' "$target"
     else
-      printf 'dry-run: would leave %s unchanged and write %s.new\n' "$target" "$target"
+      printf 'dry-run: would skip existing %s\n' "$target"
     fi
     return 0
   fi
@@ -119,8 +119,7 @@ copy_or_new() {
     printf 'already current %s\n' "$target"
     return 0
   fi
-  cp "$source" "$target.new"
-  printf 'left existing %s unchanged; wrote %s.new\n' "$target" "$target"
+  printf 'skipped existing %s\n' "$target"
 }
 
 main() {

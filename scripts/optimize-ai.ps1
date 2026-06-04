@@ -98,7 +98,7 @@ function Copy-OrNew {
     } elseif ((Get-Content -Raw $Target) -eq $Content) {
       Write-Output "dry-run: already current $Target"
     } else {
-      Write-Output "dry-run: would leave $Target unchanged and write $Target.new"
+      Write-Output "dry-run: would skip existing $Target"
     }
     return
   }
@@ -117,8 +117,7 @@ function Copy-OrNew {
     return
   }
 
-  Set-Content -Encoding UTF8 -Path "$Target.new" -Value $Content
-  Write-Output "left existing $Target unchanged; wrote $Target.new"
+  Write-Output "skipped existing $Target"
 }
 
 function Get-WithoutBlock {

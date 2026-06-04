@@ -24,7 +24,7 @@ Options:
   --non-interactive        Use defaults and do not prompt
   --dry-run                Print actions without changing files or installing tools
   --project-scope <path>   Project directory for project seeding instructions
-  --overwrite              Replace existing managed files instead of writing .new files
+  --overwrite              Replace existing managed files instead of skipping them
   --overwrite-global-instructions
                            Replace existing ~/.claude/CLAUDE.md and ~/.codex/AGENTS.md
   --overwrite-project-templates
@@ -220,7 +220,7 @@ copy_managed_file() {
     elif cmp -s "$source" "$target"; then
       printf 'dry-run: already current %s\n' "$target"
     else
-      printf 'dry-run: would leave %s unchanged and write %s.new\n' "$target" "$target"
+      printf 'dry-run: would skip existing managed file %s\n' "$target"
     fi
     return 0
   fi
@@ -238,8 +238,7 @@ copy_managed_file() {
     return 0
   fi
 
-  cp "$source" "$target.new"
-  printf 'left existing %s unchanged; wrote %s.new\n' "$target" "$target"
+  printf 'skipped existing managed file %s\n' "$target"
 }
 
 copy_global_instruction_file() {
