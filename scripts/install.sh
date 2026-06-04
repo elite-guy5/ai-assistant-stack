@@ -7,6 +7,8 @@ dry_run=0
 overwrite="${OVERWRITE:-0}"
 overwrite_global_instructions=0
 overwrite_project_templates=0
+uninstall=0
+uninstall_components=""
 project_scope="${PROJECT_SCOPE:-$HOME/Documents}"
 install_rtk=""
 install_caveman=""
@@ -29,6 +31,9 @@ Options:
                            Replace existing ~/.claude/CLAUDE.md and ~/.codex/AGENTS.md
   --overwrite-project-templates
                            Replace existing project instruction template files
+  --uninstall              Remove selected installed components
+  --uninstall-components <list>
+                           Comma-separated uninstall components, or "all available"
   --skip-rtk               Do not install or initialize RTK
   --skip-caveman           Do not install Caveman
   --rtk-agents <list>      Comma-separated RTK agents to initialize (default: claude,codex)
@@ -46,6 +51,13 @@ while [ "$#" -gt 0 ]; do
     --overwrite) overwrite=1 ;;
     --overwrite-global-instructions) overwrite_global_instructions=1 ;;
     --overwrite-project-templates) overwrite_project_templates=1 ;;
+    --uninstall) uninstall=1 ;;
+    --uninstall-components)
+      [ "$#" -gt 1 ] || { printf 'missing value for --uninstall-components\n' >&2; exit 2; }
+      uninstall_components="$2"
+      shift
+      ;;
+    --uninstall-components=*) uninstall_components="${1#*=}" ;;
     --skip-rtk) install_rtk=0 ;;
     --skip-caveman) install_caveman=0 ;;
     --project-scope)
@@ -163,52 +175,6 @@ validate_caveman_mode() {
       ;;
   esac
 }
-
-project_scope="$(prompt_text "Enter project directory for project seeding instructions" "$project_scope")"
-
-if prompt_yes_no "Overwrite existing global Claude/Codex instruction files?" "no"; then
-  overwrite_global_instructions=1
-fi
-
-if prompt_yes_no "Overwrite existing project instruction template files?" "no"; then
-  overwrite_project_templates=1
-fi
-
-if [ -z "$install_rtk" ]; then
-  if prompt_yes_no "Install and initialize RTK?" "yes"; then
-    install_rtk=1
-  else
-    install_rtk=0
-  fi
-fi
-
-if [ "$install_rtk" = "1" ]; then
-  rtk_agents="$(prompt_text "RTK agents to initialize, comma-separated or 'all available'" "$rtk_agents")"
-  case "$rtk_agents" in
-    all|"all available"|"all-available")
-      rtk_agents=""
-      rtk_mode="auto"
-      ;;
-  esac
-  rtk_mode="$(prompt_text "RTK setup mode" "$rtk_mode")"
-fi
-
-if [ -z "$install_caveman" ]; then
-  if prompt_yes_no "Install Caveman?" "yes"; then
-    install_caveman=1
-  else
-    install_caveman=0
-  fi
-fi
-
-if [ "$install_caveman" = "1" ] && [ "$non_interactive" != "1" ]; then
-  caveman_mode="$(prompt_text "Caveman mode to use ($caveman_modes)" "$caveman_mode")"
-  caveman_args="$(prompt_text "Extra Caveman args (examples: --all, --minimal, --only claude, --no-hooks)" "$caveman_args")"
-fi
-
-if [ "$install_caveman" = "1" ]; then
-  validate_caveman_mode "$caveman_mode"
-fi
 
 copy_managed_file() {
   local source="$1"
@@ -632,6 +598,287 @@ install_caveman_tool() {
   run_cmd npx -y github:JuliusBrussee/caveman -- $args
   install_caveman_agent_fallbacks
 }
+
+component_selected() {
+  local wanted="$1"
+  local old_ifs component
+
+  case "$uninstall_components" in
+    ""|all|"all available"|"all-available")
+      return 0
+      ;;
+  esac
+
+  old_ifs="$IFS"
+  IFS=","
+  for component in $uninstall_components; do
+    IFS="$old_ifs"
+    component="$(printf '%s' "$component" | xargs)"
+    if [ "$component" = "$wanted" ]; then
+      IFS="$old_ifs"
+      return 0
+    fi
+    IFS=","
+  done
+  IFS="$old_ifs"
+  return 1
+}
+
+reset_file_blank() {
+  local target="$1"
+
+  if [ "$dry_run" = "1" ]; then
+    printf 'dry-run: would blank %s\n' "$target"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$target")"
+  : > "$target"
+  printf 'blanked %s\n' "$target"
+}
+
+remove_path() {
+  local target="$1"
+
+  if [ "$dry_run" = "1" ]; then
+    printf 'dry-run: would remove %s\n' "$target"
+    return 0
+  fi
+
+  if [ -e "$target" ]; then
+    rm -f "$target"
+    printf 'removed %s\n' "$target"
+  else
+    printf 'already absent %s\n' "$target"
+  fi
+}
+
+remove_claude_seed_hook() {
+  local settings_path="$HOME/.claude/settings.json"
+
+  if [ "$dry_run" = "1" ]; then
+    printf 'dry-run: would remove token-saver SessionStart hooks from %s\n' "$settings_path"
+    return 0
+  fi
+
+  [ -f "$settings_path" ] || return 0
+  command -v node >/dev/null 2>&1 || { printf 'warning: node required to edit %s; skipping\n' "$settings_path" >&2; return 0; }
+
+  node - "$settings_path" <<'NODE'
+const fs = require("fs");
+const settingsPath = process.argv[2];
+const raw = fs.readFileSync(settingsPath, "utf8").trim();
+const data = raw ? JSON.parse(raw) : {};
+if (data.hooks && Array.isArray(data.hooks.SessionStart)) {
+  data.hooks.SessionStart = data.hooks.SessionStart
+    .map((entry) => ({
+      ...entry,
+      hooks: Array.isArray(entry.hooks)
+        ? entry.hooks.filter((hook) => !String(hook && hook.command || "").includes("seed-project-instructions"))
+        : entry.hooks,
+    }))
+    .filter((entry) => !Array.isArray(entry.hooks) || entry.hooks.length > 0);
+}
+fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2) + "\n");
+console.log(`removed token-saver SessionStart hooks from ${settingsPath}`);
+NODE
+}
+
+remove_caveman_claude_settings() {
+  local settings_path="$HOME/.claude/settings.json"
+
+  if [ "$dry_run" = "1" ]; then
+    printf 'dry-run: would remove Caveman entries from %s\n' "$settings_path"
+    return 0
+  fi
+
+  [ -f "$settings_path" ] || return 0
+  command -v node >/dev/null 2>&1 || { printf 'warning: node required to edit %s; skipping\n' "$settings_path" >&2; return 0; }
+
+  node - "$settings_path" <<'NODE'
+const fs = require("fs");
+const settingsPath = process.argv[2];
+const raw = fs.readFileSync(settingsPath, "utf8").trim();
+const data = raw ? JSON.parse(raw) : {};
+const hasCaveman = (value) => JSON.stringify(value || "").toLowerCase().includes("caveman");
+
+if (data.hooks && typeof data.hooks === "object") {
+  for (const key of Object.keys(data.hooks)) {
+    if (Array.isArray(data.hooks[key])) {
+      data.hooks[key] = data.hooks[key]
+        .map((entry) => ({
+          ...entry,
+          hooks: Array.isArray(entry.hooks) ? entry.hooks.filter((hook) => !hasCaveman(hook)) : entry.hooks,
+        }))
+        .filter((entry) => !Array.isArray(entry.hooks) || entry.hooks.length > 0);
+    }
+  }
+}
+if (hasCaveman(data.statusLine)) delete data.statusLine;
+for (const prop of ["mcpServers", "plugins", "enabledPlugins"]) {
+  if (data[prop] && typeof data[prop] === "object") {
+    for (const key of Object.keys(data[prop])) {
+      if (key.toLowerCase().includes("caveman") || hasCaveman(data[prop][key])) delete data[prop][key];
+    }
+  }
+}
+fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2) + "\n");
+console.log(`removed Caveman entries from ${settingsPath}`);
+NODE
+}
+
+remove_caveman_codex_config() {
+  local config_path="$HOME/.codex/config.toml"
+  local temp skip=0 block=""
+
+  if [ "$dry_run" = "1" ]; then
+    printf 'dry-run: would remove known Caveman entries from %s\n' "$config_path"
+    return 0
+  fi
+
+  [ -f "$config_path" ] || return 0
+  temp="$(mktemp)"
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      "[mcp_servers.fs_shrunk]"|"[hooks.state./Users/burljohnson/.agents/skills/i-caveman/SKILL.md]"*)
+        skip=1
+        block="$line"
+        continue
+        ;;
+      "["*)
+        skip=0
+        block=""
+        ;;
+    esac
+    if [ "$skip" = "1" ]; then
+      continue
+    fi
+    case "$line" in
+      *caveman*|*Caveman*) continue ;;
+    esac
+    printf '%s\n' "$line" >> "$temp"
+  done < "$config_path"
+  mv "$temp" "$config_path"
+  printf 'removed known Caveman entries from %s\n' "$config_path"
+}
+
+uninstall_rtk_components() {
+  local old_ifs agent args
+
+  detect_rtk_agents
+  if command -v rtk >/dev/null 2>&1 || [ "$dry_run" = "1" ]; then
+    old_ifs="$IFS"
+    IFS=","
+    for agent in $rtk_agents; do
+      IFS="$old_ifs"
+      agent="$(printf '%s' "$agent" | tr -d '[:space:]')"
+      [ -n "$agent" ] || continue
+      args="$(rtk_init_arg "$agent")"
+      # shellcheck disable=SC2086
+      run_cmd rtk init --uninstall $args
+      IFS=","
+    done
+    IFS="$old_ifs"
+  else
+    printf 'warning: rtk not found; skipping RTK uninstall commands\n' >&2
+  fi
+  remove_path "$HOME/.codex/RTK.md"
+  remove_path "$HOME/.claude/RTK.md"
+}
+
+uninstall_caveman_components() {
+  if command -v npx >/dev/null 2>&1 || [ "$dry_run" = "1" ]; then
+    run_cmd npx -y github:JuliusBrussee/caveman -- --uninstall --non-interactive
+    run_cmd npx skills remove JuliusBrussee/caveman --all
+  else
+    printf 'warning: npx not found; skipping Caveman uninstall commands\n' >&2
+  fi
+  if command -v gemini >/dev/null 2>&1 || [ "$dry_run" = "1" ]; then
+    run_cmd gemini extensions uninstall caveman
+  fi
+  remove_path "$HOME/.config/caveman/config.json"
+  remove_caveman_claude_settings
+  remove_caveman_codex_config
+}
+
+uninstall_selected_components() {
+  case "$uninstall_components" in
+    ""|all|"all available"|"all-available") uninstall_components="all available" ;;
+  esac
+
+  component_selected "global-instructions" && {
+    reset_file_blank "$HOME/.claude/CLAUDE.md"
+    reset_file_blank "$HOME/.codex/AGENTS.md"
+  }
+  component_selected "project-templates" && {
+    remove_path "$HOME/.claude/CLAUDE.project-template.md"
+    remove_path "$HOME/.codex/AGENTS.project-template.md"
+  }
+  component_selected "seeding" && {
+    remove_path "$HOME/.agents/scripts/seed-project-instructions.sh"
+    remove_path "$HOME/.agents/scripts/seed-project-instructions.ps1"
+    remove_claude_seed_hook
+  }
+  component_selected "ignore-optimizer" && {
+    remove_path "$HOME/.agents/scripts/optimize-ai.sh"
+    remove_path "$HOME/.agents/scripts/optimize-ai.ps1"
+  }
+  component_selected "rtk" && uninstall_rtk_components
+  component_selected "caveman" && uninstall_caveman_components
+}
+
+if [ "$uninstall" = "1" ]; then
+  uninstall_components="$(prompt_text "Components to uninstall, comma-separated or 'all available' (global-instructions, project-templates, seeding, ignore-optimizer, rtk, caveman, all available)" "${uninstall_components:-all available}")"
+  uninstall_selected_components
+  say "uninstall complete"
+  exit 0
+fi
+
+project_scope="$(prompt_text "Enter project directory for project seeding instructions" "$project_scope")"
+
+if prompt_yes_no "Overwrite existing global Claude/Codex instruction files?" "no"; then
+  overwrite_global_instructions=1
+fi
+
+if prompt_yes_no "Overwrite existing project instruction template files?" "no"; then
+  overwrite_project_templates=1
+fi
+
+if [ -z "$install_rtk" ]; then
+  if prompt_yes_no "Install and initialize RTK?" "yes"; then
+    install_rtk=1
+  else
+    install_rtk=0
+  fi
+fi
+
+if [ "$install_rtk" = "1" ]; then
+  rtk_agents="$(prompt_text "RTK agents to initialize, comma-separated or 'all available'" "$rtk_agents")"
+  case "$rtk_agents" in
+    all|"all available"|"all-available")
+      rtk_agents=""
+      rtk_mode="auto"
+      ;;
+  esac
+  rtk_mode="$(prompt_text "RTK setup mode" "$rtk_mode")"
+fi
+
+if [ -z "$install_caveman" ]; then
+  if prompt_yes_no "Install Caveman?" "yes"; then
+    install_caveman=1
+  else
+    install_caveman=0
+  fi
+fi
+
+if [ "$install_caveman" = "1" ] && [ "$non_interactive" != "1" ]; then
+  caveman_mode="$(prompt_text "Caveman mode to use ($caveman_modes)" "$caveman_mode")"
+  caveman_args="$(prompt_text "Extra Caveman args (examples: --all, --minimal, --only claude, --no-hooks)" "$caveman_args")"
+fi
+
+if [ "$install_caveman" = "1" ]; then
+  validate_caveman_mode "$caveman_mode"
+fi
 
 copy_global_instruction_file "$ROOT/templates/CLAUDE.global.md" "$HOME/.claude/CLAUDE.md"
 render_global_instruction_template "$ROOT/templates/AGENTS.global.md" "$HOME/.codex/AGENTS.md"

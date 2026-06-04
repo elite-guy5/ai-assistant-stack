@@ -5,6 +5,8 @@ param(
   [switch]$Overwrite,
   [switch]$OverwriteGlobalInstructions,
   [switch]$OverwriteProjectTemplates,
+  [switch]$Uninstall,
+  [string]$UninstallComponents = "",
   [string]$ProjectScope,
   [switch]$SkipRtk,
   [switch]$SkipCaveman,
@@ -535,6 +537,223 @@ function Install-CavemanTool {
   $args = @("-y", "github:JuliusBrussee/caveman", "--") + $installerArgs
   Invoke-SetupCommand -FilePath "npx" -Arguments $args
   Install-CavemanAgentFallbacks
+}
+
+function Test-UninstallComponent {
+  param([string]$Component)
+
+  if ([string]::IsNullOrWhiteSpace($UninstallComponents) -or $UninstallComponents -in @("all", "all available", "all-available")) {
+    return $true
+  }
+
+  return @($UninstallComponents.Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -contains $Component
+}
+
+function Reset-FileBlank {
+  param([string]$Path)
+
+  if ($DryRun) {
+    Write-Setup "dry-run: would blank $Path"
+    return
+  }
+
+  $parent = Split-Path -Parent $Path
+  New-Item -ItemType Directory -Force -Path $parent | Out-Null
+  Set-Content -NoNewline -Encoding UTF8 -Path $Path -Value ""
+  Write-Setup "blanked $Path"
+}
+
+function Remove-ManagedPath {
+  param([string]$Path)
+
+  if ($DryRun) {
+    Write-Setup "dry-run: would remove $Path"
+    return
+  }
+
+  if (Test-Path $Path) {
+    Remove-Item -Force $Path
+    Write-Setup "removed $Path"
+  } else {
+    Write-Setup "already absent $Path"
+  }
+}
+
+function Remove-ClaudeSeedHook {
+  $settingsPath = Join-Path $HomeDir ".claude/settings.json"
+
+  if ($DryRun) {
+    Write-Setup "dry-run: would remove token-saver SessionStart hooks from $settingsPath"
+    return
+  }
+  if (-not (Test-Path $settingsPath)) {
+    return
+  }
+
+  $raw = Get-Content -Raw $settingsPath
+  $data = if ([string]::IsNullOrWhiteSpace($raw)) { [pscustomobject]@{} } else { $raw | ConvertFrom-Json }
+  if ($data.PSObject.Properties["hooks"] -and $data.hooks.PSObject.Properties["SessionStart"]) {
+    $entries = @()
+    foreach ($entry in @($data.hooks.SessionStart)) {
+      $hooks = @($entry.hooks | Where-Object { ([string]$_.command) -notmatch "seed-project-instructions" })
+      if ($hooks.Count -gt 0) {
+        $entry.hooks = $hooks
+        $entries += $entry
+      }
+    }
+    $data.hooks.SessionStart = $entries
+  }
+  $data | ConvertTo-Json -Depth 20 | Set-Content -Encoding UTF8 $settingsPath
+  Write-Setup "removed token-saver SessionStart hooks from $settingsPath"
+}
+
+function Remove-CavemanClaudeSettings {
+  $settingsPath = Join-Path $HomeDir ".claude/settings.json"
+
+  if ($DryRun) {
+    Write-Setup "dry-run: would remove Caveman entries from $settingsPath"
+    return
+  }
+  if (-not (Test-Path $settingsPath)) {
+    return
+  }
+
+  $raw = Get-Content -Raw $settingsPath
+  $data = if ([string]::IsNullOrWhiteSpace($raw)) { [pscustomobject]@{} } else { $raw | ConvertFrom-Json }
+  if ($data.PSObject.Properties["hooks"]) {
+    foreach ($hookName in @($data.hooks.PSObject.Properties.Name)) {
+      $entries = @()
+      foreach ($entry in @($data.hooks.$hookName)) {
+        $hooks = @($entry.hooks | Where-Object { ($_ | ConvertTo-Json -Depth 20) -notmatch "caveman" })
+        if ($hooks.Count -gt 0) {
+          $entry.hooks = $hooks
+          $entries += $entry
+        }
+      }
+      $data.hooks.$hookName = $entries
+    }
+  }
+  if ($data.PSObject.Properties["statusLine"] -and (($data.statusLine | ConvertTo-Json -Depth 20) -match "caveman")) {
+    $data.PSObject.Properties.Remove("statusLine")
+  }
+  foreach ($prop in @("mcpServers", "plugins", "enabledPlugins")) {
+    if ($data.PSObject.Properties[$prop]) {
+      foreach ($name in @($data.$prop.PSObject.Properties.Name)) {
+        $value = $data.$prop.$name | ConvertTo-Json -Depth 20
+        if ($name -match "caveman" -or $value -match "caveman") {
+          $data.$prop.PSObject.Properties.Remove($name)
+        }
+      }
+    }
+  }
+  $data | ConvertTo-Json -Depth 20 | Set-Content -Encoding UTF8 $settingsPath
+  Write-Setup "removed Caveman entries from $settingsPath"
+}
+
+function Remove-CavemanCodexConfig {
+  $configPath = Join-Path $HomeDir ".codex/config.toml"
+
+  if ($DryRun) {
+    Write-Setup "dry-run: would remove known Caveman entries from $configPath"
+    return
+  }
+  if (-not (Test-Path $configPath)) {
+    return
+  }
+
+  $out = New-Object System.Collections.Generic.List[string]
+  $skip = $false
+  foreach ($line in Get-Content $configPath) {
+    if ($line -eq "[mcp_servers.fs_shrunk]" -or $line -like "[hooks.state.*caveman*") {
+      $skip = $true
+      continue
+    }
+    if ($line.StartsWith("[") -and $skip) {
+      $skip = $false
+    }
+    if ($skip) {
+      continue
+    }
+    if ($line -match "caveman") {
+      continue
+    }
+    $out.Add($line)
+  }
+  Set-Content -Encoding UTF8 -Path $configPath -Value $out
+  Write-Setup "removed known Caveman entries from $configPath"
+}
+
+function Uninstall-RtkComponents {
+  Detect-RtkAgents
+  foreach ($agent in $RtkAgents.Split(",")) {
+    $cleanAgent = $agent.Trim()
+    if (-not $cleanAgent) {
+      continue
+    }
+    if ((Get-Command rtk -ErrorAction SilentlyContinue) -or $DryRun) {
+      $args = @("init", "--uninstall") + @((Get-RtkInitArgs -Agent $cleanAgent)[1..((Get-RtkInitArgs -Agent $cleanAgent).Count - 1)])
+      Invoke-SetupCommand -FilePath "rtk" -Arguments $args
+    }
+  }
+  Remove-ManagedPath -Path (Join-Path $HomeDir ".codex/RTK.md")
+  Remove-ManagedPath -Path (Join-Path $HomeDir ".claude/RTK.md")
+}
+
+function Uninstall-CavemanComponents {
+  if ((Get-Command npx -ErrorAction SilentlyContinue) -or $DryRun) {
+    Invoke-SetupCommand -FilePath "npx" -Arguments @("-y", "github:JuliusBrussee/caveman", "--", "--uninstall", "--non-interactive")
+    Invoke-SetupCommand -FilePath "npx" -Arguments @("skills", "remove", "JuliusBrussee/caveman", "--all")
+  } else {
+    Write-Warning "npx not found; skipping Caveman uninstall commands"
+  }
+  if ((Get-Command gemini -ErrorAction SilentlyContinue) -or $DryRun) {
+    Invoke-SetupCommand -FilePath "gemini" -Arguments @("extensions", "uninstall", "caveman")
+  }
+  Remove-ManagedPath -Path (Join-Path $HomeDir ".config/caveman/config.json")
+  Remove-CavemanClaudeSettings
+  Remove-CavemanCodexConfig
+}
+
+function Invoke-Uninstall {
+  if ([string]::IsNullOrWhiteSpace($script:UninstallComponents) -or $script:UninstallComponents -in @("all", "all available", "all-available")) {
+    $script:UninstallComponents = "all available"
+  }
+  if (Test-UninstallComponent "global-instructions") {
+    Reset-FileBlank -Path (Join-Path $HomeDir ".claude/CLAUDE.md")
+    Reset-FileBlank -Path (Join-Path $HomeDir ".codex/AGENTS.md")
+  }
+  if (Test-UninstallComponent "project-templates") {
+    Remove-ManagedPath -Path (Join-Path $HomeDir ".claude/CLAUDE.project-template.md")
+    Remove-ManagedPath -Path (Join-Path $HomeDir ".codex/AGENTS.project-template.md")
+  }
+  if (Test-UninstallComponent "seeding") {
+    Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.sh")
+    Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.ps1")
+    Remove-ClaudeSeedHook
+  }
+  if (Test-UninstallComponent "ignore-optimizer") {
+    Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/scripts/optimize-ai.sh")
+    Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/scripts/optimize-ai.ps1")
+  }
+  if (Test-UninstallComponent "rtk") {
+    Uninstall-RtkComponents
+  }
+  if (Test-UninstallComponent "caveman") {
+    Uninstall-CavemanComponents
+  }
+}
+
+if ($Uninstall) {
+  if (-not $NonInteractive) {
+    $UninstallComponents = Read-TextDefault -Prompt "Components to uninstall, comma-separated or 'all available' (global-instructions, project-templates, seeding, ignore-optimizer, rtk, caveman, all available)" -Default $(if ($UninstallComponents) { $UninstallComponents } else { "all available" })
+  }
+  if ([string]::IsNullOrWhiteSpace($UninstallComponents)) {
+    $UninstallComponents = "all available"
+  }
+  Invoke-Uninstall
+  Write-Setup "uninstall complete"
+  $global:LASTEXITCODE = 0
+  exit 0
 }
 
 if (-not $NonInteractive) {

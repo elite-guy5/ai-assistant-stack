@@ -34,12 +34,16 @@ Useful non-interactive examples:
 curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --non-interactive
 curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --non-interactive --skip-rtk --skip-caveman
 curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --dry-run
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --uninstall --non-interactive --uninstall-components "all available"
 ~~~
 
 ~~~powershell
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1))) -NonInteractive
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1))) -NonInteractive -SkipRtk -SkipCaveman
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1))) -DryRun
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1))) -Uninstall
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1))) -Uninstall -NonInteractive -UninstallComponents "all available"
 ~~~
 
 If you cloned the repo locally, run:
@@ -59,6 +63,9 @@ Installer flags:
 - `--project-scope <path>` / `-ProjectScope <path>` - set the project directory for project seeding instructions.
 - `--overwrite` / `-Overwrite` - replace managed files instead of skipping them.
 - `--overwrite-global-instructions` / `-OverwriteGlobalInstructions` - replace existing `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`; default is to skip existing global instruction files.
+- `--overwrite-project-templates` / `-OverwriteProjectTemplates` - replace existing `~/.claude/CLAUDE.project-template.md` and `~/.codex/AGENTS.project-template.md`; default is to skip existing project template files.
+- `--uninstall` / `-Uninstall` - remove selected installed components.
+- `--uninstall-components <list>` / `-UninstallComponents <list>` - comma-separated components to remove, or `all available`.
 - `--skip-rtk` / `-SkipRtk` - skip RTK install/init.
 - `--skip-caveman` / `-SkipCaveman` - skip Caveman install.
 - `--rtk-agents <list>` / `-RtkAgents <list>` - comma-separated RTK agents.
@@ -130,6 +137,17 @@ Installer behavior:
 - Adds the Claude Code `SessionStart` hook if it is missing.
 - When a project is seeded, updates `.gitignore`, `.codexignore`, and `.claude/settings.local.json` with token-bloat exclusions.
 - Use `--overwrite` only when you intentionally want to replace existing target files.
+
+Uninstall behavior:
+
+- Prompts for components with `global-instructions`, `project-templates`, `seeding`, `ignore-optimizer`, `rtk`, `caveman`, or `all available`.
+- `global-instructions` blanks `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`.
+- `project-templates` removes `~/.claude/CLAUDE.project-template.md` and `~/.codex/AGENTS.project-template.md`.
+- `seeding` removes token-saver seeding scripts and matching Claude `SessionStart` hooks.
+- `ignore-optimizer` removes token-saver optimizer scripts.
+- `rtk` runs RTK uninstall commands for detected agents and removes installer-managed `RTK.md` files.
+- `caveman` runs Caveman uninstall commands, removes Caveman config, known Claude settings entries, known Codex config entries, skills, and Gemini extension when available.
+- Uninstall never writes `.new` files.
 
 # AI Ignore Optimization
 

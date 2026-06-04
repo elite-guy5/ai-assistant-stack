@@ -5,6 +5,8 @@ param(
   [switch]$Overwrite,
   [switch]$OverwriteGlobalInstructions,
   [switch]$OverwriteProjectTemplates,
+  [switch]$Uninstall,
+  [string]$UninstallComponents,
   [string]$ProjectScope,
   [switch]$SkipRtk,
   [switch]$SkipCaveman,
@@ -38,6 +40,8 @@ try {
   if ($Overwrite) { $installArgs += "-Overwrite" }
   if ($OverwriteGlobalInstructions) { $installArgs += "-OverwriteGlobalInstructions" }
   if ($OverwriteProjectTemplates) { $installArgs += "-OverwriteProjectTemplates" }
+  if ($Uninstall) { $installArgs += "-Uninstall" }
+  if ($UninstallComponents) { $installArgs += @("-UninstallComponents", $UninstallComponents) }
   if ($ProjectScope) { $installArgs += @("-ProjectScope", $ProjectScope) }
   if ($SkipRtk) { $installArgs += "-SkipRtk" }
   if ($SkipCaveman) { $installArgs += "-SkipCaveman" }
