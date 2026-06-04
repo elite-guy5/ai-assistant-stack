@@ -19,6 +19,7 @@ irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/
 
 The installer prompts for:
 
+- Whether to overwrite existing global Claude/Codex instruction files. Default: no.
 - Project scope for instruction seeding. Default: `~/Documents/git`.
 - Whether to install and initialize RTK. Default: yes.
 - RTK agents to initialize. Default: `claude,codex`.

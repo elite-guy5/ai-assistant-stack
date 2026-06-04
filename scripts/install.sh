@@ -79,7 +79,7 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-if [ ! -t 0 ]; then
+if [ ! -t 0 ] && [ ! -r /dev/tty ]; then
   non_interactive=1
 fi
 
@@ -104,7 +104,14 @@ prompt_yes_no() {
     [ "$default" = "yes" ] && return 0 || return 1
   fi
 
-  read -r -p "$prompt [$default]: " answer
+  if [ -t 0 ]; then
+    read -r -p "$prompt [$default]: " answer
+  elif [ -r /dev/tty ]; then
+    printf '%s [%s]: ' "$prompt" "$default" > /dev/tty
+    read -r answer < /dev/tty
+  else
+    answer="$default"
+  fi
   answer="${answer:-$default}"
   case "$answer" in
     y|Y|yes|YES|Yes) return 0 ;;
@@ -122,7 +129,14 @@ prompt_text() {
     return 0
   fi
 
-  read -r -p "$prompt [$default]: " answer
+  if [ -t 0 ]; then
+    read -r -p "$prompt [$default]: " answer
+  elif [ -r /dev/tty ]; then
+    printf '%s [%s]: ' "$prompt" "$default" > /dev/tty
+    read -r answer < /dev/tty
+  else
+    answer="$default"
+  fi
   printf '%s\n' "${answer:-$default}"
 }
 
