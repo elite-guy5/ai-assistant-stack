@@ -17,6 +17,20 @@ curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/s
 irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1 | iex
 ~~~
 
+# Uninstall
+
+**macOS / Linux / WSL**
+
+~~~sh
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --uninstall
+~~~
+
+**Windows PowerShell**
+
+~~~powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1))) -Uninstall
+~~~
+
 The installer prompts for:
 
 - Whether to overwrite existing global Claude/Codex instruction files. Options: `y` / `n`. Default: `n`.
