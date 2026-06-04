@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./package-lock.json)",
+      "Read(./pnpm-lock.yaml)",
+      "Read(./yarn.lock)",
+      "Read(./poetry.lock)",
+      "Read(./node_modules/**)",
+      "Read(./vendor/**)",
+      "Read(./.venv/**)",
+      "Read(./venv/**)",
+      "Read(./dist/**)",
+      "Read(./build/**)",
+      "Read(./out/**)",
+      "Read(./.next/**)",
+      "Read(./.nuxt/**)",
+      "Read(./coverage/**)",
+      "Read(./.nyc_output/**)",
+      "Read(./**/*.log)",
+      "Read(./**/*.db)",
+      "Read(./**/*.sqlite)",
+      "Read(./**/*.sqlite3)"
+    ]
+  }
+}

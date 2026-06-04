@@ -575,6 +575,97 @@ function Ensure-ClaudeSessionHook {
   Add-ManifestArtifact -Type "settings_entry" -Component "seeding" -Ownership "user-owned" -Action "ensured" -Path $settingsPath -Details @{ key = "hooks.SessionStart"; command = "seed-project-instructions.ps1" }
 }
 
+function Ensure-RtkClaudeHook {
+  $settingsPath = Join-Path $HomeDir ".claude/settings.json"
+  $command = "rtk hook claude"
+
+  if ($SkipRtk -or -not (Test-RtkAgentEnabled "claude")) {
+    return
+  }
+
+  $details = @{
+    key = "hooks.PreToolUse"
+    command = $command
+    managedEntry = "RTK Claude hook"
+    uninstallBehavior = "remove only the RTK hook entry, preserve the file"
+  }
+
+  if ($DryRun) {
+    Write-Setup "dry-run: would ensure RTK Claude hook in $settingsPath"
+    Add-ManifestArtifact -Type "settings_entry" -Component "rtk" -Ownership "user-owned" -Action "added" -Path $settingsPath -Details $details
+    return
+  }
+
+  $settingsDir = Split-Path -Parent $settingsPath
+  New-Item -ItemType Directory -Force -Path $settingsDir | Out-Null
+
+  $existed = Test-Path $settingsPath
+  if ($existed) {
+    Copy-Item -Force $settingsPath "$settingsPath.bak"
+    $raw = Get-Content -Raw $settingsPath
+    try {
+      $data = if ([string]::IsNullOrWhiteSpace($raw)) { [pscustomobject]@{} } else { $raw | ConvertFrom-Json }
+    } catch {
+      throw "invalid JSON in $settingsPath; backup created at $settingsPath.bak"
+    }
+  } else {
+    $data = [pscustomobject]@{}
+  }
+
+  if (-not $data.PSObject.Properties["hooks"]) {
+    $data | Add-Member -MemberType NoteProperty -Name hooks -Value ([pscustomobject]@{})
+  }
+  if (-not $data.hooks.PSObject.Properties["PreToolUse"] -or -not ($data.hooks.PreToolUse -is [array])) {
+    if ($data.hooks.PSObject.Properties["PreToolUse"]) {
+      $data.hooks.PreToolUse = @()
+    } else {
+      $data.hooks | Add-Member -MemberType NoteProperty -Name PreToolUse -Value @()
+    }
+  }
+
+  $alreadyExists = $false
+  $bashEntry = $null
+  foreach ($entry in @($data.hooks.PreToolUse)) {
+    if ($entry.matcher -eq "Bash" -and -not $bashEntry) {
+      $bashEntry = $entry
+    }
+    foreach ($existing in @($entry.hooks)) {
+      if ($existing.type -eq "command" -and $existing.command -eq $command) {
+        $alreadyExists = $true
+      }
+    }
+  }
+
+  if ($alreadyExists) {
+    Write-Setup "already configured RTK Claude hook in $settingsPath"
+    Add-ManifestArtifact -Type "settings_entry" -Component "rtk" -Ownership "user-owned" -Action "already_existed" -Path $settingsPath -Details $details
+    return
+  }
+
+  if (-not $bashEntry) {
+    $bashEntry = [pscustomobject]@{ matcher = "Bash"; hooks = @() }
+    $data.hooks.PreToolUse = @($data.hooks.PreToolUse) + $bashEntry
+  }
+  if (-not ($bashEntry.PSObject.Properties["hooks"]) -or -not ($bashEntry.hooks -is [array])) {
+    if ($bashEntry.PSObject.Properties["hooks"]) {
+      $bashEntry.hooks = @()
+    } else {
+      $bashEntry | Add-Member -MemberType NoteProperty -Name hooks -Value @()
+    }
+  }
+  $bashEntry.hooks = @($bashEntry.hooks) + ([pscustomobject]@{ type = "command"; command = $command })
+
+  $json = $data | ConvertTo-Json -Depth 20
+  $null = $json | ConvertFrom-Json
+  $temp = "$settingsPath.tmp.$PID"
+  Set-Content -Encoding UTF8 -Path $temp -Value $json
+  Move-Item -Force $temp $settingsPath
+
+  Write-Setup "Registered Claude Code hook"
+  Write-Setup "Updated $settingsPath"
+  Add-ManifestArtifact -Type "settings_entry" -Component "rtk" -Ownership "user-owned" -Action "added" -Path $settingsPath -Details $details
+}
+
 function Install-RtkBinary {
   if (Get-Command rtk -ErrorAction SilentlyContinue) {
     Write-Setup "rtk already installed: $((Get-Command rtk).Source)"
@@ -731,7 +822,15 @@ function Initialize-RtkAgents {
       continue
     }
     $initArgs = Get-RtkInitArgs -Agent $cleanAgent
-    Invoke-SetupCommand -FilePath "rtk" -Arguments $initArgs
+    if ($DryRun) {
+      Invoke-SetupCommand -FilePath "rtk" -Arguments $initArgs
+    } else {
+      $output = & rtk @initArgs 2>&1
+      if ($LASTEXITCODE -ne 0) {
+        $output | Write-Host
+        throw "command failed: rtk $($initArgs -join ' ')"
+      }
+    }
     Add-ManifestArtifact -Type "generated_tool_reference" -Component "rtk" -Ownership "external" -Action "initialized" -Path "rtk" -Details @{ agent = $cleanAgent; command = "rtk $($initArgs -join ' ')" }
   }
 }
@@ -1017,6 +1116,7 @@ function Uninstall-ManifestComponent {
       }
       "settings_entry" {
         if ($Component -eq "seeding") { Remove-ClaudeSeedHook }
+        if ($Component -eq "rtk") { Remove-RtkClaudeHook }
         if ($Component -eq "caveman") { Remove-CavemanClaudeSettings }
       }
       "generated_tool_reference" {
@@ -1057,6 +1157,49 @@ function Remove-ClaudeSeedHook {
   }
   $data | ConvertTo-Json -Depth 20 | Set-Content -Encoding UTF8 $settingsPath
   Add-UninstallReport -Section "Skills and Plugins" -Tool "Seed Project" -Category "Configuration Entries Removed" -Item "$settingsPath hooks.SessionStart"
+}
+
+function Remove-RtkClaudeHook {
+  $settingsPath = Join-Path $HomeDir ".claude/settings.json"
+
+  if ($DryRun) {
+    if ($UninstallActive) {
+      Add-UninstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Removed" -Item "$settingsPath hooks.PreToolUse rtk hook claude"
+    } else {
+      Write-Setup "dry-run: would remove RTK Claude hook from $settingsPath"
+    }
+    return
+  }
+  if (-not (Test-Path $settingsPath)) {
+    return
+  }
+
+  $raw = Get-Content -Raw $settingsPath
+  try {
+    $data = if ([string]::IsNullOrWhiteSpace($raw)) { [pscustomobject]@{} } else { $raw | ConvertFrom-Json }
+  } catch {
+    Copy-Item -Force $settingsPath "$settingsPath.bak"
+    throw "invalid JSON in $settingsPath; backup created at $settingsPath.bak"
+  }
+
+  if ($data.PSObject.Properties["hooks"] -and $data.hooks.PSObject.Properties["PreToolUse"]) {
+    $entries = @()
+    foreach ($entry in @($data.hooks.PreToolUse)) {
+      $hooks = @($entry.hooks | Where-Object { -not ($_.type -eq "command" -and $_.command -eq "rtk hook claude") })
+      if ($hooks.Count -gt 0) {
+        $entry.hooks = $hooks
+        $entries += $entry
+      }
+    }
+    $data.hooks.PreToolUse = $entries
+  }
+
+  $json = $data | ConvertTo-Json -Depth 20
+  $null = $json | ConvertFrom-Json
+  $temp = "$settingsPath.tmp.$PID"
+  Set-Content -Encoding UTF8 -Path $temp -Value $json
+  Move-Item -Force $temp $settingsPath
+  Add-UninstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Removed" -Item "$settingsPath hooks.PreToolUse rtk hook claude"
 }
 
 function Remove-CavemanClaudeSettings {
@@ -1156,6 +1299,7 @@ function Uninstall-RtkComponents {
       Invoke-OptionalUninstallCommand -FilePath "rtk" -Arguments $args
     }
   }
+  Remove-RtkClaudeHook
   Remove-ManagedPath -Path (Join-Path $HomeDir ".codex/RTK.md")
   Remove-ManagedPath -Path (Join-Path $HomeDir ".claude/RTK.md")
   Remove-ManagedPath -Path (Join-Path $HomeDir ".agents/rules/antigravity-rtk-rules.md")
@@ -1344,7 +1488,7 @@ if ($RtkAgents -in @("all", "all available", "all-available")) {
 }
 
 $installSteps = 5
-if (-not $SkipRtk) { $installSteps += 2 }
+if (-not $SkipRtk) { $installSteps += 3 }
 if (-not $SkipCaveman) { $installSteps += 1 }
 $installStep = 0
 
@@ -1379,6 +1523,12 @@ if (-not $SkipRtk) {
   Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "RTK initialization"
 }
 Initialize-RtkAgents
+
+if (-not $SkipRtk) {
+  $installStep += 1
+  Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "RTK Claude hook"
+}
+Ensure-RtkClaudeHook
 
 if (-not $SkipRtk) {
   $installStep += 1

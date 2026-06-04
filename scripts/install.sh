@@ -165,8 +165,17 @@ record_manifest() {
   node - "$manifest_path" "$type" "$component" "$ownership" "$action" "$path" "$details" <<'NODE'
 const fs = require("fs");
 const [manifestPath, type, component, ownership, action, targetPath, detailsRaw] = process.argv.slice(2);
-let details = {};
-try { details = detailsRaw ? JSON.parse(detailsRaw) : {}; } catch { details = { raw: detailsRaw }; }
+const parseDetails = (raw) => {
+  if (!raw) return {};
+  let candidate = raw;
+  while (candidate) {
+    try { return JSON.parse(candidate); } catch {}
+    if (!candidate.endsWith("}")) break;
+    candidate = candidate.slice(0, -1);
+  }
+  return { raw };
+};
+let details = parseDetails(detailsRaw);
 let manifest = { schemaVersion: 1, managedBy: "token-saver-setup", artifacts: [] };
 if (fs.existsSync(manifestPath)) {
   const raw = fs.readFileSync(manifestPath, "utf8").trim();
@@ -446,7 +455,13 @@ const hook = { type: "command", command, timeout: 5 };
 let data = {};
 if (fs.existsSync(settingsPath)) {
   const raw = fs.readFileSync(settingsPath, "utf8").trim();
-  data = raw ? JSON.parse(raw) : {};
+  fs.copyFileSync(settingsPath, `${settingsPath}.bak`);
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch (error) {
+    console.error(`error: invalid JSON in ${settingsPath}; backup created at ${settingsPath}.bak`);
+    process.exit(1);
+  }
 }
 
 data.hooks = data.hooks || {};
@@ -468,11 +483,103 @@ if (exists) {
   console.log(`already has SessionStart hook in ${settingsPath}`);
 } else {
   data.hooks.SessionStart.push({ hooks: [hook] });
-  fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2) + "\n");
+  const tmp = `${settingsPath}.tmp.${process.pid}`;
+  const output = JSON.stringify(data, null, 2) + "\n";
+  JSON.parse(output);
+  fs.writeFileSync(tmp, output, { mode: fs.existsSync(settingsPath) ? fs.statSync(settingsPath).mode : 0o600 });
+  fs.renameSync(tmp, settingsPath);
   console.log(`added SessionStart hook to ${settingsPath}`);
 }
 NODE
   record_manifest "settings_entry" "seeding" "user-owned" "ensured" "$settings_path" '{"key":"hooks.SessionStart","command":"seed-project-instructions.sh"}'
+}
+
+ensure_rtk_claude_hook() {
+  local settings_path="$HOME/.claude/settings.json"
+  local action
+
+  [ "$install_rtk" = "1" ] || return 0
+  rtk_agent_enabled "claude" || return 0
+
+  if [ "$dry_run" = "1" ]; then
+    printf 'dry-run: would ensure RTK Claude hook in %s\n' "$settings_path"
+    record_manifest "settings_entry" "rtk" "user-owned" "added" "$settings_path" '{"key":"hooks.PreToolUse","command":"rtk hook claude","managedEntry":"RTK Claude hook","uninstallBehavior":"remove only the RTK hook entry, preserve the file"}'
+    return 0
+  fi
+
+  if ! command -v node >/dev/null 2>&1; then
+    printf 'error: node is required to patch %s for RTK Claude hook\n' "$settings_path" >&2
+    return 1
+  fi
+
+  mkdir -p "$(dirname "$settings_path")"
+  action="$(
+    node - "$settings_path" <<'NODE'
+const fs = require("fs");
+const settingsPath = process.argv[2];
+const command = "rtk hook claude";
+const hook = { type: "command", command };
+const backupPath = `${settingsPath}.bak`;
+const existed = fs.existsSync(settingsPath);
+let data = {};
+
+if (existed) {
+  fs.copyFileSync(settingsPath, backupPath);
+  const raw = fs.readFileSync(settingsPath, "utf8").trim();
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch (error) {
+    console.error(`error: invalid JSON in ${settingsPath}; backup created at ${backupPath}`);
+    process.exit(2);
+  }
+}
+
+if (!data || typeof data !== "object" || Array.isArray(data)) data = {};
+if (!data.hooks || typeof data.hooks !== "object" || Array.isArray(data.hooks)) data.hooks = {};
+if (!Array.isArray(data.hooks.PreToolUse)) data.hooks.PreToolUse = [];
+
+let bashEntry = data.hooks.PreToolUse.find((entry) => entry && entry.matcher === "Bash");
+const alreadyExists = data.hooks.PreToolUse.some((entry) =>
+  Array.isArray(entry && entry.hooks) &&
+  entry.hooks.some((existing) => existing && existing.type === "command" && existing.command === command)
+);
+
+if (alreadyExists) {
+  console.log("already_existed");
+  process.exit(0);
+}
+
+if (!bashEntry) {
+  bashEntry = { matcher: "Bash", hooks: [] };
+  data.hooks.PreToolUse.push(bashEntry);
+}
+if (!Array.isArray(bashEntry.hooks)) bashEntry.hooks = [];
+bashEntry.hooks.push(hook);
+
+const output = JSON.stringify(data, null, 2) + "\n";
+JSON.parse(output);
+const tmp = `${settingsPath}.tmp.${process.pid}`;
+fs.writeFileSync(tmp, output, { mode: existed ? fs.statSync(settingsPath).mode : 0o600 });
+fs.renameSync(tmp, settingsPath);
+console.log("added");
+NODE
+  )" || return 1
+
+  case "$action" in
+    already_existed)
+      say "already configured RTK Claude hook in $settings_path"
+      record_manifest "settings_entry" "rtk" "user-owned" "already_existed" "$settings_path" '{"key":"hooks.PreToolUse","command":"rtk hook claude","managedEntry":"RTK Claude hook","uninstallBehavior":"remove only the RTK hook entry, preserve the file"}'
+      ;;
+    added)
+      say "Registered Claude Code hook"
+      say "Updated $settings_path"
+      record_manifest "settings_entry" "rtk" "user-owned" "added" "$settings_path" '{"key":"hooks.PreToolUse","command":"rtk hook claude","managedEntry":"RTK Claude hook","uninstallBehavior":"remove only the RTK hook entry, preserve the file"}'
+      ;;
+    *)
+      printf 'error: unexpected RTK Claude hook action: %s\n' "$action" >&2
+      return 1
+      ;;
+  esac
 }
 
 install_rtk_binary() {
@@ -575,7 +682,7 @@ detect_rtk_agents() {
 }
 
 initialize_rtk_agents() {
-  local old_ifs agent args
+  local old_ifs agent args output status
 
   [ "$install_rtk" = "1" ] || return 0
   install_rtk_binary
@@ -593,8 +700,22 @@ initialize_rtk_agents() {
     agent="$(printf '%s' "$agent" | tr -d '[:space:]')"
     [ -n "$agent" ] || continue
     args="$(rtk_init_arg "$agent")"
-    # shellcheck disable=SC2086
-    run_cmd rtk init $args
+    if [ "$dry_run" = "1" ]; then
+      # shellcheck disable=SC2086
+      run_cmd rtk init $args
+    else
+      output="$(mktemp)"
+      # shellcheck disable=SC2086
+      if rtk init $args >"$output" 2>&1; then
+        :
+      else
+        status=$?
+        cat "$output" >&2
+        rm -f "$output"
+        return "$status"
+      fi
+      rm -f "$output"
+    fi
     record_manifest "generated_tool_reference" "rtk" "external" "initialized" "rtk" "{\"agent\":\"$agent\",\"command\":\"rtk init $args\"}"
     IFS=","
   done
@@ -1122,6 +1243,7 @@ uninstall_manifest_component() {
       settings_entry)
         case "$component" in
           seeding) remove_claude_seed_hook ;;
+          rtk) remove_rtk_claude_hook ;;
           caveman) remove_caveman_claude_settings ;;
         esac
         ;;
@@ -1168,6 +1290,52 @@ if (data.hooks && Array.isArray(data.hooks.SessionStart)) {
 fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2) + "\n");
 NODE
   report_event "Skills and Plugins" "Seed Project" "Configuration Entries Removed" "$settings_path hooks.SessionStart" "ok"
+}
+
+remove_rtk_claude_hook() {
+  local settings_path="$HOME/.claude/settings.json"
+
+  if [ "$dry_run" = "1" ]; then
+    if [ "$uninstall_active" = "1" ]; then
+      report_event "Skills and Plugins" "RTK" "Configuration Entries Removed" "$settings_path hooks.PreToolUse rtk hook claude" "ok"
+    else
+      printf 'dry-run: would remove RTK Claude hook from %s\n' "$settings_path"
+    fi
+    return 0
+  fi
+
+  [ -f "$settings_path" ] || return 0
+  command -v node >/dev/null 2>&1 || { printf 'warning: node required to edit %s; skipping\n' "$settings_path" >&2; return 0; }
+
+  node - "$settings_path" <<'NODE'
+const fs = require("fs");
+const settingsPath = process.argv[2];
+const raw = fs.readFileSync(settingsPath, "utf8").trim();
+let data = {};
+try {
+  data = raw ? JSON.parse(raw) : {};
+} catch (error) {
+  fs.copyFileSync(settingsPath, `${settingsPath}.bak`);
+  console.error(`error: invalid JSON in ${settingsPath}; backup created at ${settingsPath}.bak`);
+  process.exit(1);
+}
+if (data.hooks && Array.isArray(data.hooks.PreToolUse)) {
+  data.hooks.PreToolUse = data.hooks.PreToolUse
+    .map((entry) => ({
+      ...entry,
+      hooks: Array.isArray(entry.hooks)
+        ? entry.hooks.filter((hook) => !(hook && hook.type === "command" && hook.command === "rtk hook claude"))
+        : entry.hooks,
+    }))
+    .filter((entry) => !Array.isArray(entry.hooks) || entry.hooks.length > 0);
+}
+const output = JSON.stringify(data, null, 2) + "\n";
+JSON.parse(output);
+const tmp = `${settingsPath}.tmp.${process.pid}`;
+fs.writeFileSync(tmp, output, { mode: fs.statSync(settingsPath).mode });
+fs.renameSync(tmp, settingsPath);
+NODE
+  report_event "Skills and Plugins" "RTK" "Configuration Entries Removed" "$settings_path hooks.PreToolUse rtk hook claude" "ok"
 }
 
 remove_caveman_claude_settings() {
@@ -1280,6 +1448,7 @@ uninstall_rtk_components() {
   else
     report_event "Verification" "RTK" "Verification Issues" "rtk command not found; skipped external uninstall" "warn"
   fi
+  remove_rtk_claude_hook
   remove_path "$HOME/.codex/RTK.md"
   remove_path "$HOME/.claude/RTK.md"
   remove_path "$HOME/.agents/rules/antigravity-rtk-rules.md"
@@ -1466,7 +1635,7 @@ if [ "$install_caveman" = "1" ]; then
 fi
 
 install_steps=5
-[ "$install_rtk" != "0" ] && install_steps=$((install_steps + 2))
+[ "$install_rtk" != "0" ] && install_steps=$((install_steps + 3))
 [ "$install_caveman" != "0" ] && install_steps=$((install_steps + 1))
 install_step=0
 
@@ -1502,6 +1671,12 @@ if [ "$install_rtk" != "0" ]; then
   progress_line "Install" "$install_step" "$install_steps" "RTK initialization"
 fi
 initialize_rtk_agents
+
+if [ "$install_rtk" != "0" ]; then
+  install_step=$((install_step + 1))
+  progress_line "Install" "$install_step" "$install_steps" "RTK Claude hook"
+fi
+ensure_rtk_claude_hook
 
 if [ "$install_rtk" != "0" ]; then
   install_step=$((install_step + 1))
