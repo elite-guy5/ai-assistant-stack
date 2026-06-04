@@ -7,7 +7,9 @@ param(
   [switch]$SkipRtk,
   [switch]$SkipCaveman,
   [string]$RtkAgents = "claude,codex",
-  [string]$CavemanArgs = ""
+  [string]$RtkMode = "auto",
+  [string]$CavemanArgs = "",
+  [string]$CavemanMode = "ultra"
 )
 
 $ErrorActionPreference = "Stop"
@@ -233,8 +235,87 @@ function Get-RtkInitArgs {
     "codex" { return @("init", "-g", "--codex") }
     "gemini" { return @("init", "-g", "--gemini") }
     "copilot" { return @("init", "-g", "--copilot") }
+    "cursor" { return @("init", "-g", "--agent", "cursor") }
     default { return @("init", "--agent", $Agent) }
   }
+}
+
+function Test-AgentCommandOrPath {
+  param(
+    [string]$CommandName,
+    [string[]]$Paths = @()
+  )
+
+  if (Get-Command $CommandName -ErrorAction SilentlyContinue) {
+    return $true
+  }
+
+  foreach ($path in $Paths) {
+    if (Test-Path $path) {
+      return $true
+    }
+  }
+
+  return $false
+}
+
+function Add-RtkAgent {
+  param([string]$Agent)
+
+  $agents = @($script:RtkAgents.Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+  if ($agents -contains $Agent) {
+    return
+  }
+
+  $script:RtkAgents = (@($agents) + $Agent) -join ","
+}
+
+function Detect-RtkAgents {
+  if ($RtkMode -ne "auto") {
+    return
+  }
+
+  Add-RtkAgent "claude"
+  if (Test-AgentCommandOrPath -CommandName "claude" -Paths @(Join-Path $HomeDir ".claude")) { Add-RtkAgent "claude" }
+  if (Test-AgentCommandOrPath -CommandName "codex" -Paths @(Join-Path $HomeDir ".codex")) { Add-RtkAgent "codex" }
+  if (Test-AgentCommandOrPath -CommandName "gemini" -Paths @(Join-Path $HomeDir ".gemini")) { Add-RtkAgent "gemini" }
+  if (Test-AgentCommandOrPath -CommandName "cursor" -Paths @(Join-Path $HomeDir ".cursor")) { Add-RtkAgent "cursor" }
+  if (Test-AgentCommandOrPath -CommandName "gh" -Paths @((Join-Path $HomeDir ".vscode"), (Join-Path $HomeDir ".config/Code/User"))) { Add-RtkAgent "copilot" }
+  if (Test-AgentCommandOrPath -CommandName "opencode" -Paths @(Join-Path $HomeDir ".config/opencode")) { Add-RtkAgent "opencode" }
+  if (Test-AgentCommandOrPath -CommandName "openclaw" -Paths @(Join-Path $HomeDir ".openclaw")) { Add-RtkAgent "openclaw" }
+  if (Test-AgentCommandOrPath -CommandName "pi" -Paths @(Join-Path $HomeDir ".pi")) { Add-RtkAgent "pi" }
+  if (Test-AgentCommandOrPath -CommandName "hermes" -Paths @(Join-Path $HomeDir ".hermes")) { Add-RtkAgent "hermes" }
+  if (Test-AgentCommandOrPath -CommandName "cline" -Paths @((Join-Path $HomeDir ".config/cline"), (Join-Path $HomeDir ".cline"))) { Add-RtkAgent "cline" }
+  if (Test-AgentCommandOrPath -CommandName "windsurf" -Paths @(Join-Path $HomeDir ".windsurf")) { Add-RtkAgent "windsurf" }
+  if (Test-AgentCommandOrPath -CommandName "kilocode" -Paths @(Join-Path $HomeDir ".kilocode")) { Add-RtkAgent "kilocode" }
+  if (Test-AgentCommandOrPath -CommandName "antigravity" -Paths @(Join-Path $HomeDir ".agents/rules")) { Add-RtkAgent "antigravity" }
+}
+
+function Test-RtkAgentEnabled {
+  param([string]$Agent)
+
+  return @($RtkAgents.Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -contains $Agent
+}
+
+function Test-FileContains {
+  param(
+    [string]$Path,
+    [string]$Pattern,
+    [string]$Label
+  )
+
+  if (-not (Test-Path $Path)) {
+    Write-Warning "missing ${Label}: $Path"
+    return $false
+  }
+
+  $content = Get-Content -Raw $Path
+  if ($content -notmatch $Pattern) {
+    Write-Warning "$Label does not contain required RTK rule: $Path"
+    return $false
+  }
+
+  return $true
 }
 
 function Initialize-RtkAgents {
@@ -243,7 +324,10 @@ function Initialize-RtkAgents {
   }
 
   Install-RtkBinary
-  Write-Warning "On native Windows, RTK installs the binary and config. Full shell-hook behavior is best under WSL."
+  Detect-RtkAgents
+  if (([Environment]::OSVersion.Platform -eq "Win32NT") -and (-not $env:WSL_DISTRO_NAME)) {
+    Write-Warning "On native Windows, RTK installs the binary and config. Transparent shell-hook rewrite requires WSL."
+  }
 
   if (-not (Get-Command rtk -ErrorAction SilentlyContinue) -and -not $DryRun) {
     Write-Warning "rtk is not on PATH after install; skipping rtk init"
@@ -259,6 +343,66 @@ function Initialize-RtkAgents {
   }
 }
 
+function Verify-RtkSetup {
+  if ($SkipRtk) {
+    return
+  }
+
+  if ($DryRun) {
+    Write-Setup "dry-run: would verify RTK binary and assistant instruction wiring"
+    return
+  }
+
+  $failures = 0
+  if (-not (Get-Command rtk -ErrorAction SilentlyContinue)) {
+    Write-Warning "rtk is not available on PATH after install/init"
+    $failures += 1
+  } else {
+    & rtk --version | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warning "rtk is installed but failed verification: rtk --version"
+      $failures += 1
+    }
+  }
+
+  if (Test-RtkAgentEnabled "codex") {
+    if (-not (Test-FileContains -Path (Join-Path $HomeDir ".codex/AGENTS.md") -Pattern "RTK\.md" -Label "Codex AGENTS.md")) { $failures += 1 }
+    if (-not (Test-FileContains -Path (Join-Path $HomeDir ".codex/RTK.md") -Pattern 'Always prefix shell commands with `rtk`' -Label "Codex RTK.md")) { $failures += 1 }
+  }
+
+  if (Test-RtkAgentEnabled "claude") {
+    if (-not (Test-FileContains -Path (Join-Path $HomeDir ".claude/CLAUDE.md") -Pattern "RTK\.md" -Label "Claude CLAUDE.md")) { $failures += 1 }
+    if (-not (Test-FileContains -Path (Join-Path $HomeDir ".claude/RTK.md") -Pattern "Always prefix shell commands|automatically rewritten|Hook-Based Usage" -Label "Claude RTK.md")) { $failures += 1 }
+  }
+
+  if ($failures -gt 0) {
+    throw "RTK setup verification failed; rerun with -Overwrite or inspect the .new instruction files"
+  }
+
+  Write-Setup "verified RTK setup"
+}
+
+function Install-CavemanAgentFallbacks {
+  if (Get-Command gemini -ErrorAction SilentlyContinue) {
+    Invoke-SetupCommand -FilePath "gemini" -Arguments @("extensions", "install", "https://github.com/JuliusBrussee/caveman")
+  }
+  if (Test-AgentCommandOrPath -CommandName "codex" -Paths @(Join-Path $HomeDir ".codex")) {
+    Invoke-SetupCommand -FilePath "npx" -Arguments @("skills", "add", "JuliusBrussee/caveman", "-a", "codex")
+  }
+  if (Test-AgentCommandOrPath -CommandName "cursor" -Paths @(Join-Path $HomeDir ".cursor")) {
+    Invoke-SetupCommand -FilePath "npx" -Arguments @("skills", "add", "JuliusBrussee/caveman", "-a", "cursor")
+  }
+  if (Test-AgentCommandOrPath -CommandName "windsurf" -Paths @(Join-Path $HomeDir ".windsurf")) {
+    Invoke-SetupCommand -FilePath "npx" -Arguments @("skills", "add", "JuliusBrussee/caveman", "-a", "windsurf")
+  }
+  if (Test-AgentCommandOrPath -CommandName "cline" -Paths @((Join-Path $HomeDir ".config/cline"), (Join-Path $HomeDir ".cline"))) {
+    Invoke-SetupCommand -FilePath "npx" -Arguments @("skills", "add", "JuliusBrussee/caveman", "-a", "cline")
+  }
+  if (Test-AgentCommandOrPath -CommandName "antigravity" -Paths @(Join-Path $HomeDir ".agents/rules")) {
+    Invoke-SetupCommand -FilePath "npx" -Arguments @("skills", "add", "JuliusBrussee/caveman", "-a", "antigravity")
+  }
+}
+
 function Install-CavemanTool {
   if ($SkipCaveman) {
     return
@@ -269,17 +413,31 @@ function Install-CavemanTool {
     return
   }
 
-  $args = @("-y", "github:JuliusBrussee/caveman", "--")
+  if ($DryRun) {
+    Write-Setup "dry-run: would write caveman default mode $CavemanMode"
+  } else {
+    $configDir = Join-Path $HomeDir ".config/caveman"
+    New-Item -ItemType Directory -Force -Path $configDir | Out-Null
+    [pscustomobject]@{ defaultMode = $CavemanMode } | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 (Join-Path $configDir "config.json")
+  }
+
+  $installerArgs = @("--all")
   if ($CavemanArgs) {
-    $args += $CavemanArgs.Split(" ", [StringSplitOptions]::RemoveEmptyEntries)
+    $extraArgs = @($CavemanArgs.Split(" ", [StringSplitOptions]::RemoveEmptyEntries))
+    if ($extraArgs -contains "--all") {
+      $installerArgs = @()
+    }
+    $installerArgs += $extraArgs
   }
-  if ($NonInteractive -and ($args -notcontains "--non-interactive")) {
-    $args += "--non-interactive"
+  if ($NonInteractive -and ($installerArgs -notcontains "--non-interactive")) {
+    $installerArgs += "--non-interactive"
   }
-  if ($DryRun -and ($args -notcontains "--dry-run")) {
-    $args += "--dry-run"
+  if ($DryRun -and ($installerArgs -notcontains "--dry-run")) {
+    $installerArgs += "--dry-run"
   }
+  $args = @("-y", "github:JuliusBrussee/caveman", "--") + $installerArgs
   Invoke-SetupCommand -FilePath "npx" -Arguments $args
+  Install-CavemanAgentFallbacks
 }
 
 if (-not $NonInteractive) {
@@ -289,11 +447,13 @@ if (-not $NonInteractive) {
   }
   if (-not $SkipRtk) {
     $RtkAgents = Read-TextDefault -Prompt "RTK agents to initialize, comma-separated" -Default $RtkAgents
+    $RtkMode = Read-TextDefault -Prompt "RTK setup mode" -Default $RtkMode
   }
   if (-not $SkipCaveman) {
     $SkipCaveman = -not (Read-YesNo -Prompt "Install Caveman?" -Default $true)
   }
   if (-not $SkipCaveman) {
+    $CavemanMode = Read-TextDefault -Prompt "Persistent Caveman default mode" -Default $CavemanMode
     $CavemanArgs = Read-TextDefault -Prompt "Extra Caveman args (examples: --all, --minimal, --only claude, --no-hooks)" -Default $CavemanArgs
   }
 }
@@ -308,6 +468,7 @@ Copy-RenderedFile -Source (Join-Path $Root "scripts/seed-project-instructions.sh
 
 Ensure-ClaudeSessionHook
 Initialize-RtkAgents
+Verify-RtkSetup
 Install-CavemanTool
 
 Write-Setup "setup complete"

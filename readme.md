@@ -22,7 +22,9 @@ The installer prompts for:
 - Project scope for instruction seeding. Default: `~/Documents/git`.
 - Whether to install and initialize RTK. Default: yes.
 - RTK agents to initialize. Default: `claude,codex`.
+- RTK setup mode. Default: `auto`, which adds detected installed agents.
 - Whether to install Caveman. Default: yes.
+- Persistent Caveman default mode. Default: `ultra`.
 - Optional Caveman flags. Default: none.
 
 Useful non-interactive examples:
@@ -58,7 +60,9 @@ Installer flags:
 - `--skip-rtk` / `-SkipRtk` - skip RTK install/init.
 - `--skip-caveman` / `-SkipCaveman` - skip Caveman install.
 - `--rtk-agents <list>` / `-RtkAgents <list>` - comma-separated RTK agents.
+- `--rtk-mode <mode>` / `-RtkMode <mode>` - RTK setup mode, default `auto`.
 - `--caveman-args <args>` / `-CavemanArgs <args>` - pass extra flags to Caveman.
+- `--caveman-mode <mode>` / `-CavemanMode <mode>` - persistent Caveman default mode, default `ultra`.
 
 # Recommended Layered Configuration
 
@@ -118,6 +122,8 @@ Installer behavior:
 - Leaves existing files unchanged when they differ and writes `<target>.new` for review.
 - Installs the seeding scripts to `~/.agents/scripts/`.
 - Installs the AI ignore optimizer scripts to `~/.agents/scripts/`.
+- Installs RTK globally, then auto-detects installed agents and runs per-agent RTK init commands when needed.
+- Writes persistent Caveman config, runs the unified Caveman installer, and adds per-agent fallbacks for detected non-Claude agents.
 - Adds the Claude Code `SessionStart` hook if it is missing.
 - When a project is seeded, updates `.gitignore`, `.codexignore`, and `.claude/settings.local.json` with token-bloat exclusions.
 - Use `--overwrite` only when you intentionally want to replace existing target files.
@@ -212,15 +218,18 @@ rtk init --global
 rtk init --global
 ~~~
 
-This injects a pre-tool Bash hook so commands like `git status` are automatically rewritten to `rtk git status` without any further configuration. On Windows without WSL, the hook is unavailable — use WSL for full functionality.
+This injects a pre-tool Bash hook so commands like `git status` are automatically rewritten to `rtk git status` without any further configuration. On Windows without WSL, the hook is unavailable; RTK falls back to prompt-level guidance and explicit `rtk <cmd>` usage. Use WSL for transparent shell rewrite.
 
-Just incase you use multiple AI tools and the global init configuration doesn't work, you can run one of these
+The installer uses this same pattern automatically: global setup first, then detected-agent fallback setup. If you need to run a fallback manually:
 ~~~sh
 # 1. Install for your AI tool
 rtk init -g                     # Claude Code / Copilot (default)
 rtk init -g --gemini            # Gemini CLI
 rtk init -g --codex             # Codex (OpenAI)
 rtk init -g --agent cursor      # Cursor
+rtk init --agent opencode       # OpenCode
+rtk init --agent openclaw       # OpenClaw
+rtk init --agent pi             # Pi
 rtk init --agent windsurf       # Windsurf
 rtk init --agent cline          # Cline / Roo Code
 rtk init --agent kilocode       # Kilo Code
@@ -242,6 +251,8 @@ Open the **Extensions** tab in VS Code (`Ctrl+Shift+X` / `Cmd+Shift+X`), search 
 GitHub Link: [GitHub: juliusbrussee/caveman](https://github.com/juliusbrussee/caveman)
 
 Adds a `/caveman` slash command that forces Claude Code into a minimal, verbose-free response mode. Reduces output bloat in long sessions.
+
+The installer writes `~/.config/caveman/config.json` with `defaultMode` set to `ultra`, runs the upstream unified Caveman installer with `--all`, and adds per-agent fallback installs for detected non-Claude agents where needed. Some agents still require per-session activation if their native integration does not support always-on hooks.
 
 ### Manual install
 
