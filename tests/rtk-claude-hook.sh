@@ -88,8 +88,8 @@ install_case() {
   fi
 
   output="$(run_install "$home")"
-  if printf '%s\n' "$output" | grep -Fq 'MANUAL STEP'; then
-    printf '%s printed a manual step\n' "$name" >&2
+  if ! printf '%s\n' "$output" | grep -Fq 'MANUAL STEP'; then
+    printf '%s did not print RTK child installer output\n' "$name" >&2
     exit 1
   fi
   assert_hook_state "$home/.claude/settings.json" 1

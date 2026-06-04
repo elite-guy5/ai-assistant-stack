@@ -31,16 +31,14 @@ curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/s
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1))) -Uninstall
 ~~~
 
-The installer prompts for:
+The installer prompts in this order:
 
-- Whether to overwrite existing global Claude/Codex instruction files. Options: `y` / `n`. Default: `n`.
-- Project directory for project seeding instructions. Default: `~/Documents`.
-- Whether to install and initialize RTK. Options: `y` / `n`. Default: `y`.
-- RTK agents to initialize. Enter a comma-separated list or `all available`. Default: `claude,codex`.
-- RTK setup mode. Default: `auto`, which adds detected installed agents.
-- Whether to install Caveman. Options: `y` / `n`. Default: `y`.
-- Persistent Caveman default mode. Default: `ultra`.
-- Optional Caveman flags. Default: none.
+- AI apps to configure. Options: `claude`, `codex`, `gemini`, `cursor`, `opencode`, `openclaw`, `copilot`, or `all`. Default: `claude,codex`.
+- Whether to install RTK for the selected AI apps. Options: `y` / `n`. Default: `y`.
+- Whether to install Caveman for the selected AI apps. Options: `y` / `n`. Default: `y`.
+- Whether to install global instruction files for the selected AI apps. Options: `y` / `n`. Default: `y`.
+- Whether to install project instruction files for the selected AI apps. Options: `y` / `n`. Default: `y`.
+- Whether to install AI ignore boundaries for the selected AI apps. Options: `y` / `n`. Default: `y`.
 
 Useful non-interactive examples:
 
@@ -82,6 +80,8 @@ Installer flags:
 - `--uninstall-components <list>` / `-UninstallComponents <list>` - comma-separated components to remove, or `all available`.
 - `--skip-rtk` / `-SkipRtk` - skip RTK install/init.
 - `--skip-caveman` / `-SkipCaveman` - skip Caveman install.
+- `--ai-apps <list>` / `-AiApps <list>` - comma-separated AI apps to configure. Default: `claude,codex`.
+- `--assets <list>` / `-Assets <list>` - comma-separated assets to install. Default: `all`.
 - `--rtk-agents <list>` / `-RtkAgents <list>` - comma-separated RTK agents.
 - `--rtk-mode <mode>` / `-RtkMode <mode>` - RTK setup mode, default `auto`.
 - `--caveman-args <args>` / `-CavemanArgs <args>` - pass extra flags to Caveman.

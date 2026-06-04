@@ -12,6 +12,8 @@ uninstall_components=""
 project_scope="${PROJECT_SCOPE:-$HOME/Documents}"
 install_rtk=""
 install_caveman=""
+ai_apps="claude,codex"
+assets="all"
 rtk_agents="claude,codex"
 rtk_mode="auto"
 caveman_args=""
@@ -43,6 +45,8 @@ Options:
                            Components: global-instructions, reset-global-instructions, project-instructions, project-templates, seeding, ignore-optimizer, rtk, caveman
   --skip-rtk               Do not install or initialize RTK
   --skip-caveman           Do not install Caveman
+  --ai-apps <list>         Comma-separated AI apps: claude,codex,gemini,cursor,opencode,openclaw,copilot,all
+  --assets <list>          Comma-separated assets: rtk,caveman,global-instructions,project-instructions,ai-ignore-boundaries,all
   --rtk-agents <list>      Comma-separated RTK agents to initialize (default: claude,codex)
   --rtk-mode <mode>        RTK setup mode: auto or manual (default: auto)
   --caveman-args <args>    Extra args passed to the Caveman installer
@@ -67,6 +71,18 @@ while [ "$#" -gt 0 ]; do
     --uninstall-components=*) uninstall_components="${1#*=}" ;;
     --skip-rtk) install_rtk=0 ;;
     --skip-caveman) install_caveman=0 ;;
+    --ai-apps)
+      [ "$#" -gt 1 ] || { printf 'missing value for --ai-apps\n' >&2; exit 2; }
+      ai_apps="$2"
+      shift
+      ;;
+    --ai-apps=*) ai_apps="${1#*=}" ;;
+    --assets)
+      [ "$#" -gt 1 ] || { printf 'missing value for --assets\n' >&2; exit 2; }
+      assets="$2"
+      shift
+      ;;
+    --assets=*) assets="${1#*=}" ;;
     --project-scope)
       [ "$#" -gt 1 ] || { printf 'missing value for --project-scope\n' >&2; exit 2; }
       project_scope="$2"
@@ -76,9 +92,10 @@ while [ "$#" -gt 0 ]; do
     --rtk-agents)
       [ "$#" -gt 1 ] || { printf 'missing value for --rtk-agents\n' >&2; exit 2; }
       rtk_agents="$2"
+      ai_apps="$2"
       shift
       ;;
-    --rtk-agents=*) rtk_agents="${1#*=}" ;;
+    --rtk-agents=*) rtk_agents="${1#*=}"; ai_apps="${1#*=}" ;;
     --rtk-mode)
       [ "$#" -gt 1 ] || { printf 'missing value for --rtk-mode\n' >&2; exit 2; }
       rtk_mode="$2"
@@ -112,6 +129,8 @@ say() {
 }
 
 run_cmd() {
+  local status
+
   if [ "$dry_run" = "1" ]; then
     if [ "$install_active" = "1" ]; then
       install_event "Skills and Plugins" "$current_tool" "Shell Commands Run" "dry-run: $*" "ok"
@@ -120,7 +139,13 @@ run_cmd() {
     fi
     return 0
   fi
-  "$@"
+  if "$@"; then
+    :
+  else
+    status=$?
+    printf 'error: %s failed with exit code %s: %s\n' "${current_tool:-command}" "$status" "$*" >&2
+    return "$status"
+  fi
   if [ "$install_active" = "1" ]; then
     install_event "Skills and Plugins" "$current_tool" "Shell Commands Run" "$*" "ok"
   fi
@@ -273,6 +298,95 @@ prompt_text() {
     answer="$default"
   fi
   printf '%s\n' "${answer:-$default}"
+}
+
+normalize_ai_app() {
+  local app="$1"
+
+  app="$(printf '%s' "$app" | tr '[:upper:]_' '[:lower:]-' | xargs)"
+  app="$(printf '%s' "$app" | sed 's/[[:space:]]\+/-/g')"
+  case "$app" in
+    claude|claude-code|claudecode) printf '%s\n' "claude" ;;
+    codex|gemini|cursor|opencode|openclaw|copilot) printf '%s\n' "$app" ;;
+    github-copilot|githubcopilot) printf '%s\n' "copilot" ;;
+    *) printf 'error: unsupported AI app: %s\n' "$1" >&2; return 1 ;;
+  esac
+}
+
+normalize_ai_apps() {
+  local input="$1"
+  local old_ifs item normalized result=""
+
+  case "$(printf '%s' "$input" | tr '[:upper:]' '[:lower:]' | xargs)" in
+    all|"all available"|"all-available")
+      printf '%s\n' "claude,codex,gemini,cursor,opencode,openclaw,copilot"
+      return 0
+      ;;
+  esac
+
+  old_ifs="$IFS"
+  IFS=","
+  for item in $input; do
+    IFS="$old_ifs"
+    item="$(printf '%s' "$item" | xargs)"
+    [ -n "$item" ] || { IFS=","; continue; }
+    normalized="$(normalize_ai_app "$item")"
+    csv_has_agent "$result" "$normalized" || result="${result:+$result,}$normalized"
+    IFS=","
+  done
+  IFS="$old_ifs"
+
+  [ -n "$result" ] || result="claude,codex"
+  printf '%s\n' "$result"
+}
+
+normalize_asset() {
+  local asset="$1"
+
+  asset="$(printf '%s' "$asset" | tr '[:upper:]_' '[:lower:]-' | xargs)"
+  asset="$(printf '%s' "$asset" | sed 's/[[:space:]]\+/-/g')"
+  case "$asset" in
+    rtk|caveman|global-instructions|project-instructions|ai-ignore-boundaries) printf '%s\n' "$asset" ;;
+    global|global-instruction-files) printf '%s\n' "global-instructions" ;;
+    project|project-instruction-files|project-templates|seeding) printf '%s\n' "project-instructions" ;;
+    ignore|ignore-boundaries|ignore-optimizer|ai-ignore) printf '%s\n' "ai-ignore-boundaries" ;;
+    *) printf 'error: unsupported asset: %s\n' "$1" >&2; return 1 ;;
+  esac
+}
+
+normalize_assets() {
+  local input="$1"
+  local old_ifs item normalized result=""
+
+  case "$(printf '%s' "$input" | tr '[:upper:]' '[:lower:]' | xargs)" in
+    all|"all available"|"all-available")
+      printf '%s\n' "rtk,caveman,global-instructions,project-instructions,ai-ignore-boundaries"
+      return 0
+      ;;
+  esac
+
+  old_ifs="$IFS"
+  IFS=","
+  for item in $input; do
+    IFS="$old_ifs"
+    item="$(printf '%s' "$item" | xargs)"
+    [ -n "$item" ] || { IFS=","; continue; }
+    normalized="$(normalize_asset "$item")"
+    csv_has_agent "$result" "$normalized" || result="${result:+$result,}$normalized"
+    IFS=","
+  done
+  IFS="$old_ifs"
+
+  [ -n "$result" ] || result="rtk,caveman,global-instructions,project-instructions,ai-ignore-boundaries"
+  printf '%s\n' "$result"
+}
+
+app_selected() {
+  csv_has_agent "$ai_apps" "$1"
+}
+
+asset_selected() {
+  csv_has_agent "$assets" "$1"
 }
 
 validate_caveman_mode() {
@@ -700,12 +814,11 @@ detect_rtk_agents() {
 }
 
 initialize_rtk_agents() {
-  local old_ifs agent args output status
+  local old_ifs agent args
 
   [ "$install_rtk" = "1" ] || return 0
   current_tool="RTK"
   install_rtk_binary
-  detect_rtk_agents
 
   if ! command -v rtk >/dev/null 2>&1 && [ "$dry_run" != "1" ]; then
     printf 'warning: rtk not found on PATH after install; skipping rtk init\n' >&2
@@ -714,27 +827,13 @@ initialize_rtk_agents() {
 
   old_ifs="$IFS"
   IFS=","
-  for agent in $rtk_agents; do
+  for agent in $ai_apps; do
     IFS="$old_ifs"
     agent="$(printf '%s' "$agent" | tr -d '[:space:]')"
     [ -n "$agent" ] || continue
     args="$(rtk_init_arg "$agent")"
-    if [ "$dry_run" = "1" ]; then
-      # shellcheck disable=SC2086
-      run_cmd rtk init $args
-    else
-      output="$(mktemp)"
-      # shellcheck disable=SC2086
-      if rtk init $args >"$output" 2>&1; then
-        :
-      else
-        status=$?
-        cat "$output" >&2
-        rm -f "$output"
-        return "$status"
-      fi
-      rm -f "$output"
-    fi
+    # shellcheck disable=SC2086
+    run_cmd rtk init $args
     record_manifest "generated_tool_reference" "rtk" "external" "initialized" "rtk" "{\"agent\":\"$agent\",\"command\":\"rtk init $args\"}"
     IFS=","
   done
@@ -747,7 +846,7 @@ rtk_agent_enabled() {
 
   old_ifs="$IFS"
   IFS=","
-  for agent in $rtk_agents; do
+  for agent in $ai_apps; do
     IFS="$old_ifs"
     agent="$(printf '%s' "$agent" | tr -d '[:space:]')"
     if [ "$agent" = "$wanted" ]; then
@@ -815,27 +914,48 @@ verify_rtk_setup() {
 }
 
 install_caveman_agent_fallbacks() {
+  local old_ifs app
+
   current_tool="Caveman"
-  command -v gemini >/dev/null 2>&1 && run_cmd gemini extensions install https://github.com/JuliusBrussee/caveman
-  detect_command_or_dir codex "$HOME/.codex" && run_cmd npx skills add JuliusBrussee/caveman -a codex
-  detect_command_or_dir cursor "$HOME/.cursor" && run_cmd npx skills add JuliusBrussee/caveman -a cursor
-  detect_command_or_dir windsurf "$HOME/.windsurf" && run_cmd npx skills add JuliusBrussee/caveman -a windsurf
-  detect_command_or_dir cline "$HOME/.config/cline" "$HOME/.cline" && run_cmd npx skills add JuliusBrussee/caveman -a cline
-  detect_command_or_dir antigravity "$HOME/.agents/rules" && run_cmd npx skills add JuliusBrussee/caveman -a antigravity
+  old_ifs="$IFS"
+  IFS=","
+  for app in $ai_apps; do
+    IFS="$old_ifs"
+    app="$(printf '%s' "$app" | xargs)"
+    case "$app" in
+      claude)
+        run_cmd claude plugin marketplace add JuliusBrussee/caveman
+        run_cmd claude plugin install caveman@caveman
+        ;;
+      gemini)
+        run_cmd gemini extensions install https://github.com/JuliusBrussee/caveman
+        ;;
+      opencode)
+        run_cmd npx -y github:JuliusBrussee/caveman -- --only opencode
+        ;;
+      openclaw)
+        run_cmd npx -y github:JuliusBrussee/caveman -- --only openclaw
+        ;;
+      codex)
+        run_cmd npx skills add JuliusBrussee/caveman -a codex
+        ;;
+      cursor)
+        run_cmd npx skills add JuliusBrussee/caveman -a cursor
+        ;;
+      copilot)
+        run_cmd npx -y github:JuliusBrussee/caveman -- --only copilot --with-init
+        ;;
+    esac
+    IFS=","
+  done
+  IFS="$old_ifs"
 
   return 0
 }
 
 install_caveman_tool() {
-  local args
-
   [ "$install_caveman" = "1" ] || return 0
   current_tool="Caveman"
-
-  if ! command -v npx >/dev/null 2>&1 && [ "$dry_run" != "1" ]; then
-    printf 'warning: npx is required to install Caveman; skipping\n' >&2
-    return 0
-  fi
 
   if [ "$dry_run" = "1" ]; then
     install_event "Skills and Plugins" "Caveman" "Configuration Entries Updated" "dry-run: would write caveman default mode $caveman_mode" "ok"
@@ -845,22 +965,42 @@ install_caveman_tool() {
     install_event "Skills and Plugins" "Caveman" "Configuration Entries Updated" "wrote caveman default mode $caveman_mode" "ok"
   fi
 
-  args="$caveman_args"
-  if ! printf '%s' "$args" | grep -q -- '--all'; then
-    args="--all${args:+ $args}"
+  record_manifest "file" "caveman" "installer-created" "created-or-modified" "$HOME/.config/caveman/config.json"
+  install_caveman_agent_fallbacks
+}
+
+install_global_instruction_files() {
+  if app_selected claude; then
+    copy_global_instruction_file "$ROOT/templates/CLAUDE.global.md" "$HOME/.claude/CLAUDE.md"
   fi
-  if [ "$non_interactive" = "1" ] && ! printf '%s' "$args" | grep -q -- '--non-interactive'; then
-    args="${args:+$args }--non-interactive"
+  if app_selected codex; then
+    render_global_instruction_template "$ROOT/templates/AGENTS.global.md" "$HOME/.codex/AGENTS.md"
   fi
-  if [ "$dry_run" = "1" ] && ! printf '%s' "$args" | grep -q -- '--dry-run'; then
-    args="${args:+$args }--dry-run"
+}
+
+install_project_instruction_files() {
+  if app_selected claude; then
+    copy_project_template_file "$ROOT/templates/CLAUDE.project-template.md" "$HOME/.claude/CLAUDE.project-template.md"
+  fi
+  if app_selected codex; then
+    copy_project_template_file "$ROOT/templates/AGENTS.project-template.md" "$HOME/.codex/AGENTS.project-template.md"
   fi
 
-  # shellcheck disable=SC2086
-  run_cmd npx -y github:JuliusBrussee/caveman -- $args
-  record_manifest "file" "caveman" "installer-created" "created-or-modified" "$HOME/.config/caveman/config.json"
-  record_manifest "generated_tool_reference" "caveman" "external" "installed" "npx" "{\"command\":\"npx -y github:JuliusBrussee/caveman -- $args\"}"
-  install_caveman_agent_fallbacks
+  render_template "$ROOT/scripts/seed-project-instructions.sh" "$HOME/.agents/scripts/seed-project-instructions.sh"
+  if [ "$dry_run" != "1" ]; then
+    chmod +x "$HOME/.agents/scripts/seed-project-instructions.sh"
+  fi
+
+  if app_selected claude; then
+    merge_claude_session_hook
+  fi
+}
+
+install_ai_ignore_boundaries() {
+  copy_managed_file "$ROOT/scripts/optimize-ai.sh" "$HOME/.agents/scripts/optimize-ai.sh" "ignore-optimizer"
+  if [ "$dry_run" != "1" ]; then
+    chmod +x "$HOME/.agents/scripts/optimize-ai.sh"
+  fi
 }
 
 component_selected() {
@@ -1728,109 +1868,71 @@ if [ "$uninstall" = "1" ]; then
   exit 0
 fi
 
-project_scope="$(prompt_text "Enter project directory for project seeding instructions" "$project_scope")"
-
-if prompt_yes_no "Overwrite existing global Claude/Codex instruction files?" "no"; then
-  overwrite_global_instructions=1
-fi
-
-if prompt_yes_no "Overwrite existing project instruction template files?" "no"; then
-  overwrite_project_templates=1
-fi
-
-if [ -z "$install_rtk" ]; then
-  if prompt_yes_no "Install and initialize RTK?" "yes"; then
-    install_rtk=1
-  else
-    install_rtk=0
-  fi
-fi
-
-if [ "$install_rtk" = "1" ]; then
-  rtk_agents="$(prompt_text "RTK agents to initialize, comma-separated or 'all available'" "$rtk_agents")"
-  case "$rtk_agents" in
-    all|"all available"|"all-available")
-      rtk_agents=""
-      rtk_mode="auto"
-      ;;
-  esac
-  rtk_mode="$(prompt_text "RTK setup mode" "$rtk_mode")"
-fi
-
-if [ -z "$install_caveman" ]; then
-  if prompt_yes_no "Install Caveman?" "yes"; then
-    install_caveman=1
-  else
-    install_caveman=0
-  fi
-fi
-
-if [ "$install_caveman" = "1" ] && [ "$non_interactive" != "1" ]; then
-  caveman_mode="$(prompt_text "Caveman mode to use ($caveman_modes)" "$caveman_mode")"
-  caveman_args="$(prompt_text "Extra Caveman args (examples: --all, --minimal, --only claude, --no-hooks)" "$caveman_args")"
-fi
-
-if [ "$install_caveman" = "1" ]; then
-  validate_caveman_mode "$caveman_mode"
-fi
+ai_apps="$(prompt_text "AI apps to configure" "$ai_apps")"
+ai_apps="$(normalize_ai_apps "$ai_apps")"
+assets="$(normalize_assets "$assets")"
+rtk_agents="$ai_apps"
 
 install_steps=5
-[ "$install_rtk" != "0" ] && install_steps=$((install_steps + 3))
-[ "$install_caveman" != "0" ] && install_steps=$((install_steps + 1))
 install_step=0
 install_active=1
 install_report_file="$(mktemp)"
 
-install_step=$((install_step + 1))
-progress_line "Install" "$install_step" "$install_steps" "global instructions"
-copy_global_instruction_file "$ROOT/templates/CLAUDE.global.md" "$HOME/.claude/CLAUDE.md"
-
-install_step=$((install_step + 1))
-progress_line "Install" "$install_step" "$install_steps" "project templates"
-render_global_instruction_template "$ROOT/templates/AGENTS.global.md" "$HOME/.codex/AGENTS.md"
-copy_project_template_file "$ROOT/templates/CLAUDE.project-template.md" "$HOME/.claude/CLAUDE.project-template.md"
-copy_project_template_file "$ROOT/templates/AGENTS.project-template.md" "$HOME/.codex/AGENTS.project-template.md"
-
-install_step=$((install_step + 1))
-progress_line "Install" "$install_step" "$install_steps" "optimize-ai files"
-copy_managed_file "$ROOT/scripts/optimize-ai.sh" "$HOME/.agents/scripts/optimize-ai.sh" "ignore-optimizer"
-
-install_step=$((install_step + 1))
-progress_line "Install" "$install_step" "$install_steps" "seed project scripts"
-render_template "$ROOT/scripts/seed-project-instructions.sh" "$HOME/.agents/scripts/seed-project-instructions.sh"
-
-if [ "$dry_run" != "1" ]; then
-  chmod +x "$HOME/.agents/scripts/optimize-ai.sh"
-  chmod +x "$HOME/.agents/scripts/seed-project-instructions.sh"
-fi
-
-install_step=$((install_step + 1))
-progress_line "Install" "$install_step" "$install_steps" "session hook"
-merge_claude_session_hook
-
-if [ "$install_rtk" != "0" ]; then
+if asset_selected rtk && [ "$install_rtk" != "0" ] && prompt_yes_no "Install RTK for selected AI apps?" "yes"; then
+  install_rtk=1
   install_step=$((install_step + 1))
   progress_line "Install" "$install_step" "$install_steps" "RTK initialization"
-fi
-initialize_rtk_agents
+  initialize_rtk_agents
 
-if [ "$install_rtk" != "0" ]; then
   install_step=$((install_step + 1))
   progress_line "Install" "$install_step" "$install_steps" "RTK Claude hook"
-fi
-ensure_rtk_claude_hook
+  ensure_rtk_claude_hook
 
-if [ "$install_rtk" != "0" ]; then
   install_step=$((install_step + 1))
   progress_line "Install" "$install_step" "$install_steps" "RTK verification"
+  verify_rtk_setup
+else
+  install_rtk=0
 fi
-verify_rtk_setup
 
-if [ "$install_caveman" != "0" ]; then
+if asset_selected caveman && [ "$install_caveman" != "0" ] && prompt_yes_no "Install Caveman for selected AI apps?" "yes"; then
+  install_caveman=1
+  if [ "$non_interactive" != "1" ]; then
+    caveman_mode="$(prompt_text "Caveman mode to use ($caveman_modes)" "$caveman_mode")"
+    caveman_args="$(prompt_text "Extra Caveman args" "$caveman_args")"
+  fi
+  validate_caveman_mode "$caveman_mode"
   install_step=$((install_step + 1))
   progress_line "Install" "$install_step" "$install_steps" "Caveman install"
+  install_caveman_tool
+else
+  install_caveman=0
 fi
-install_caveman_tool
+
+if asset_selected global-instructions && prompt_yes_no "Install global instruction files for selected AI apps?" "yes"; then
+  if prompt_yes_no "Overwrite existing global instruction files?" "no"; then
+    overwrite_global_instructions=1
+  fi
+  install_step=$((install_step + 1))
+  progress_line "Install" "$install_step" "$install_steps" "global instructions"
+  install_global_instruction_files
+fi
+
+if asset_selected project-instructions && prompt_yes_no "Install project instruction files for selected AI apps?" "yes"; then
+  project_scope="$(prompt_text "Enter project directory for project seeding instructions" "$project_scope")"
+  if prompt_yes_no "Overwrite existing project instruction template files?" "no"; then
+    overwrite_project_templates=1
+  fi
+  install_step=$((install_step + 1))
+  progress_line "Install" "$install_step" "$install_steps" "project instructions"
+  install_project_instruction_files
+fi
+
+if asset_selected ai-ignore-boundaries && prompt_yes_no "Install AI ignore boundaries for selected AI apps?" "yes"; then
+  install_step=$((install_step + 1))
+  progress_line "Install" "$install_step" "$install_steps" "AI ignore boundaries"
+  install_ai_ignore_boundaries
+fi
 
 report_install_summary
 say "setup complete"

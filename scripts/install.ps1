@@ -10,6 +10,8 @@ param(
   [string]$ProjectScope,
   [switch]$SkipRtk,
   [switch]$SkipCaveman,
+  [string]$AiApps = "claude,codex",
+  [string]$Assets = "all",
   [string]$RtkAgents = "claude,codex",
   [string]$RtkMode = "auto",
   [string]$CavemanArgs = "",
@@ -292,7 +294,7 @@ function Invoke-SetupCommand {
 
   & $FilePath @Arguments
   if ($LASTEXITCODE -ne 0) {
-    throw "command failed: $($display -join ' ')"
+    throw "command failed with exit code ${LASTEXITCODE}: $($display -join ' ')"
   }
   Add-InstallReport -Section "Skills and Plugins" -Tool $CurrentTool -Category "Shell Commands Run" -Item ($display -join ' ')
 }
@@ -415,6 +417,100 @@ function Read-TextDefault {
     return $Default
   }
   return $answer
+}
+
+function Normalize-AiApp {
+  param([string]$App)
+
+  $clean = $App.Trim().ToLowerInvariant().Replace("_", "-")
+  $clean = ($clean -replace "\s+", "-")
+  switch ($clean) {
+    "claude" { return "claude" }
+    "claude-code" { return "claude" }
+    "claudecode" { return "claude" }
+    "github-copilot" { return "copilot" }
+    "githubcopilot" { return "copilot" }
+    "codex" { return "codex" }
+    "gemini" { return "gemini" }
+    "cursor" { return "cursor" }
+    "opencode" { return "opencode" }
+    "openclaw" { return "openclaw" }
+    "copilot" { return "copilot" }
+    default { throw "unsupported AI app: $App" }
+  }
+}
+
+function Normalize-AiApps {
+  param([string]$Value)
+
+  $clean = $Value.Trim().ToLowerInvariant()
+  if ($clean -in @("all", "all available", "all-available")) {
+    return "claude,codex,gemini,cursor,opencode,openclaw,copilot"
+  }
+
+  $items = @()
+  foreach ($item in $Value.Split(",")) {
+    if ([string]::IsNullOrWhiteSpace($item)) { continue }
+    $normalized = Normalize-AiApp -App $item
+    if ($items -notcontains $normalized) { $items += $normalized }
+  }
+
+  if (-not $items.Count) { return "claude,codex" }
+  return ($items -join ",")
+}
+
+function Normalize-Asset {
+  param([string]$Asset)
+
+  $clean = $Asset.Trim().ToLowerInvariant().Replace("_", "-")
+  $clean = ($clean -replace "\s+", "-")
+  switch ($clean) {
+    "rtk" { return "rtk" }
+    "caveman" { return "caveman" }
+    "global-instructions" { return "global-instructions" }
+    "global" { return "global-instructions" }
+    "global-instruction-files" { return "global-instructions" }
+    "project-instructions" { return "project-instructions" }
+    "project" { return "project-instructions" }
+    "project-instruction-files" { return "project-instructions" }
+    "project-templates" { return "project-instructions" }
+    "seeding" { return "project-instructions" }
+    "ai-ignore-boundaries" { return "ai-ignore-boundaries" }
+    "ai-ignore" { return "ai-ignore-boundaries" }
+    "ignore" { return "ai-ignore-boundaries" }
+    "ignore-boundaries" { return "ai-ignore-boundaries" }
+    "ignore-optimizer" { return "ai-ignore-boundaries" }
+    default { throw "unsupported asset: $Asset" }
+  }
+}
+
+function Normalize-Assets {
+  param([string]$Value)
+
+  $clean = $Value.Trim().ToLowerInvariant()
+  if ($clean -in @("all", "all available", "all-available")) {
+    return "rtk,caveman,global-instructions,project-instructions,ai-ignore-boundaries"
+  }
+
+  $items = @()
+  foreach ($item in $Value.Split(",")) {
+    if ([string]::IsNullOrWhiteSpace($item)) { continue }
+    $normalized = Normalize-Asset -Asset $item
+    if ($items -notcontains $normalized) { $items += $normalized }
+  }
+
+  if (-not $items.Count) { return "rtk,caveman,global-instructions,project-instructions,ai-ignore-boundaries" }
+  return ($items -join ",")
+}
+
+function Test-AiApp {
+  param([string]$App)
+  return @($script:AiApps.Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -contains $App
+}
+
+function Test-Asset {
+  param([string]$Asset)
+  return @($script:Assets.Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -contains $Asset
 }
 
 function Prompt-UninstallComponents {
@@ -873,7 +969,7 @@ function Detect-RtkAgents {
 function Test-RtkAgentEnabled {
   param([string]$Agent)
 
-  return @($RtkAgents.Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -contains $Agent
+  return @($AiApps.Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -contains $Agent
 }
 
 function Test-FileContains {
@@ -904,7 +1000,6 @@ function Initialize-RtkAgents {
 
   $script:CurrentTool = "RTK"
   Install-RtkBinary
-  Detect-RtkAgents
   if (([Environment]::OSVersion.Platform -eq "Win32NT") -and (-not $env:WSL_DISTRO_NAME)) {
     Write-Warning "On native Windows, RTK installs the binary and config. Transparent shell-hook rewrite requires WSL."
   }
@@ -914,22 +1009,13 @@ function Initialize-RtkAgents {
     return
   }
 
-  foreach ($agent in $RtkAgents.Split(",")) {
+  foreach ($agent in $AiApps.Split(",")) {
     $cleanAgent = $agent.Trim()
     if (-not $cleanAgent) {
       continue
     }
     $initArgs = Get-RtkInitArgs -Agent $cleanAgent
-    if ($DryRun) {
-      Invoke-SetupCommand -FilePath "rtk" -Arguments $initArgs
-    } else {
-      $output = & rtk @initArgs 2>&1
-      if ($LASTEXITCODE -ne 0) {
-        $output | Write-Host
-        throw "command failed: rtk $($initArgs -join ' ')"
-      }
-      Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Shell Commands Run" -Item "rtk $($initArgs -join ' ')"
-    }
+    Invoke-SetupCommand -FilePath "rtk" -Arguments $initArgs
     Add-ManifestArtifact -Type "generated_tool_reference" -Component "rtk" -Ownership "external" -Action "initialized" -Path "rtk" -Details @{ agent = $cleanAgent; command = "rtk $($initArgs -join ' ')" }
   }
 }
@@ -975,23 +1061,32 @@ function Verify-RtkSetup {
 
 function Install-CavemanAgentFallbacks {
   $script:CurrentTool = "Caveman"
-  if (Get-Command gemini -ErrorAction SilentlyContinue) {
-    Invoke-SetupCommand -FilePath "gemini" -Arguments @("extensions", "install", "https://github.com/JuliusBrussee/caveman")
-  }
-  if (Test-AgentCommandOrPath -CommandName "codex" -Paths @(Join-Path $HomeDir ".codex")) {
-    Invoke-SetupCommand -FilePath "npx" -Arguments @("skills", "add", "JuliusBrussee/caveman", "-a", "codex")
-  }
-  if (Test-AgentCommandOrPath -CommandName "cursor" -Paths @(Join-Path $HomeDir ".cursor")) {
-    Invoke-SetupCommand -FilePath "npx" -Arguments @("skills", "add", "JuliusBrussee/caveman", "-a", "cursor")
-  }
-  if (Test-AgentCommandOrPath -CommandName "windsurf" -Paths @(Join-Path $HomeDir ".windsurf")) {
-    Invoke-SetupCommand -FilePath "npx" -Arguments @("skills", "add", "JuliusBrussee/caveman", "-a", "windsurf")
-  }
-  if (Test-AgentCommandOrPath -CommandName "cline" -Paths @((Join-Path $HomeDir ".config/cline"), (Join-Path $HomeDir ".cline"))) {
-    Invoke-SetupCommand -FilePath "npx" -Arguments @("skills", "add", "JuliusBrussee/caveman", "-a", "cline")
-  }
-  if (Test-AgentCommandOrPath -CommandName "antigravity" -Paths @(Join-Path $HomeDir ".agents/rules")) {
-    Invoke-SetupCommand -FilePath "npx" -Arguments @("skills", "add", "JuliusBrussee/caveman", "-a", "antigravity")
+  foreach ($app in $AiApps.Split(",")) {
+    $cleanApp = $app.Trim()
+    switch ($cleanApp) {
+      "claude" {
+        Invoke-SetupCommand -FilePath "claude" -Arguments @("plugin", "marketplace", "add", "JuliusBrussee/caveman")
+        Invoke-SetupCommand -FilePath "claude" -Arguments @("plugin", "install", "caveman@caveman")
+      }
+      "gemini" {
+        Invoke-SetupCommand -FilePath "gemini" -Arguments @("extensions", "install", "https://github.com/JuliusBrussee/caveman")
+      }
+      "opencode" {
+        Invoke-SetupCommand -FilePath "npx" -Arguments @("-y", "github:JuliusBrussee/caveman", "--", "--only", "opencode")
+      }
+      "openclaw" {
+        Invoke-SetupCommand -FilePath "npx" -Arguments @("-y", "github:JuliusBrussee/caveman", "--", "--only", "openclaw")
+      }
+      "codex" {
+        Invoke-SetupCommand -FilePath "npx" -Arguments @("skills", "add", "JuliusBrussee/caveman", "-a", "codex")
+      }
+      "cursor" {
+        Invoke-SetupCommand -FilePath "npx" -Arguments @("skills", "add", "JuliusBrussee/caveman", "-a", "cursor")
+      }
+      "copilot" {
+        Invoke-SetupCommand -FilePath "npx" -Arguments @("-y", "github:JuliusBrussee/caveman", "--", "--only", "copilot", "--with-init")
+      }
+    }
   }
 }
 
@@ -1001,11 +1096,6 @@ function Install-CavemanTool {
   }
 
   $script:CurrentTool = "Caveman"
-  if (-not (Get-Command npx -ErrorAction SilentlyContinue) -and -not $DryRun) {
-    Write-Warning "npx is required to install Caveman; skipping"
-    return
-  }
-
   if ($DryRun) {
     Add-InstallReport -Section "Skills and Plugins" -Tool "Caveman" -Category "Configuration Entries Updated" -Item "dry-run: would write caveman default mode $CavemanMode"
   } else {
@@ -1015,25 +1105,36 @@ function Install-CavemanTool {
     Add-InstallReport -Section "Skills and Plugins" -Tool "Caveman" -Category "Configuration Entries Updated" -Item "wrote caveman default mode $CavemanMode"
   }
 
-  $installerArgs = @("--all")
-  if ($CavemanArgs) {
-    $extraArgs = @($CavemanArgs.Split(" ", [StringSplitOptions]::RemoveEmptyEntries))
-    if ($extraArgs -contains "--all") {
-      $installerArgs = @()
-    }
-    $installerArgs += $extraArgs
-  }
-  if ($NonInteractive -and ($installerArgs -notcontains "--non-interactive")) {
-    $installerArgs += "--non-interactive"
-  }
-  if ($DryRun -and ($installerArgs -notcontains "--dry-run")) {
-    $installerArgs += "--dry-run"
-  }
-  $args = @("-y", "github:JuliusBrussee/caveman", "--") + $installerArgs
-  Invoke-SetupCommand -FilePath "npx" -Arguments $args
   Add-ManifestArtifact -Type "file" -Component "caveman" -Ownership "installer-created" -Action "created-or-modified" -Path (Join-Path $HomeDir ".config/caveman/config.json")
-  Add-ManifestArtifact -Type "generated_tool_reference" -Component "caveman" -Ownership "external" -Action "installed" -Path "npx" -Details @{ command = "npx $($args -join ' ')" }
   Install-CavemanAgentFallbacks
+}
+
+function Install-GlobalInstructionFiles {
+  if (Test-AiApp "claude") {
+    Copy-GlobalInstructionFile -Source (Join-Path $Root "templates/CLAUDE.global.md") -Target (Join-Path $HomeDir ".claude/CLAUDE.md")
+  }
+  if (Test-AiApp "codex") {
+    Copy-RenderedGlobalInstructionFile -Source (Join-Path $Root "templates/AGENTS.global.md") -Target (Join-Path $HomeDir ".codex/AGENTS.md")
+  }
+}
+
+function Install-ProjectInstructionFiles {
+  if (Test-AiApp "claude") {
+    Copy-ProjectTemplateFile -Source (Join-Path $Root "templates/CLAUDE.project-template.md") -Target (Join-Path $HomeDir ".claude/CLAUDE.project-template.md")
+  }
+  if (Test-AiApp "codex") {
+    Copy-ProjectTemplateFile -Source (Join-Path $Root "templates/AGENTS.project-template.md") -Target (Join-Path $HomeDir ".codex/AGENTS.project-template.md")
+  }
+
+  Copy-RenderedFile -Source (Join-Path $Root "scripts/seed-project-instructions.ps1") -Target (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.ps1")
+  Copy-RenderedFile -Source (Join-Path $Root "scripts/seed-project-instructions.sh") -Target (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.sh")
+  if (Test-AiApp "claude") {
+    Ensure-ClaudeSessionHook
+  }
+}
+
+function Install-AiIgnoreBoundaries {
+  Copy-ManagedFile -Source (Join-Path $Root "scripts/optimize-ai.ps1") -Target (Join-Path $HomeDir ".agents/scripts/optimize-ai.ps1") -Component "ignore-optimizer"
 }
 
 function Test-UninstallComponent {
@@ -1552,98 +1653,68 @@ if ($Uninstall) {
   exit 0
 }
 
-if (-not $NonInteractive) {
-  $ProjectScope = Read-TextDefault -Prompt "Enter project directory for project seeding instructions" -Default $ProjectScope
-  if (-not $OverwriteGlobalInstructions) {
-    $OverwriteGlobalInstructions = Read-YesNo -Prompt "Overwrite existing global Claude/Codex instruction files?" -Default $false
-  }
-  if (-not $OverwriteProjectTemplates) {
-    $OverwriteProjectTemplates = Read-YesNo -Prompt "Overwrite existing project instruction template files?" -Default $false
-  }
-  if (-not $SkipRtk) {
-    $SkipRtk = -not (Read-YesNo -Prompt "Install and initialize RTK?" -Default $true)
-  }
-  if (-not $SkipRtk) {
-    $RtkAgents = Read-TextDefault -Prompt "RTK agents to initialize, comma-separated or 'all available'" -Default $RtkAgents
-    if ($RtkAgents -in @("all", "all available", "all-available")) {
-      $RtkAgents = ""
-      $RtkMode = "auto"
-    }
-    $RtkMode = Read-TextDefault -Prompt "RTK setup mode" -Default $RtkMode
-  }
-  if (-not $SkipCaveman) {
-    $SkipCaveman = -not (Read-YesNo -Prompt "Install Caveman?" -Default $true)
-  }
-  if (-not $SkipCaveman) {
-    $CavemanMode = Read-TextDefault -Prompt "Caveman mode to use ($($CavemanModes -join ','))" -Default $CavemanMode
-    $CavemanArgs = Read-TextDefault -Prompt "Extra Caveman args (examples: --all, --minimal, --only claude, --no-hooks)" -Default $CavemanArgs
-  }
-}
+$AiApps = Read-TextDefault -Prompt "AI apps to configure" -Default $AiApps
+$AiApps = Normalize-AiApps -Value $AiApps
+$Assets = Normalize-Assets -Value $Assets
+$RtkAgents = $AiApps
 
-if (-not $SkipCaveman) {
-  Assert-CavemanMode -Mode $CavemanMode
-}
-
-if ($RtkAgents -in @("all", "all available", "all-available")) {
-  $RtkAgents = ""
-  $RtkMode = "auto"
-}
-
-$installSteps = 6
-if (-not $SkipRtk) { $installSteps += 3 }
-if (-not $SkipCaveman) { $installSteps += 1 }
+$installSteps = 5
 $installStep = 0
 $InstallActive = $true
 
-$installStep += 1
-Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "global instructions"
-Copy-GlobalInstructionFile -Source (Join-Path $Root "templates/CLAUDE.global.md") -Target (Join-Path $HomeDir ".claude/CLAUDE.md")
-
-$installStep += 1
-Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "render global instructions"
-Copy-RenderedGlobalInstructionFile -Source (Join-Path $Root "templates/AGENTS.global.md") -Target (Join-Path $HomeDir ".codex/AGENTS.md")
-
-$installStep += 1
-Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "project templates"
-Copy-ProjectTemplateFile -Source (Join-Path $Root "templates/CLAUDE.project-template.md") -Target (Join-Path $HomeDir ".claude/CLAUDE.project-template.md")
-Copy-ProjectTemplateFile -Source (Join-Path $Root "templates/AGENTS.project-template.md") -Target (Join-Path $HomeDir ".codex/AGENTS.project-template.md")
-
-$installStep += 1
-Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "optimize-ai files"
-Copy-ManagedFile -Source (Join-Path $Root "scripts/optimize-ai.ps1") -Target (Join-Path $HomeDir ".agents/scripts/optimize-ai.ps1") -Component "ignore-optimizer"
-
-$installStep += 1
-Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "seed project scripts"
-Copy-RenderedFile -Source (Join-Path $Root "scripts/seed-project-instructions.ps1") -Target (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.ps1")
-Copy-RenderedFile -Source (Join-Path $Root "scripts/seed-project-instructions.sh") -Target (Join-Path $HomeDir ".agents/scripts/seed-project-instructions.sh")
-
-$installStep += 1
-Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "session hook"
-Ensure-ClaudeSessionHook
-
-if (-not $SkipRtk) {
+if ((Test-Asset "rtk") -and (-not $SkipRtk) -and (Read-YesNo -Prompt "Install RTK for selected AI apps?" -Default $true)) {
   $installStep += 1
   Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "RTK initialization"
-}
-Initialize-RtkAgents
+  Initialize-RtkAgents
 
-if (-not $SkipRtk) {
   $installStep += 1
   Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "RTK Claude hook"
-}
-Ensure-RtkClaudeHook
+  Ensure-RtkClaudeHook
 
-if (-not $SkipRtk) {
   $installStep += 1
   Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "RTK verification"
+  Verify-RtkSetup
+} else {
+  $SkipRtk = $true
 }
-Verify-RtkSetup
 
-if (-not $SkipCaveman) {
+if ((Test-Asset "caveman") -and (-not $SkipCaveman) -and (Read-YesNo -Prompt "Install Caveman for selected AI apps?" -Default $true)) {
+  if (-not $NonInteractive) {
+    $CavemanMode = Read-TextDefault -Prompt "Caveman mode to use ($($CavemanModes -join ','))" -Default $CavemanMode
+    $CavemanArgs = Read-TextDefault -Prompt "Extra Caveman args" -Default $CavemanArgs
+  }
+  Assert-CavemanMode -Mode $CavemanMode
   $installStep += 1
   Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "Caveman install"
+  Install-CavemanTool
+} else {
+  $SkipCaveman = $true
 }
-Install-CavemanTool
+
+if ((Test-Asset "global-instructions") -and (Read-YesNo -Prompt "Install global instruction files for selected AI apps?" -Default $true)) {
+  if (-not $OverwriteGlobalInstructions) {
+    $OverwriteGlobalInstructions = Read-YesNo -Prompt "Overwrite existing global instruction files?" -Default $false
+  }
+  $installStep += 1
+  Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "global instructions"
+  Install-GlobalInstructionFiles
+}
+
+if ((Test-Asset "project-instructions") -and (Read-YesNo -Prompt "Install project instruction files for selected AI apps?" -Default $true)) {
+  $ProjectScope = Read-TextDefault -Prompt "Enter project directory for project seeding instructions" -Default $ProjectScope
+  if (-not $OverwriteProjectTemplates) {
+    $OverwriteProjectTemplates = Read-YesNo -Prompt "Overwrite existing project instruction template files?" -Default $false
+  }
+  $installStep += 1
+  Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "project instructions"
+  Install-ProjectInstructionFiles
+}
+
+if ((Test-Asset "ai-ignore-boundaries") -and (Read-YesNo -Prompt "Install AI ignore boundaries for selected AI apps?" -Default $true)) {
+  $installStep += 1
+  Write-StepProgress -Phase "Install" -Current $installStep -Total $installSteps -Message "AI ignore boundaries"
+  Install-AiIgnoreBoundaries
+}
 
 Show-InstallReport
 Write-Setup "setup complete"
