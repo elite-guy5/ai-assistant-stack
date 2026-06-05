@@ -859,6 +859,239 @@ function Ensure-RtkClaudeHook {
   Add-ManifestArtifact -Type "settings_entry" -Component "rtk" -Ownership "user-owned" -Action "added" -Path $settingsPath -Details $details
 }
 
+function Get-RtkConfigPath {
+  $candidates = @(
+    Join-Path $HomeDir ".config/rtk/rtk.toml",
+    Join-Path $HomeDir ".config/rtk/config.toml",
+    Join-Path $HomeDir ".rtk/rtk.toml",
+    Join-Path $HomeDir ".rtk/config.toml"
+  )
+  foreach ($candidate in $candidates) {
+    if (Test-Path $candidate) { return $candidate }
+  }
+  return Join-Path $HomeDir ".config/rtk/rtk.toml"
+}
+
+function Find-ShellProfilePath {
+  $candidates = @(
+    Join-Path $HomeDir ".zshrc",
+    Join-Path $HomeDir ".bashrc",
+    Join-Path $HomeDir ".bash_profile",
+    Join-Path $HomeDir ".profile"
+  )
+  foreach ($candidate in $candidates) {
+    if (Test-Path $candidate) { return $candidate }
+  }
+  return Join-Path $HomeDir ".profile"
+}
+
+function Ensure-RtkTelemetryDisabled {
+  $configPath = Get-RtkConfigPath
+  if ($DryRun) {
+    Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Updated" -Item "dry-run: would ensure RTK telemetry disabled in $configPath"
+    return
+  }
+
+  if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Write-Warning "node is required to patch $configPath for RTK telemetry disable"
+    return
+  }
+
+  $configDir = Split-Path -Parent $configPath
+  New-Item -ItemType Directory -Force -Path $configDir | Out-Null
+
+  $script = @'
+const fs = require("fs");
+const configPath = process.argv[2];
+const raw = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf8').replace(/\r/g, '') : '';
+const lines = raw === '' ? [] : raw.split('\n');
+let inTelemetry = false;
+let telemetryFound = false;
+let enabledFound = false;
+let originalValue = '';
+let sectionCreated = false;
+const output = [];
+
+for (let i = 0; i < lines.length; i++) {
+  const line = lines[i];
+  const trimmed = line.trim();
+  if (/^\[.*\]$/.test(trimmed)) {
+    if (inTelemetry && !enabledFound) {
+      output.push('enabled = false');
+      enabledFound = true;
+    }
+    inTelemetry = trimmed === '[telemetry]';
+    if (inTelemetry) telemetryFound = true;
+    output.push(line);
+    continue;
+  }
+  if (inTelemetry) {
+    const m = trimmed.match(/^enabled\s*=\s*(.*)$/);
+    if (m) {
+      originalValue = m[1].trim();
+      if (originalValue === 'false') {
+        output.push(line);
+        enabledFound = true;
+        continue;
+      }
+      output.push('enabled = false');
+      enabledFound = true;
+      continue;
+    }
+  }
+  output.push(line);
+}
+
+if (!telemetryFound) {
+  if (output.length && output[output.length - 1] !== '') output.push('');
+  output.push('[telemetry]');
+  output.push('enabled = false');
+  sectionCreated = true;
+} else if (!enabledFound) {
+  output.push('enabled = false');
+}
+
+fs.writeFileSync(configPath, (output.join('\n') + '\n'), { mode: fs.existsSync(configPath) ? fs.statSync(configPath).mode : 0o600 });
+const action = telemetryFound && enabledFound && originalValue === 'false' ? 'already_disabled' : (raw === '' ? 'created' : 'updated');
+process.stdout.write(`${action}\t${originalValue}\t${sectionCreated ? '1' : '0'}`);
+'@
+
+  $result = $script | node - $configPath
+  $parts = $result -split "`t"
+  $action = $parts[0]
+  $originalValue = if ($parts.Count -gt 1) { $parts[1] } else { "" }
+  $sectionCreated = if ($parts.Count -gt 2) { $parts[2] } else { "0" }
+
+  switch ($action) {
+    'created' {
+      Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Updated" -Item "Created RTK config with telemetry disabled at $configPath"
+      Add-ManifestArtifact -Type "file" -Component "rtk" -Ownership "installer-created" -Action "created" -Path $configPath
+    }
+    'updated' {
+      Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Updated" -Item "Disabled RTK telemetry in $configPath"
+      Add-ManifestArtifact -Type "settings_entry" -Component "rtk" -Ownership "user-owned" -Action "modified" -Path $configPath -Details @{ key = "telemetry.enabled"; originalValue = $originalValue; createdSection = ($sectionCreated -ne '0') }
+    }
+    'already_disabled' {
+      Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Updated" -Item "Telemetry already disabled in $configPath"
+    }
+    default {
+      Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Updated" -Item "Ensured RTK telemetry disabled in $configPath"
+    }
+  }
+}
+
+function Ensure-RtkTelemetryShellEnv {
+  $profilePath = Find-ShellProfilePath
+  $startMarker = '# token-saver-setup managed RTK telemetry start'
+  $endMarker = '# token-saver-setup managed RTK telemetry end'
+
+  if ($DryRun) {
+    Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Updated" -Item "dry-run: would ensure RTK_TELEMETRY_DISABLED=1 is present in $profilePath"
+    return
+  }
+
+  $profileDir = Split-Path -Parent $profilePath
+  New-Item -ItemType Directory -Force -Path $profileDir | Out-Null
+  if (-not (Test-Path $profilePath)) {
+    Set-Content -Encoding UTF8 -Path $profilePath -Value ""
+  }
+
+  if (Get-Content -Raw -ErrorAction SilentlyContinue $profilePath | Select-String -SimpleMatch $startMarker) {
+    Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Updated" -Item "RTK shell telemetry env already present in $profilePath"
+    return
+  }
+
+  Add-Content -Path $profilePath -Value "$startMarker`nexport RTK_TELEMETRY_DISABLED=1`n$endMarker"
+  Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Updated" -Item "Added managed RTK telemetry shell env to $profilePath"
+  Add-ManifestArtifact -Type "settings_entry" -Component "rtk" -Ownership "user-owned" -Action "added" -Path $profilePath -Details @{ key = "shell.RTK_TELEMETRY_DISABLED" }
+}
+
+function Remove-RtkTelemetryConfig {
+  param(
+    [string]$Path,
+    [string]$OriginalValue
+  )
+
+  if ($DryRun) {
+    if ($UninstallActive) {
+      Add-UninstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Removed" -Item "$Path telemetry.enabled"
+    } else {
+      Write-Setup "dry-run: would remove managed telemetry setting from $Path"
+    }
+    return
+  }
+  if (-not (Test-Path $Path)) {
+    return
+  }
+
+  $raw = Get-Content -Raw -Path $Path
+  $lines = if ([string]::IsNullOrWhiteSpace($raw)) { @() } else { $raw -split "`n" }
+  $blocks = @()
+  $current = [pscustomobject]@{ Header = $null; Body = @() }
+  foreach ($line in $lines) {
+    if ($line.Trim() -match '^\[.*\]$') {
+      $blocks += $current
+      $current = [pscustomobject]@{ Header = $line; Body = @() }
+      continue
+    }
+    $current.Body += $line
+  }
+  $blocks += $current
+
+  $output = @()
+  foreach ($block in $blocks) {
+    if ($block.Header -and $block.Header.Trim() -eq '[telemetry]') {
+      $filtered = $block.Body | Where-Object { $_ -notmatch '^[ \t]*enabled[ \t]*=' }
+      if (-not [string]::IsNullOrWhiteSpace($OriginalValue)) {
+        $filtered = @("enabled = $OriginalValue") + $filtered
+      }
+      if ($filtered.Count -eq 0) {
+        continue
+      }
+      $output += $block.Header
+      $output += $filtered
+      continue
+    }
+    if ($block.Header) { $output += $block.Header }
+    $output += $block.Body
+  }
+
+  $joined = $output -join "`n"
+  if ($joined -notmatch "`n$") { $joined += "`n" }
+  Set-Content -Encoding UTF8 -Path $Path -Value $joined
+  Add-UninstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Removed" -Item "$Path telemetry.enabled"
+}
+
+function Remove-RtkTelemetryShellEnv {
+  param([string]$Path)
+
+  if ($DryRun) {
+    if ($UninstallActive) {
+      Add-UninstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Removed" -Item "$Path RTK_TELEMETRY_DISABLED block"
+    } else {
+      Write-Setup "dry-run: would remove managed RTK shell telemetry env from $Path"
+    }
+    return
+  }
+  if (-not (Test-Path $Path)) {
+    return
+  }
+
+  $startMarker = '# token-saver-setup managed RTK telemetry start'
+  $endMarker = '# token-saver-setup managed RTK telemetry end'
+  $out = New-Object System.Collections.Generic.List[string]
+  $removing = $false
+  foreach ($line in Get-Content -Path $Path) {
+    if ($line -eq $startMarker) { $removing = $true; continue }
+    if ($line -eq $endMarker -and $removing) { $removing = $false; continue }
+    if ($removing) { continue }
+    $out.Add($line)
+  }
+
+  Set-Content -Encoding UTF8 -Path $Path -Value $out
+  Add-UninstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Configuration Entries Removed" -Item "$Path RTK_TELEMETRY_DISABLED block"
+}
+
 function Install-RtkBinary {
   if (Get-Command rtk -ErrorAction SilentlyContinue) {
     Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Files Already Current" -Item "rtk already installed: $((Get-Command rtk).Source)"
@@ -1000,6 +1233,8 @@ function Initialize-RtkAgents {
 
   $script:CurrentTool = "RTK"
   Install-RtkBinary
+  Ensure-RtkTelemetryDisabled
+  Ensure-RtkTelemetryShellEnv
   if (([Environment]::OSVersion.Platform -eq "Win32NT") -and (-not $env:WSL_DISTRO_NAME)) {
     Write-Warning "On native Windows, RTK installs the binary and config. Transparent shell-hook rewrite requires WSL."
   }
@@ -1323,7 +1558,14 @@ function Uninstall-ManifestComponent {
       }
       "settings_entry" {
         if ($Component -eq "seeding") { Remove-ClaudeSeedHook }
-        if ($Component -eq "rtk") { Remove-RtkClaudeHook }
+        if ($Component -eq "rtk") {
+          switch ($artifact.details.key) {
+            "hooks.PreToolUse" { Remove-RtkClaudeHook }
+            "telemetry.enabled" { Remove-RtkTelemetryConfig -Path $artifact.path -OriginalValue $artifact.details.originalValue }
+            "shell.RTK_TELEMETRY_DISABLED" { Remove-RtkTelemetryShellEnv -Path $artifact.path }
+            default { Remove-RtkClaudeHook }
+          }
+        }
         if ($Component -eq "caveman") { Remove-CavemanClaudeSettings }
       }
       "generated_tool_reference" {

@@ -713,6 +713,245 @@ NODE
   esac
 }
 
+find_rtk_config_path() {
+  local candidates=(
+    "$HOME/.config/rtk/rtk.toml"
+    "$HOME/.config/rtk/config.toml"
+    "$HOME/.rtk/rtk.toml"
+    "$HOME/.rtk/config.toml"
+  )
+  local candidate
+
+  for candidate in "${candidates[@]}"; do
+    if [ -f "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  printf '%s\n' "$HOME/.config/rtk/rtk.toml"
+}
+
+ensure_rtk_telemetry_disabled() {
+  local config_path action original_value section_created
+  config_path="$(find_rtk_config_path)"
+
+  if [ "$dry_run" = "1" ]; then
+    install_event "Skills and Plugins" "RTK" "Configuration Entries Updated" "dry-run: would ensure RTK telemetry disabled in $config_path" "ok"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$config_path")"
+  action="$(
+    node - "$config_path" <<'NODE'
+const fs = require('fs');
+const configPath = process.argv[2];
+const raw = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf8').replace(/\r/g, '') : '';
+const lines = raw === '' ? [] : raw.split('\n');
+let inTelemetry = false;
+let telemetryFound = false;
+let enabledFound = false;
+let originalValue = '';
+let sectionCreated = false;
+const output = [];
+
+for (let i = 0; i < lines.length; i++) {
+  const line = lines[i];
+  const trimmed = line.trim();
+  if (/^\[.*\]$/.test(trimmed)) {
+    if (inTelemetry && !enabledFound) {
+      output.push('enabled = false');
+      enabledFound = true;
+    }
+    inTelemetry = trimmed === '[telemetry]';
+    if (inTelemetry) telemetryFound = true;
+    output.push(line);
+    continue;
+  }
+  if (inTelemetry) {
+    const m = trimmed.match(/^enabled\s*=\s*(.*)$/);
+    if (m) {
+      originalValue = m[1].trim();
+      if (originalValue === 'false') {
+        output.push(line);
+        enabledFound = true;
+        continue;
+      }
+      output.push('enabled = false');
+      enabledFound = true;
+      continue;
+    }
+  }
+  output.push(line);
+}
+
+if (!telemetryFound) {
+  if (output.length && output[output.length - 1] !== '') output.push('');
+  output.push('[telemetry]');
+  output.push('enabled = false');
+  sectionCreated = true;
+} else if (!enabledFound) {
+  output.push('enabled = false');
+}
+
+fs.writeFileSync(configPath, (output.join('\n') + '\n'), { mode: fs.existsSync(configPath) ? fs.statSync(configPath).mode : 0o600 });
+const action = telemetryFound && enabledFound && originalValue === 'false' ? 'already_disabled' : (raw === '' ? 'created' : 'updated');
+process.stdout.write(`${action}\t${originalValue}\t${sectionCreated ? '1' : '0'}`);
+NODE
+  )"
+
+  original_value="$(printf '%s' "$action" | cut -f2)"
+  section_created="$(printf '%s' "$action" | cut -f3)"
+  action="$(printf '%s' "$action" | cut -f1)"
+
+  case "$action" in
+    created)
+      install_event "Skills and Plugins" "RTK" "Configuration Entries Updated" "Created RTK config with telemetry disabled at $config_path" "ok"
+      record_manifest "file" "rtk" "installer-created" "created" "$config_path"
+      ;;
+    updated)
+      install_event "Skills and Plugins" "RTK" "Configuration Entries Updated" "Disabled RTK telemetry in $config_path" "ok"
+      record_manifest "settings_entry" "rtk" "user-owned" "modified" "$config_path" "{\"key\":\"telemetry.enabled\",\"originalValue\":\"$original_value\",\"createdSection\":$section_created}"
+      ;;
+    already_disabled)
+      install_event "Skills and Plugins" "RTK" "Configuration Entries Updated" "Telemetry already disabled in $config_path" "ok"
+      ;;
+    *)
+      install_event "Skills and Plugins" "RTK" "Configuration Entries Updated" "Ensured RTK telemetry disabled in $config_path" "ok"
+      ;;
+  esac
+}
+
+find_shell_profile_path() {
+  local candidates=(
+    "$HOME/.zshrc"
+    "$HOME/.bashrc"
+    "$HOME/.bash_profile"
+    "$HOME/.profile"
+  )
+  local candidate
+
+  for candidate in "${candidates[@]}"; do
+    if [ -f "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  printf '%s\n' "$HOME/.profile"
+}
+
+ensure_rtk_telemetry_shell_env() {
+  local profile_path start_marker end_marker
+  profile_path="$(find_shell_profile_path)"
+  start_marker="# token-saver-setup managed RTK telemetry start"
+  end_marker="# token-saver-setup managed RTK telemetry end"
+
+  if [ "$dry_run" = "1" ]; then
+    install_event "Skills and Plugins" "RTK" "Configuration Entries Updated" "dry-run: would ensure RTK_TELEMETRY_DISABLED=1 is present in $profile_path" "ok"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$profile_path")"
+  if [ ! -e "$profile_path" ]; then
+    : > "$profile_path"
+  fi
+
+  if grep -Fq "$start_marker" "$profile_path"; then
+    install_event "Skills and Plugins" "RTK" "Configuration Entries Updated" "RTK shell telemetry env already present in $profile_path" "ok"
+    return 0
+  fi
+
+  printf '%s\n%s\n%s\n' "$start_marker" 'export RTK_TELEMETRY_DISABLED=1' "$end_marker" >> "$profile_path"
+  install_event "Skills and Plugins" "RTK" "Configuration Entries Updated" "Added managed RTK telemetry shell env to $profile_path" "ok"
+  record_manifest "settings_entry" "rtk" "user-owned" "added" "$profile_path" '{"key":"shell.RTK_TELEMETRY_DISABLED"}'
+}
+
+remove_rtk_telemetry_config() {
+  local config_path="$1"
+  local original_value="$2"
+
+  if [ "$dry_run" = "1" ]; then
+    report_event "Skills and Plugins" "RTK" "Configuration Entries Removed" "dry-run: would remove managed telemetry setting from $config_path" "ok"
+    return 0
+  fi
+
+  [ -f "$config_path" ] || return 0
+  node - "$config_path" "$original_value" <<'NODE'
+const fs = require('fs');
+const configPath = process.argv[2];
+const originalValue = process.argv[3];
+const raw = fs.readFileSync(configPath, 'utf8').replace(/\r/g, '');
+const lines = raw.split('\n');
+const blocks = [];
+let current = { header: null, body: [] };
+for (const line of lines) {
+  const trimmed = line.trim();
+  if (/^\[.*\]$/.test(trimmed)) {
+    blocks.push(current);
+    current = { header: line, body: [] };
+    continue;
+  }
+  current.body.push(line);
+}
+blocks.push(current);
+const output = [];
+for (const block of blocks) {
+  if (!block.header) {
+    for (const line of block.body) output.push(line);
+    continue;
+  }
+  if (block.header.trim() === '[telemetry]') {
+    const filtered = block.body.filter((line) => !/^\s*enabled\s*=/.test(line));
+    if (originalValue) {
+      filtered.unshift(`enabled = ${originalValue}`);
+    }
+    if (filtered.length === 0) {
+      continue;
+    }
+    output.push(block.header);
+    for (const line of filtered) output.push(line);
+    continue;
+  }
+  output.push(block.header);
+  for (const line of block.body) output.push(line);
+}
+let cleaned = output.join('\n').replace(/\n{3,}/g, '\n\n');
+fs.writeFileSync(configPath, cleaned + (cleaned.endsWith('\n') ? '' : '\n'));
+NODE
+  report_event "Skills and Plugins" "RTK" "Configuration Entries Removed" "$config_path telemetry.enabled" "ok"
+}
+
+remove_rtk_telemetry_shell_env() {
+  local profile_path="$1"
+  local start_marker="# token-saver-setup managed RTK telemetry start"
+  local end_marker="# token-saver-setup managed RTK telemetry end"
+
+  if [ "$dry_run" = "1" ]; then
+    report_event "Skills and Plugins" "RTK" "Configuration Entries Removed" "dry-run: would remove managed RTK shell telemetry env from $profile_path" "ok"
+    return 0
+  fi
+
+  [ -f "$profile_path" ] || return 0
+  local temp
+  temp="$(mktemp)"
+  local removing=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [ "$line" = "$start_marker" ]; then
+      removing=1
+      continue
+    fi
+    if [ "$line" = "$end_marker" ] && [ "$removing" = "1" ]; then
+      removing=0
+      continue
+    fi
+    [ "$removing" = "1" ] && continue
+    printf '%s\n' "$line" >> "$temp"
+  done < "$profile_path"
+  mv "$temp" "$profile_path"
+  report_event "Skills and Plugins" "RTK" "Configuration Entries Removed" "$profile_path RTK_TELEMETRY_DISABLED block" "ok"
+}
+
 install_rtk_binary() {
   if command -v rtk >/dev/null 2>&1; then
     install_event "Skills and Plugins" "RTK" "Files Already Current" "rtk already installed: $(command -v rtk)" "ok"
@@ -819,6 +1058,8 @@ initialize_rtk_agents() {
   [ "$install_rtk" = "1" ] || return 0
   current_tool="RTK"
   install_rtk_binary
+  ensure_rtk_telemetry_disabled
+  ensure_rtk_telemetry_shell_env
 
   if ! command -v rtk >/dev/null 2>&1 && [ "$dry_run" != "1" ]; then
     printf 'warning: rtk not found on PATH after install; skipping rtk init\n' >&2
@@ -1499,16 +1740,18 @@ for (const item of manifest.artifacts || []) {
   if (item.component !== component) continue;
   const key = item.details && item.details.key ? item.details.key : "";
   const command = item.details && item.details.command ? item.details.command : "";
-  console.log([item.type || "", item.ownership || "", item.path || "", key, command].join("\t"));
+  const originalValue = item.details && item.details.originalValue ? item.details.originalValue : "";
+  const createdSection = item.details && item.details.createdSection ? "1" : "0";
+  console.log([item.type || "", item.ownership || "", item.path || "", key, command, originalValue, createdSection].join("\t"));
 }
 NODE
 }
 
 uninstall_manifest_component() {
   local component="$1"
-  local type ownership target key command
+  local type ownership target key command originalValue createdSection
 
-  manifest_artifacts_for_component "$component" | while IFS="$(printf '\t')" read -r type ownership target key command; do
+  manifest_artifacts_for_component "$component" | while IFS="$(printf '\t')" read -r type ownership target key command originalValue createdSection; do
     case "$type" in
       file|global_instruction_file|project_template_file)
         if [ "$component" = "global-instructions" ]; then
@@ -1531,7 +1774,13 @@ uninstall_manifest_component() {
       settings_entry)
         case "$component" in
           seeding) remove_claude_seed_hook ;;
-          rtk) remove_rtk_claude_hook ;;
+          rtk)
+            case "$key" in
+              hooks.PreToolUse) remove_rtk_claude_hook ;;
+              telemetry.enabled) remove_rtk_telemetry_config "$target" "$originalValue" ;;
+              shell.RTK_TELEMETRY_DISABLED) remove_rtk_telemetry_shell_env "$target" ;;
+              *) remove_rtk_claude_hook ;;
+            esac ;;
           caveman) remove_caveman_claude_settings ;;
         esac
         ;;

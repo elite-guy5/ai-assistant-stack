@@ -36,6 +36,8 @@ printf '%s\n' "$output" | grep -Fq 'dry-run: would write caveman default mode ul
 printf '%s\n' "$output" | grep -Fq 'dry-run: claude plugin marketplace add JuliusBrussee/caveman'
 printf '%s\n' "$output" | grep -Fq 'dry-run: claude plugin install caveman@caveman'
 printf '%s\n' "$output" | grep -Fq 'dry-run: npx skills add JuliusBrussee/caveman -a codex --yes --global'
+printf '%s\n' "$output" | grep -Fq 'dry-run: would ensure RTK telemetry disabled'
+printf '%s\n' "$output" | grep -Fq 'dry-run: would ensure RTK_TELEMETRY_DISABLED=1 is present'
 printf '%s\n' "$output" | grep -Fq 'Instruction Files'
 printf '%s\n' "$output" | grep -Fq 'Skills and Plugins'
 printf '%s\n' "$output" | grep -Fq 'Files Skipped'
@@ -149,6 +151,8 @@ if command -v pwsh >/dev/null 2>&1; then
 
   printf '%s\n' "$ps_output" | grep -Fq 'dry-run: rtk init -g --auto-patch'
   printf '%s\n' "$ps_output" | grep -Fq 'dry-run: rtk init -g --codex'
+  printf '%s\n' "$ps_output" | grep -Fq 'dry-run: would ensure RTK telemetry disabled'
+  printf '%s\n' "$ps_output" | grep -Fq 'dry-run: would ensure RTK_TELEMETRY_DISABLED=1 is present'
   if printf '%s\n' "$ps_output" | grep -Eq 'rtk init -g --gemini|rtk init -g --agent cursor'; then
     printf 'PowerShell default non-interactive install included non-default AI apps\n' >&2
     exit 1
