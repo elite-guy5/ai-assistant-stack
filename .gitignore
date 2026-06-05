@@ -12,6 +12,6 @@ target/
 .cache/
 AGENTS.md
 CLAUDE.md
-.copilotignore/
-.claudeignore/
-.codexignore/
+.copilotignore
+.claudeignore
+.codexignore
