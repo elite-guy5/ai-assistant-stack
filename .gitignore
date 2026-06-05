@@ -13,5 +13,5 @@ target/
 AGENTS.md
 CLAUDE.md
 .copilotignore
-.claudeignore
 .codexignore
+.claudeignore
