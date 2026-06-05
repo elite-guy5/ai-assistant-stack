@@ -151,6 +151,38 @@ run_cmd() {
   fi
 }
 
+run_interactive_cmd() {
+  local status
+
+  if [ "$dry_run" = "1" ]; then
+    if [ "$install_active" = "1" ]; then
+      install_event "Skills and Plugins" "$current_tool" "Shell Commands Run" "dry-run: $*" "ok"
+    else
+      printf 'dry-run: %s\n' "$*"
+    fi
+    return 0
+  fi
+
+  if [ ! -r /dev/tty ]; then
+    run_cmd "$@"
+    return $?
+  fi
+
+  if "$@" </dev/tty >/dev/tty 2>&1; then
+    :
+  else
+    status=$?
+    stty sane </dev/tty >/dev/tty 2>&1 || true
+    printf 'error: %s failed with exit code %s: %s\n' "${current_tool:-command}" "$status" "$*" >&2
+    return "$status"
+  fi
+
+  stty sane </dev/tty >/dev/tty 2>&1 || true
+  if [ "$install_active" = "1" ]; then
+    install_event "Skills and Plugins" "$current_tool" "Shell Commands Run" "$*" "ok"
+  fi
+}
+
 run_optional_uninstall_cmd() {
   local output status
 
@@ -1165,34 +1197,34 @@ install_caveman_agent_fallbacks() {
     app="$(printf '%s' "$app" | xargs)"
     case "$app" in
       claude)
-        run_cmd claude plugin marketplace add JuliusBrussee/caveman
-        run_cmd claude plugin install caveman@caveman
+        run_interactive_cmd claude plugin marketplace add JuliusBrussee/caveman
+        run_interactive_cmd claude plugin install caveman@caveman
         ;;
       gemini)
-        run_cmd gemini extensions install https://github.com/JuliusBrussee/caveman
+        run_interactive_cmd gemini extensions install https://github.com/JuliusBrussee/caveman
         ;;
       opencode)
-        run_cmd npx -y github:JuliusBrussee/caveman -- --only opencode
+        run_interactive_cmd npx -y github:JuliusBrussee/caveman -- --only opencode
         ;;
       openclaw)
-        run_cmd npx -y github:JuliusBrussee/caveman -- --only openclaw
+        run_interactive_cmd npx -y github:JuliusBrussee/caveman -- --only openclaw
         ;;
       codex)
         if [ "$non_interactive" = "1" ]; then
           run_cmd npx skills add JuliusBrussee/caveman -a codex --yes --global
         else
-          run_cmd npx skills add JuliusBrussee/caveman -a codex
+          run_interactive_cmd npx skills add JuliusBrussee/caveman -a codex
         fi
         ;;
       cursor)
         if [ "$non_interactive" = "1" ]; then
           run_cmd npx skills add JuliusBrussee/caveman -a cursor --yes --global
         else
-          run_cmd npx skills add JuliusBrussee/caveman -a cursor
+          run_interactive_cmd npx skills add JuliusBrussee/caveman -a cursor
         fi
         ;;
       copilot)
-        run_cmd npx -y github:JuliusBrussee/caveman -- --only copilot --with-init
+        run_interactive_cmd npx -y github:JuliusBrussee/caveman -- --only copilot --with-init
         ;;
     esac
     IFS=","
@@ -1216,6 +1248,7 @@ install_caveman_tool() {
 
   record_manifest "file" "caveman" "installer-created" "created-or-modified" "$HOME/.config/caveman/config.json"
   install_caveman_agent_fallbacks
+  say "Caveman install step complete. Continuing setup..."
 }
 
 install_global_instruction_files() {

@@ -280,6 +280,7 @@ function Show-UninstallReport {
   Write-Host "Verification Issues: $($verification.Count)"
 }
 
+
 function Invoke-SetupCommand {
   param(
     [string]$FilePath,
@@ -296,6 +297,39 @@ function Invoke-SetupCommand {
   if ($LASTEXITCODE -ne 0) {
     throw "command failed with exit code ${LASTEXITCODE}: $($display -join ' ')"
   }
+  Add-InstallReport -Section "Skills and Plugins" -Tool $CurrentTool -Category "Shell Commands Run" -Item ($display -join ' ')
+}
+
+# Interactive setup command: allows for interactive processes (does not redirect stdio)
+function Invoke-InteractiveSetupCommand {
+  param(
+    [string]$FilePath,
+    [string[]]$Arguments = @()
+  )
+
+  $display = @($FilePath) + $Arguments
+  if ($DryRun) {
+    Add-InstallReport -Section "Skills and Plugins" -Tool $CurrentTool -Category "Shell Commands Run" -Item "dry-run: $($display -join ' ')"
+    return
+  }
+
+  $psi = [System.Diagnostics.ProcessStartInfo]::new()
+  $psi.FileName = $FilePath
+  foreach ($arg in $Arguments) {
+    [void]$psi.ArgumentList.Add($arg)
+  }
+  $psi.UseShellExecute = $false
+  $psi.RedirectStandardInput = $false
+  $psi.RedirectStandardOutput = $false
+  $psi.RedirectStandardError = $false
+
+  $process = [System.Diagnostics.Process]::Start($psi)
+  $process.WaitForExit()
+
+  if ($process.ExitCode -ne 0) {
+    throw "command failed with exit code $($process.ExitCode): $($display -join ' ')"
+  }
+
   Add-InstallReport -Section "Skills and Plugins" -Tool $CurrentTool -Category "Shell Commands Run" -Item ($display -join ' ')
 }
 
@@ -1300,30 +1334,38 @@ function Install-CavemanAgentFallbacks {
     $cleanApp = $app.Trim()
     switch ($cleanApp) {
       "claude" {
-        Invoke-SetupCommand -FilePath "claude" -Arguments @("plugin", "marketplace", "add", "JuliusBrussee/caveman")
-        Invoke-SetupCommand -FilePath "claude" -Arguments @("plugin", "install", "caveman@caveman")
+        Invoke-InteractiveSetupCommand -FilePath "claude" -Arguments @("plugin", "marketplace", "add", "JuliusBrussee/caveman")
+        Invoke-InteractiveSetupCommand -FilePath "claude" -Arguments @("plugin", "install", "caveman@caveman")
       }
       "gemini" {
-        Invoke-SetupCommand -FilePath "gemini" -Arguments @("extensions", "install", "https://github.com/JuliusBrussee/caveman")
+        Invoke-InteractiveSetupCommand -FilePath "gemini" -Arguments @("extensions", "install", "https://github.com/JuliusBrussee/caveman")
       }
       "opencode" {
-        Invoke-SetupCommand -FilePath "npx" -Arguments @("-y", "github:JuliusBrussee/caveman", "--", "--only", "opencode")
+        Invoke-InteractiveSetupCommand -FilePath "npx" -Arguments @("-y", "github:JuliusBrussee/caveman", "--", "--only", "opencode")
       }
       "openclaw" {
-        Invoke-SetupCommand -FilePath "npx" -Arguments @("-y", "github:JuliusBrussee/caveman", "--", "--only", "openclaw")
+        Invoke-InteractiveSetupCommand -FilePath "npx" -Arguments @("-y", "github:JuliusBrussee/caveman", "--", "--only", "openclaw")
       }
       "codex" {
         $args = @("skills", "add", "JuliusBrussee/caveman", "-a", "codex")
-        if ($NonInteractive) { $args += @("--yes", "--global") }
-        Invoke-SetupCommand -FilePath "npx" -Arguments $args
+        if ($NonInteractive) {
+          $args += @("--yes", "--global")
+          Invoke-SetupCommand -FilePath "npx" -Arguments $args
+        } else {
+          Invoke-InteractiveSetupCommand -FilePath "npx" -Arguments $args
+        }
       }
       "cursor" {
         $args = @("skills", "add", "JuliusBrussee/caveman", "-a", "cursor")
-        if ($NonInteractive) { $args += @("--yes", "--global") }
-        Invoke-SetupCommand -FilePath "npx" -Arguments $args
+        if ($NonInteractive) {
+          $args += @("--yes", "--global")
+          Invoke-SetupCommand -FilePath "npx" -Arguments $args
+        } else {
+          Invoke-InteractiveSetupCommand -FilePath "npx" -Arguments $args
+        }
       }
       "copilot" {
-        Invoke-SetupCommand -FilePath "npx" -Arguments @("-y", "github:JuliusBrussee/caveman", "--", "--only", "copilot", "--with-init")
+        Invoke-InteractiveSetupCommand -FilePath "npx" -Arguments @("-y", "github:JuliusBrussee/caveman", "--", "--only", "copilot", "--with-init")
       }
     }
   }
@@ -1346,6 +1388,7 @@ function Install-CavemanTool {
 
   Add-ManifestArtifact -Type "file" -Component "caveman" -Ownership "installer-created" -Action "created-or-modified" -Path (Join-Path $HomeDir ".config/caveman/config.json")
   Install-CavemanAgentFallbacks
+  Write-Setup "Caveman install step complete. Continuing setup..."
 }
 
 function Install-GlobalInstructionFiles {
