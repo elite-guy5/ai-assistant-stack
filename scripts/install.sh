@@ -163,21 +163,32 @@ run_interactive_cmd() {
     return 0
   fi
 
-  if [ ! -r /dev/tty ]; then
+  # Prefer inheriting the current terminal directly. Some packaged CLIs, including
+  # Bun-based Claude commands, fail when stdout/stderr are reopened against /dev/tty.
+  if [ -t 0 ] && [ -t 1 ] && [ -t 2 ]; then
+    if "$@"; then
+      :
+    else
+      status=$?
+      stty sane >/dev/null 2>&1 || true
+      printf 'error: %s failed with exit code %s: %s\n' "${current_tool:-command}" "$status" "$*" >&2
+      return "$status"
+    fi
+  elif [ -r /dev/tty ]; then
+    if "$@" </dev/tty; then
+      :
+    else
+      status=$?
+      stty sane </dev/tty >/dev/null 2>&1 || true
+      printf 'error: %s failed with exit code %s: %s\n' "${current_tool:-command}" "$status" "$*" >&2
+      return "$status"
+    fi
+  else
     run_cmd "$@"
     return $?
   fi
 
-  if "$@" </dev/tty >/dev/tty 2>&1; then
-    :
-  else
-    status=$?
-    stty sane </dev/tty >/dev/tty 2>&1 || true
-    printf 'error: %s failed with exit code %s: %s\n' "${current_tool:-command}" "$status" "$*" >&2
-    return "$status"
-  fi
-
-  stty sane </dev/tty >/dev/tty 2>&1 || true
+  stty sane >/dev/null 2>&1 || true
   if [ "$install_active" = "1" ]; then
     install_event "Skills and Plugins" "$current_tool" "Shell Commands Run" "$*" "ok"
   fi

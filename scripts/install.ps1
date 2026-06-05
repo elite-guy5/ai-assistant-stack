@@ -313,21 +313,12 @@ function Invoke-InteractiveSetupCommand {
     return
   }
 
-  $psi = [System.Diagnostics.ProcessStartInfo]::new()
-  $psi.FileName = $FilePath
-  foreach ($arg in $Arguments) {
-    [void]$psi.ArgumentList.Add($arg)
-  }
-  $psi.UseShellExecute = $false
-  $psi.RedirectStandardInput = $false
-  $psi.RedirectStandardOutput = $false
-  $psi.RedirectStandardError = $false
-
-  $process = [System.Diagnostics.Process]::Start($psi)
-  $process.WaitForExit()
-
-  if ($process.ExitCode -ne 0) {
-    throw "command failed with exit code $($process.ExitCode): $($display -join ' ')"
+  # Prefer the call operator so interactive CLIs inherit the current terminal directly.
+  # Some packaged CLIs, including Bun-based Claude commands, fail when stdio is
+  # recreated through ProcessStartInfo.
+  & $FilePath @Arguments
+  if ($LASTEXITCODE -ne 0) {
+    throw "command failed with exit code ${LASTEXITCODE}: $($display -join ' ')"
   }
 
   Add-InstallReport -Section "Skills and Plugins" -Tool $CurrentTool -Category "Shell Commands Run" -Item ($display -join ' ')
