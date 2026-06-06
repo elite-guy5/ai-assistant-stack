@@ -1,48 +1,152 @@
-# <Project Name>
+# Project AGENTS.md
 
-Project-specific instructions. Inherits global behavior from `~/.codex/AGENTS.md`.
+## Project Context
 
-## Project Info
-- **Purpose:** <one line>
-- **Language / Framework:** <fill>
-- **Key entry points:** <paths>
+- Purpose:
+- Users:
+- Tech stack:
+- Architecture:
+- Constraints:
+  - Preserve user-owned files by default.
+  - Document any platform-specific limitations.
+  - Maintain backward compatibility unless explicitly approved.
+  - Keep changes scoped to the project's intended boundaries.
 
-## Commands
-- Build:   <cmd>
-- Test:    <cmd>
-- Lint:    <cmd>
-- Run:     <cmd>
+## Testing Requirements
 
-## Conventions
-- <repo-specific style, patterns, dirs the global rules don't cover>
-- <repo-specific gotchas - keep them here, not in global memory>
+### Bug Fixes
 
-## Token-Saver File Boundaries
+- Reproduce the issue when practical.
+- Verify the issue is resolved.
+- Verify no regression was introduced.
 
-- Keep generated files, secrets, logs, coverage, dependency folders, local databases, and binary assets out of agent context by default.
-- Project seeding maintains `.gitignore`, `.codexignore`, and `.claude/settings.local.json` with common token-bloat exclusions.
-- If this repo needs narrower or broader exclusions, update the local ignore files rather than weakening the global behavior.
+### Features
 
-## Development Workflow
+- Verify intended behavior.
+- Verify existing behavior remains intact.
+- Prefer safe validation methods before modifying production behavior.
+- Maintain platform parity where applicable.
 
-This repo also inherits the global required-session rule to load/use the Caveman skill at the start of every Codex session. Caveman does not override project-specific response style or development workflow rules.
+### Refactoring
 
-This repo defers to the **Superpowers** workflow when relevant to software development work. Default process, in order:
+- Verify behavior before and after remains unchanged.
 
-1. **brainstorming** - refine the idea, get design sign-off.
-   Spec saved to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`.
-2. **writing-plans** - bite-sized tasks with exact file paths + tests.
-   Plan saved to `docs/superpowers/plans/YYYY-MM-DD-<feature>.md`.
-3. **using-git-worktrees** - isolated branch + clean test baseline.
-4. **subagent-driven-development** / **executing-plans** - work the plan task by task
-   with review checkpoints.
-5. **test-driven-development** - ENFORCED default for this repo. Red-green-refactor:
-   write the failing test first, watch it fail, then minimal code.
-6. **requesting-code-review** -> **finishing-a-development-branch** - review, then
-   merge / PR / cleanup.
+Never claim success without validation.
 
-**Precedence:** instructions in THIS file override skills where they conflict
-(user AGENTS.md > skills). Put any project-specific deltas under Conventions.
+## Repository Rules
 
-Durable learnings go to memory (global section 8: native `feedback` memory, or the
-Obsidian vault for domain knowledge), not here.
+### Build Commands
+
+text <build command(s)> 
+
+### Test Commands
+
+text <test command(s)> 
+
+### Local Run Commands
+
+text <local execution command(s)> 
+
+### Validation Commands
+
+text <validation or dry-run command(s)> 
+
+### Deployment Requirements
+
+- Document deployment process.
+- Document release requirements.
+- Document versioning requirements.
+- Document rollback expectations.
+
+## Architectural Rules
+
+### Change Safety
+
+Before modifying behavior:
+
+- Verify current behavior.
+- Verify upgrade behavior.
+- Verify rollback behavior.
+- Verify validation workflows.
+- Verify existing user workflows continue to work.
+- Verify existing public interfaces remain functional.
+
+### User-Facing Behavior
+
+Preserve:
+
+- User prompts
+- Visible output
+- Confirmation flows
+- Progress indicators
+- Logging expectations
+- Verification steps
+
+Do not suppress, remove, or alter user-facing behavior unless explicitly requested.
+
+### Backward Compatibility
+
+- Preserve public APIs unless explicitly approved.
+- Preserve public CLI flags unless explicitly approved.
+- Preserve documented workflows unless explicitly approved.
+- Preserve existing integrations unless explicitly approved.
+
+### Project Boundaries
+
+- Keep changes within the project's intended scope.
+- Do not modify unrelated systems.
+- Do not overwrite user-owned assets without approval.
+- Respect documented ownership boundaries.
+
+### Data and Configuration
+
+- Preserve configuration compatibility.
+- Preserve migration compatibility.
+- Preserve existing data formats unless approved.
+- Document any breaking changes.
+
+### Dependencies
+
+- No new dependencies without approval.
+- Prefer existing project patterns before introducing new tooling.
+- Reuse established libraries and frameworks when practical.
+
+### Performance and Efficiency
+
+Performance improvements must not alter behavior.
+
+Preserve:
+
+- Functional behavior
+- User workflows
+- Validation paths
+- Security controls
+- Safety checks
+
+Optimize implementation, not functionality.
+
+## Definition of Done
+
+A task is complete only when:
+
+- Requested behavior exists.
+- Validation was performed.
+- Relevant tests pass.
+- No unrelated code was modified.
+- Assumptions and risks are documented.
+- Results are summarized.
+
+## Project-Specific Rules
+
+Add repository-specific requirements here.
+
+Examples:
+
+- Coding standards
+- Security requirements
+- Deployment restrictions
+- Platform-specific constraints
+- Regulatory requirements
+- Architecture conventions
+- Environment requirements
+- Repository workflows

@@ -20,10 +20,30 @@
 - If important information is missing or the request is ambiguous, **ask clarifying questions before answering** instead of making assumptions.
 - Do not guess APIs, versions, flags, commit SHAs, or package names. Verify by reading code or docs before asserting.
 
+### RTK Usage
+
+@RTK.md
+
+## Claude Agent Execution Rules
+
+### CLI Output Compression (RTK)
+
+- ALWAYS prefix shell execution, repository mapping, and file-reading commands with `rtk`.
+- Never execute raw shell commands that output to the terminal without wrapping them through `rtk` first.
+
 ### Skill Usage
 
+- Caveman is required at the start of every session.
 - Superpowers skills should only be invoked automatically for software development work: writing or editing code, implementing features, fixing bugs, refactoring, testing, code review, or creating/editing skills.
 - Do not invoke Superpowers automatically for ordinary questions, explanations, configuration checks, local machine troubleshooting, install verification, process inspection, or other non-development tasks unless I explicitly ask for Superpowers.
+
+### Required Session Skills
+
+- At the start of every Claude Code session, load/use the Caveman skill.
+- Caveman is a session efficiency/compression skill, not the user-facing response style.
+- Use Caveman to reduce filler, compress low-value narrative, and keep technical work concise.
+- Preserve exact technical details, command names, code, paths, APIs, flags, and error strings.
+- Do not apply Caveman compression where it could reduce clarity for security warnings, irreversible actions, confirmations, or multi-step instructions.
 
 ### Token-Saver File Boundaries
 
@@ -149,5 +169,3 @@ Self-improvement loop after a user correction:
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
-
-@RTK.md
