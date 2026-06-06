@@ -25,6 +25,8 @@ Project-specific instructions. Inherits global behavior from `~/.codex/AGENTS.md
 
 ## Development Workflow
 
+This repo also inherits the global required-session rule to load/use the Caveman skill at the start of every Codex session. Caveman does not override project-specific response style or development workflow rules.
+
 This repo defers to the **Superpowers** workflow when relevant to software development work. Default process, in order:
 
 1. **brainstorming** - refine the idea, get design sign-off.
