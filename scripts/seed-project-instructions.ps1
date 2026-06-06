@@ -14,7 +14,11 @@ $ClaudeTemplate = if ($env:CLAUDE_TEMPLATE) { $env:CLAUDE_TEMPLATE } else { Join
 $CodexTemplate = if ($env:CODEX_TEMPLATE) { $env:CODEX_TEMPLATE } else { Join-Path $HomeDir ".codex/AGENTS.project-template.md" }
 $DryRun = if ($env:DRY_RUN) { $env:DRY_RUN } else { "0" }
 
-$scopeFull = [IO.Path]::GetFullPath($Scope).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+$scopeInfo = Get-Item -LiteralPath $Scope -ErrorAction SilentlyContinue
+if (-not $scopeInfo -or -not $scopeInfo.PSIsContainer) {
+  exit 0
+}
+$scopeFull = $scopeInfo.FullName.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
 $cwdFull = [IO.Path]::GetFullPath($Cwd)
 
 if (-not ($cwdFull.StartsWith($scopeFull + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or
@@ -29,8 +33,39 @@ if ([string]::IsNullOrWhiteSpace($child) -or $child.StartsWith(".")) {
 }
 
 $project = Join-Path $scopeFull $child
-if (-not (Test-Path -PathType Container $project)) {
+$projectInfo = Get-Item -LiteralPath $project -ErrorAction SilentlyContinue
+if (-not $projectInfo -or -not $projectInfo.PSIsContainer -or ($projectInfo.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
   exit 0
+}
+$projectFull = $projectInfo.FullName
+if (-not ($projectFull.StartsWith($scopeFull + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or
+          $projectFull.StartsWith($scopeFull + [IO.Path]::AltDirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase))) {
+  exit 0
+}
+$project = $projectFull
+
+function Test-SafeTarget {
+  param([string]$Target)
+
+  $targetItem = Get-Item -LiteralPath $Target -Force -ErrorAction SilentlyContinue
+  if ($targetItem -and ($targetItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+    return $false
+  }
+
+  $parent = Split-Path -Parent $Target
+  while ($parent -and ($parent -ne $project)) {
+    $parentItem = Get-Item -LiteralPath $parent -Force -ErrorAction SilentlyContinue
+    if ($parentItem -and ($parentItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+      return $false
+    }
+    $next = Split-Path -Parent $parent
+    if ($next -eq $parent) {
+      break
+    }
+    $parent = $next
+  }
+
+  return $true
 }
 
 function Copy-IfMissing {
@@ -40,6 +75,9 @@ function Copy-IfMissing {
   )
 
   if (-not (Test-Path -PathType Leaf $Template)) {
+    return
+  }
+  if (-not (Test-SafeTarget -Target $Target)) {
     return
   }
   if (Test-Path $Target) {

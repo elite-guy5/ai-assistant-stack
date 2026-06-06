@@ -4,6 +4,10 @@ set -euo pipefail
 project="${1:-$PWD}"
 dry_run="${DRY_RUN:-0}"
 
+resolve_dir() {
+  (cd -P "$1" 2>/dev/null && pwd)
+}
+
 gitignore_block='# -- AI Token Bloat Exclusions --
 .env
 .env.*
@@ -97,6 +101,7 @@ render_without_block() {
 copy_or_new() {
   local source="$1"
   local target="$2"
+  local parent current
 
   if [ "$dry_run" = "1" ]; then
     if [ ! -e "$target" ]; then
@@ -108,6 +113,14 @@ copy_or_new() {
     fi
     return 0
   fi
+
+  [ ! -L "$target" ] || return 0
+  parent="$(dirname "$target")"
+  current="$parent"
+  while [ "$current" != "$project" ] && [ "$current" != "/" ] && [ -n "$current" ]; do
+    [ ! -L "$current" ] || return 0
+    current="$(dirname "$current")"
+  done
 
   mkdir -p "$(dirname "$target")"
   if [ ! -e "$target" ]; then
@@ -123,7 +136,9 @@ copy_or_new() {
 }
 
 main() {
+  [ ! -L "$project" ] || exit 0
   [ -d "$project" ] || exit 0
+  project="$(resolve_dir "$project")" || exit 0
 
   local temp_gitignore temp_codex temp_claude
   temp_gitignore="$(mktemp)"

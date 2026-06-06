@@ -33,9 +33,7 @@ if printf '%s\n' "$output" | grep -Eq 'rtk init -g --gemini|rtk init -g --agent 
   exit 1
 fi
 printf '%s\n' "$output" | grep -Fq 'dry-run: would write caveman default mode ultra'
-printf '%s\n' "$output" | grep -Fq 'dry-run: claude plugin marketplace add JuliusBrussee/caveman'
-printf '%s\n' "$output" | grep -Fq 'dry-run: claude plugin install caveman@caveman'
-printf '%s\n' "$output" | grep -Fq 'dry-run: npx skills add JuliusBrussee/caveman -a codex --yes --global'
+printf '%s\n' "$output" | grep -Fq 'dry-run: skipping unverified Caveman remote installer commands'
 printf '%s\n' "$output" | grep -Fq 'dry-run: would ensure RTK telemetry disabled'
 printf '%s\n' "$output" | grep -Fq 'dry-run: would ensure RTK_TELEMETRY_DISABLED=1 is present'
 printf '%s\n' "$output" | grep -Fq 'Instruction Files'
@@ -56,7 +54,7 @@ if printf '%s\n' "$skip_output" | grep -Eq 'rtk init|caveman default|github:Juli
 fi
 
 scoped_caveman_output="$(
-  bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --ai-apps codex,cursor --assets caveman
+  bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --allow-unverified-downloads --ai-apps codex,cursor --assets caveman
 )"
 
 printf '%s\n' "$scoped_caveman_output" | grep -Fq 'dry-run: npx skills add JuliusBrussee/caveman -a codex --yes --global'
@@ -67,7 +65,7 @@ if printf '%s\n' "$scoped_caveman_output" | grep -Eq 'rtk init|claude plugin|gem
 fi
 
 extended_caveman_output="$(
-  bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --ai-apps claude,gemini,opencode,openclaw,copilot --assets caveman
+  bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --allow-unverified-downloads --ai-apps claude,gemini,opencode,openclaw,copilot --assets caveman
 )"
 
 printf '%s\n' "$extended_caveman_output" | grep -Fq 'dry-run: claude plugin marketplace add JuliusBrussee/caveman'
@@ -121,7 +119,7 @@ EOF
   caveman_expect_script="$tmp/interactive-caveman.exp"
   cat > "$caveman_expect_script" <<'EOF'
 set timeout 10
-spawn bash scripts/install.sh --dry-run --ai-apps codex,cursor --assets caveman
+spawn bash scripts/install.sh --dry-run --allow-unverified-downloads --ai-apps codex,cursor --assets caveman
 expect -exact {AI apps to configure [codex,cursor]: }
 send "\r"
 expect -exact {Install Caveman for selected AI apps? (y/n) [y]: }
@@ -158,9 +156,7 @@ if command -v pwsh >/dev/null 2>&1; then
     exit 1
   fi
   printf '%s\n' "$ps_output" | grep -Fq 'dry-run: would write caveman default mode ultra'
-  printf '%s\n' "$ps_output" | grep -Fq 'dry-run: claude plugin marketplace add JuliusBrussee/caveman'
-  printf '%s\n' "$ps_output" | grep -Fq 'dry-run: claude plugin install caveman@caveman'
-  printf '%s\n' "$ps_output" | grep -Fq 'dry-run: npx skills add JuliusBrussee/caveman -a codex --yes --global'
+  printf '%s\n' "$ps_output" | grep -Fq 'skipping unverified Caveman remote installer commands'
   printf '%s\n' "$ps_output" | grep -Fq 'Instruction Files'
   printf '%s\n' "$ps_output" | grep -Fq 'Skills and Plugins'
   printf '%s\n' "$ps_output" | grep -Fq 'Files Skipped'
@@ -179,13 +175,13 @@ if command -v pwsh >/dev/null 2>&1; then
   fi
 
   ps_scoped_caveman_output="$(
-    pwsh -NoProfile -File "$ROOT/scripts/install.ps1" -DryRun -NonInteractive -AiApps codex,cursor -Assets caveman
+    pwsh -NoProfile -File "$ROOT/scripts/install.ps1" -DryRun -NonInteractive -AllowUnverifiedDownloads -AiApps codex,cursor -Assets caveman
   )"
   printf '%s\n' "$ps_scoped_caveman_output" | grep -Fq 'dry-run: npx skills add JuliusBrussee/caveman -a codex --yes --global'
   printf '%s\n' "$ps_scoped_caveman_output" | grep -Fq 'dry-run: npx skills add JuliusBrussee/caveman -a cursor --yes --global'
 
   ps_extended_caveman_output="$(
-    pwsh -NoProfile -File "$ROOT/scripts/install.ps1" -DryRun -NonInteractive -AiApps claude,gemini,opencode,openclaw,copilot -Assets caveman
+    pwsh -NoProfile -File "$ROOT/scripts/install.ps1" -DryRun -NonInteractive -AllowUnverifiedDownloads -AiApps claude,gemini,opencode,openclaw,copilot -Assets caveman
   )"
   printf '%s\n' "$ps_extended_caveman_output" | grep -Fq 'dry-run: claude plugin marketplace add JuliusBrussee/caveman'
   printf '%s\n' "$ps_extended_caveman_output" | grep -Fq 'dry-run: claude plugin install caveman@caveman'

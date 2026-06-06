@@ -155,7 +155,7 @@ shell_caveman_output_is_visible_once() {
 
   output="$(
     HOME="$tmp/home" PATH="$tmp/bin:$SYSTEM_PATH" TOKEN_SAVER_MANIFEST="$tmp/home/.agents/install_manifest.json" \
-      bash "$ROOT/scripts/install.sh" --non-interactive --skip-rtk 2>&1
+      bash "$ROOT/scripts/install.sh" --non-interactive --skip-rtk --allow-unverified-downloads 2>&1
   )"
 
   assert_count "$output" "caveman claude stdout visible" 2
@@ -179,7 +179,7 @@ pwsh_child_output_is_visible() {
 
   output="$(
     HOME="$tmp/home" PATH="$tmp/bin:$SYSTEM_PATH" TOKEN_SAVER_HOME="$tmp/home" TOKEN_SAVER_MANIFEST="$tmp/home/.agents/install_manifest.json" \
-      "$pwsh_bin" -NoProfile -File "$ROOT/scripts/install.ps1" -NonInteractive -RtkAgents claude -RtkMode manual 2>&1
+      "$pwsh_bin" -NoProfile -File "$ROOT/scripts/install.ps1" -NonInteractive -AllowUnverifiedDownloads -RtkAgents claude -RtkMode manual 2>&1
   )"
 
   assert_contains "$output" "rtk init stdout visible"

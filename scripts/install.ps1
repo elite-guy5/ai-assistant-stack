@@ -15,7 +15,8 @@ param(
   [string]$RtkAgents = "claude,codex",
   [string]$RtkMode = "auto",
   [string]$CavemanArgs = "",
-  [string]$CavemanMode = "ultra"
+  [string]$CavemanMode = "ultra",
+  [switch]$AllowUnverifiedDownloads
 )
 
 $ErrorActionPreference = "Stop"
@@ -886,10 +887,10 @@ function Ensure-RtkClaudeHook {
 
 function Get-RtkConfigPath {
   $candidates = @(
-    Join-Path $HomeDir ".config/rtk/rtk.toml",
-    Join-Path $HomeDir ".config/rtk/config.toml",
-    Join-Path $HomeDir ".rtk/rtk.toml",
-    Join-Path $HomeDir ".rtk/config.toml"
+    (Join-Path $HomeDir ".config/rtk/rtk.toml")
+    (Join-Path $HomeDir ".config/rtk/config.toml")
+    (Join-Path $HomeDir ".rtk/rtk.toml")
+    (Join-Path $HomeDir ".rtk/config.toml")
   )
   foreach ($candidate in $candidates) {
     if (Test-Path $candidate) { return $candidate }
@@ -899,10 +900,10 @@ function Get-RtkConfigPath {
 
 function Find-ShellProfilePath {
   $candidates = @(
-    Join-Path $HomeDir ".zshrc",
-    Join-Path $HomeDir ".bashrc",
-    Join-Path $HomeDir ".bash_profile",
-    Join-Path $HomeDir ".profile"
+    (Join-Path $HomeDir ".zshrc")
+    (Join-Path $HomeDir ".bashrc")
+    (Join-Path $HomeDir ".bash_profile")
+    (Join-Path $HomeDir ".profile")
   )
   foreach ($candidate in $candidates) {
     if (Test-Path $candidate) { return $candidate }
@@ -1128,8 +1129,23 @@ function Install-RtkBinary {
   $extractDir = Join-Path ([IO.Path]::GetTempPath()) ("rtk-windows-" + [Guid]::NewGuid().ToString("N"))
 
   if ($DryRun) {
-    Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Files Installed" -Item "dry-run: would download the latest rtk-x86_64-pc-windows-msvc.zip release asset"
-    Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Files Installed" -Item "dry-run: would extract rtk.exe to $binDir"
+    if ($AllowUnverifiedDownloads) {
+      Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Files Installed" -Item "dry-run: unverified: would download the latest rtk-x86_64-pc-windows-msvc.zip release asset" -Status "warn"
+      Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Files Installed" -Item "dry-run: would extract rtk.exe to $binDir"
+    } else {
+      Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Shell Commands Run" -Item "dry-run: winget install --id rtk-ai.rtk --exact"
+    }
+    return
+  }
+
+  if (Get-Command winget -ErrorAction SilentlyContinue) {
+    Invoke-SetupCommand -FilePath "winget" -Arguments @("install", "--id", "rtk-ai.rtk", "--exact")
+    return
+  }
+
+  if (-not $AllowUnverifiedDownloads) {
+    Add-InstallReport -Section "Skills and Plugins" -Tool "RTK" -Category "Shell Commands Skipped" -Item "skipping unverified RTK latest-release download; install RTK with Winget or rerun with -AllowUnverifiedDownloads" -Status "warn"
+    Write-Warning "skipping unverified RTK latest-release download; install RTK with Winget or rerun with -AllowUnverifiedDownloads"
     return
   }
 
@@ -1321,6 +1337,11 @@ function Verify-RtkSetup {
 
 function Install-CavemanAgentFallbacks {
   $script:CurrentTool = "Caveman"
+  if (-not $AllowUnverifiedDownloads) {
+    Add-InstallReport -Section "Skills and Plugins" -Tool "Caveman" -Category "Shell Commands Skipped" -Item "skipping unverified Caveman remote installer commands; rerun with -AllowUnverifiedDownloads to permit legacy remote installs" -Status "warn"
+    Write-Warning "skipping unverified Caveman remote installer commands; rerun with -AllowUnverifiedDownloads to permit legacy remote installs"
+    return
+  }
   foreach ($app in $AiApps.Split(",")) {
     $cleanApp = $app.Trim()
     switch ($cleanApp) {
@@ -1791,7 +1812,9 @@ function Uninstall-RtkComponents {
 
 function Uninstall-CavemanComponents {
   $script:CurrentTool = "Caveman"
-  if ((Get-Command npx -ErrorAction SilentlyContinue) -or $DryRun) {
+  if (-not $AllowUnverifiedDownloads) {
+    Add-UninstallReport -Section "Verification" -Tool "Caveman" -Category "Verification Issues" -Item "skipping unverified Caveman npx uninstall commands; rerun with -AllowUnverifiedDownloads to permit legacy remote uninstall" -Status "warn"
+  } elseif ((Get-Command npx -ErrorAction SilentlyContinue) -or $DryRun) {
     Invoke-OptionalUninstallCommand -FilePath "npx" -Arguments @("-y", "github:JuliusBrussee/caveman", "--", "--uninstall", "--non-interactive")
     Invoke-OptionalUninstallCommand -FilePath "npx" -Arguments @("skills", "remove", "JuliusBrussee/caveman", "--all")
   } else {

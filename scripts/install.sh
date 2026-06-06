@@ -19,6 +19,7 @@ rtk_mode="auto"
 caveman_args=""
 caveman_mode="ultra"
 caveman_modes="lite,full,ultra,wenyan-lite,wenyan-full,wenyan-ultra"
+allow_unverified_downloads=0
 manifest_path="${TOKEN_SAVER_MANIFEST:-$HOME/.agents/install_manifest.json}"
 uninstall_active=0
 uninstall_report_file=""
@@ -51,6 +52,8 @@ Options:
   --rtk-mode <mode>        RTK setup mode: auto or manual (default: auto)
   --caveman-args <args>    Extra args passed to the Caveman installer
   --caveman-mode <mode>    Persistent Caveman default mode (default: ultra)
+  --allow-unverified-downloads
+                           Permit legacy unpinned third-party RTK/Caveman remote installer fallbacks
   --help                   Show this help
 EOF
 }
@@ -114,6 +117,7 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     --caveman-mode=*) caveman_mode="${1#*=}" ;;
+    --allow-unverified-downloads) allow_unverified_downloads=1 ;;
     --help|-h) usage; exit 0 ;;
     *) printf 'unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
@@ -161,6 +165,11 @@ run_interactive_cmd() {
       printf 'dry-run: %s\n' "$*"
     fi
     return 0
+  fi
+
+  if [ "$non_interactive" = "1" ]; then
+    run_cmd "$@"
+    return $?
   fi
 
   # Prefer inheriting the current terminal directly. Some packaged CLIs, including
@@ -1006,12 +1015,21 @@ install_rtk_binary() {
     return 0
   fi
 
+  if [ "$allow_unverified_downloads" != "1" ]; then
+    if [ "$dry_run" = "1" ]; then
+      install_event "Skills and Plugins" "RTK" "Shell Commands Skipped" "dry-run: skipping unverified RTK fallback download; rerun with --allow-unverified-downloads to permit legacy curl | sh" "warn"
+    else
+      printf 'warning: skipping unverified RTK fallback download; install RTK with Homebrew or rerun with --allow-unverified-downloads\n' >&2
+    fi
+    return 0
+  fi
+
   if command -v curl >/dev/null 2>&1; then
     if [ "$dry_run" = "1" ]; then
-      install_event "Skills and Plugins" "RTK" "Shell Commands Run" "dry-run: curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh" "ok"
+      install_event "Skills and Plugins" "RTK" "Shell Commands Run" "dry-run: unverified: curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh" "warn"
     else
       curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh
-      install_event "Skills and Plugins" "RTK" "Shell Commands Run" "curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh" "ok"
+      install_event "Skills and Plugins" "RTK" "Shell Commands Run" "unverified: curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh" "warn"
     fi
     return 0
   fi
@@ -1201,6 +1219,14 @@ install_caveman_agent_fallbacks() {
   local old_ifs app
 
   current_tool="Caveman"
+  if [ "$allow_unverified_downloads" != "1" ]; then
+    if [ "$dry_run" = "1" ]; then
+      install_event "Skills and Plugins" "Caveman" "Shell Commands Skipped" "dry-run: skipping unverified Caveman remote installer commands; rerun with --allow-unverified-downloads to permit legacy remote installs" "warn"
+    else
+      printf 'warning: skipping unverified Caveman remote installer commands; rerun with --allow-unverified-downloads to permit legacy remote installs\n' >&2
+    fi
+    return 0
+  fi
   old_ifs="$IFS"
   IFS=","
   for app in $ai_apps; do
@@ -2040,7 +2066,9 @@ uninstall_caveman_components() {
   local skill
 
   current_tool="Caveman"
-  if command -v npx >/dev/null 2>&1 || [ "$dry_run" = "1" ]; then
+  if [ "$allow_unverified_downloads" != "1" ]; then
+    report_event "Verification" "Caveman" "Verification Issues" "skipping unverified Caveman npx uninstall commands; rerun with --allow-unverified-downloads to permit legacy remote uninstall" "warn"
+  elif command -v npx >/dev/null 2>&1 || [ "$dry_run" = "1" ]; then
     run_optional_uninstall_cmd npx -y github:JuliusBrussee/caveman -- --uninstall --non-interactive
     run_optional_uninstall_cmd npx skills remove JuliusBrussee/caveman --all
   else

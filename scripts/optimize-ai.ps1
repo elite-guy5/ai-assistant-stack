@@ -103,6 +103,10 @@ function Copy-OrNew {
     return
   }
 
+  if (-not (Test-SafeTarget -Target $Target)) {
+    return
+  }
+
   $parent = Split-Path -Parent $Target
   New-Item -ItemType Directory -Force -Path $parent | Out-Null
 
@@ -118,6 +122,30 @@ function Copy-OrNew {
   }
 
   Write-Output "skipped existing $Target"
+}
+
+function Test-SafeTarget {
+  param([string]$Target)
+
+  $targetItem = Get-Item -LiteralPath $Target -Force -ErrorAction SilentlyContinue
+  if ($targetItem -and ($targetItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+    return $false
+  }
+
+  $parent = Split-Path -Parent $Target
+  while ($parent -and ($parent -ne $script:ProjectRoot)) {
+    $parentItem = Get-Item -LiteralPath $parent -Force -ErrorAction SilentlyContinue
+    if ($parentItem -and ($parentItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+      return $false
+    }
+    $next = Split-Path -Parent $parent
+    if ($next -eq $parent) {
+      break
+    }
+    $parent = $next
+  }
+
+  return $true
 }
 
 function Get-WithoutBlock {
@@ -152,15 +180,17 @@ function Get-WithoutBlock {
   return $content
 }
 
-if (-not (Test-Path -PathType Container $Project)) {
+$projectItem = Get-Item -LiteralPath $Project -Force -ErrorAction SilentlyContinue
+if (-not $projectItem -or -not $projectItem.PSIsContainer -or ($projectItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
   exit 0
 }
+$script:ProjectRoot = $projectItem.FullName
 
-$gitignore = Join-Path $Project ".gitignore"
+$gitignore = Join-Path $script:ProjectRoot ".gitignore"
 $gitignoreContent = Get-WithoutBlock -File $gitignore -Start "# -- AI Token Bloat Exclusions --" -End "# -- End AI Token Bloat Exclusions --"
 $gitignoreContent += $GitignoreBlock + [Environment]::NewLine
 Copy-OrNew -Content $gitignoreContent -Target $gitignore
 
 $codexContent = $gitignoreContent + [Environment]::NewLine + $CodexExtraBlock + [Environment]::NewLine
-Copy-OrNew -Content $codexContent -Target (Join-Path $Project ".codexignore")
-Copy-OrNew -Content ($ClaudeSettings + [Environment]::NewLine) -Target (Join-Path $Project ".claude/settings.local.json")
+Copy-OrNew -Content $codexContent -Target (Join-Path $script:ProjectRoot ".codexignore")
+Copy-OrNew -Content ($ClaudeSettings + [Environment]::NewLine) -Target (Join-Path $script:ProjectRoot ".claude/settings.local.json")

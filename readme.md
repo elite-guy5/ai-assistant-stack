@@ -8,13 +8,13 @@ Run the installer for your platform. It downloads this repo, asks which optional
 **macOS / Linux / WSL**
 
 ~~~sh
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash
 ~~~
 
 **Windows PowerShell**
 
 ~~~powershell
-irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1 | iex
+irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.ps1 | iex
 ~~~
 
 # Uninstall
@@ -22,13 +22,13 @@ irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/
 **macOS / Linux / WSL**
 
 ~~~sh
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash -s -- --uninstall
 ~~~
 
 **Windows PowerShell**
 
 ~~~powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1))) -Uninstall
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.ps1))) -Uninstall
 ~~~
 
 The installer prompts in this order:
@@ -43,19 +43,19 @@ The installer prompts in this order:
 Useful non-interactive examples:
 
 ~~~sh
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --non-interactive
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --non-interactive --skip-rtk --skip-caveman
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --dry-run
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --uninstall
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --uninstall --non-interactive --uninstall-components "all available"
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash -s -- --non-interactive
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash -s -- --non-interactive --skip-rtk --skip-caveman
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash -s -- --dry-run
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash -s -- --uninstall --non-interactive --uninstall-components "all available"
 ~~~
 
 ~~~powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1))) -NonInteractive
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1))) -NonInteractive -SkipRtk -SkipCaveman
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1))) -DryRun
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1))) -Uninstall
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.ps1))) -Uninstall -NonInteractive -UninstallComponents "all available"
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.ps1))) -NonInteractive
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.ps1))) -NonInteractive -SkipRtk -SkipCaveman
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.ps1))) -DryRun
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.ps1))) -Uninstall
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.ps1))) -Uninstall -NonInteractive -UninstallComponents "all available"
 ~~~
 
 If you cloned the repo locally, run:
@@ -86,6 +86,7 @@ Installer flags:
 - `--rtk-mode <mode>` / `-RtkMode <mode>` - RTK setup mode, default `auto`.
 - `--caveman-args <args>` / `-CavemanArgs <args>` - pass extra flags to Caveman.
 - `--caveman-mode <mode>` / `-CavemanMode <mode>` - persistent Caveman default mode, default `ultra`.
+- `--allow-unverified-downloads` / `-AllowUnverifiedDownloads` - permit legacy unpinned RTK/Caveman remote installer fallbacks. Do not use this for routine installs.
 
 # Recommended Layered Configuration
 
@@ -296,7 +297,7 @@ GitHub Link: [GitHub: juliusbrussee/caveman](https://github.com/juliusbrussee/ca
 
 Adds a `/caveman` slash command that forces Claude Code into a minimal, verbose-free response mode. Reduces output bloat in long sessions.
 
-The installer writes `~/.config/caveman/config.json` with `defaultMode` set to `ultra`, runs the upstream unified Caveman installer with `--all`, and adds per-agent fallback installs for detected non-Claude agents where needed. Some agents still require per-session activation if their native integration does not support always-on hooks.
+The installer writes `~/.config/caveman/config.json` with `defaultMode` set to `ultra`. Unpinned remote Caveman installer commands are skipped by default; pass `--allow-unverified-downloads` / `-AllowUnverifiedDownloads` only if you explicitly accept the legacy remote execution risk. Some agents still require per-session activation if their native integration does not support always-on hooks.
 
 ### Manual install
 
