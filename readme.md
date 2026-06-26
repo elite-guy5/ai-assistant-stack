@@ -1,444 +1,257 @@
-# Overview
-This document walks you through configuring an optimized AI coding environment. The goal is to reduce token waste, improve model response quality, and keep costs in check across agentic coding sessions.
+# Token Saver Setup
 
-# One-Command Install
+Installer and project seeding scripts for token-efficient AI agent workspaces.
 
-Run the installer for your platform. It downloads this repo, asks which optional tools to install, then installs the shared instruction templates, project seeding hook, and AI ignore optimizer.
+This repository is not a general Apple Silicon setup checklist. It is the
+automation layer that installs and maintains AI-agent instruction files,
+project templates, Claude seeding hooks, RTK/Caveman helper configuration, and
+common ignore boundaries for Claude, Codex, and related tools.
 
-**macOS / Linux / WSL**
+## What It Does
 
-~~~sh
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash
-~~~
+- Installs global instruction files:
+  - `~/.claude/CLAUDE.md`
+  - `~/.codex/AGENTS.md`
+- Installs project instruction templates:
+  - `~/.claude/CLAUDE.project-template.md`
+  - `~/.codex/AGENTS.project-template.md`
+- Installs project seeding scripts under `~/.agents/scripts/`.
+- Wires a Claude `SessionStart` hook so new sessions can seed project-local
+  `CLAUDE.md` and `AGENTS.md` files when they are missing.
+- Installs or initializes optional RTK integration for selected AI apps.
+- Writes Caveman default configuration and can run legacy Caveman installers
+  when explicitly allowed.
+- Installs AI ignore boundary helpers for generated files, secrets,
+  dependencies, logs, coverage, local databases, and binary assets.
+- Records installer-owned artifacts in `~/.agents/install_manifest.json` for
+  safer uninstall behavior.
 
-**Windows PowerShell**
+## Requirements
 
-~~~powershell
-irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.ps1 | iex
-~~~
+- macOS, Linux, or Windows PowerShell environment.
+- Bash for `scripts/install.sh`.
+- PowerShell 7+ for `scripts/install.ps1` on Windows or parity checks.
+- Node for structured JSON edits to Claude settings and install manifests.
+- Optional: Homebrew or an existing `rtk` binary for RTK setup.
+- Optional: `expect` for interactive prompt regression tests.
 
-# Uninstall
+## Quick Start
 
-**macOS / Linux / WSL**
+Preview the default install without changing files:
 
-~~~sh
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash -s -- --uninstall
-~~~
+```bash
+bash scripts/install.sh --dry-run --non-interactive
+```
 
-**Windows PowerShell**
+Run the default shell installer:
 
-~~~powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.ps1))) -Uninstall
-~~~
-
-The installer prompts in this order:
-
-- AI apps to configure. Options: `claude`, `codex`, `gemini`, `cursor`, `opencode`, `openclaw`, `copilot`, or `all`. Default: `claude,codex`.
-- Whether to install RTK for the selected AI apps. Options: `y` / `n`. Default: `y`.
-- Whether to install Caveman for the selected AI apps. Options: `y` / `n`. Default: `y`.
-- Whether to install global instruction files for the selected AI apps. Options: `y` / `n`. Default: `y`.
-- Whether to install project instruction files for the selected AI apps. Options: `y` / `n`. Default: `y`.
-- Whether to install AI ignore boundaries for the selected AI apps. Options: `y` / `n`. Default: `y`.
-
-Useful non-interactive examples:
-
-~~~sh
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash -s -- --non-interactive
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash -s -- --non-interactive --skip-rtk --skip-caveman
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash -s -- --dry-run
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash -s -- --uninstall
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash -s -- --uninstall --non-interactive --uninstall-components "all available"
-~~~
-
-~~~powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.ps1))) -NonInteractive
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.ps1))) -NonInteractive -SkipRtk -SkipCaveman
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.ps1))) -DryRun
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.ps1))) -Uninstall
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.ps1))) -Uninstall -NonInteractive -UninstallComponents "all available"
-~~~
-
-If you cloned the repo locally, run:
-
-~~~sh
+```bash
 bash scripts/install.sh
-~~~
-
-~~~powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1
-~~~
-
-Installer flags:
-
-- `--non-interactive` / `-NonInteractive` - use defaults and do not prompt.
-- `--dry-run` / `-DryRun` - preview actions.
-- `--project-scope <path>` / `-ProjectScope <path>` - set the project directory for project seeding instructions.
-- `--overwrite` / `-Overwrite` - replace managed files instead of skipping them.
-- `--overwrite-global-instructions` / `-OverwriteGlobalInstructions` - replace existing `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`; default is to skip existing global instruction files.
-- `--overwrite-project-templates` / `-OverwriteProjectTemplates` - replace existing `~/.claude/CLAUDE.project-template.md` and `~/.codex/AGENTS.project-template.md`; default is to skip existing project template files.
-- `--uninstall` / `-Uninstall` - remove selected installed components.
-- `--uninstall-components <list>` / `-UninstallComponents <list>` - comma-separated components to remove, or `all available`.
-- `--skip-rtk` / `-SkipRtk` - skip RTK install/init.
-- `--skip-caveman` / `-SkipCaveman` - skip Caveman install.
-- `--ai-apps <list>` / `-AiApps <list>` - comma-separated AI apps to configure. Default: `claude,codex`.
-- `--assets <list>` / `-Assets <list>` - comma-separated assets to install. Default: `all`.
-- `--rtk-agents <list>` / `-RtkAgents <list>` - comma-separated RTK agents.
-- `--rtk-mode <mode>` / `-RtkMode <mode>` - RTK setup mode, default `auto`.
-- `--caveman-args <args>` / `-CavemanArgs <args>` - pass extra flags to Caveman.
-- `--caveman-mode <mode>` / `-CavemanMode <mode>` - persistent Caveman default mode, default `ultra`.
-- `--allow-unverified-downloads` / `-AllowUnverifiedDownloads` - permit legacy unpinned RTK/Caveman remote installer fallbacks. Do not use this for routine installs.
-
-# Recommended Layered Configuration
-
-Apply all four layers for maximum effect in a production coding environment:
-
-~~~
-Layer 1 — Shell Proxy (rtk)
-  └── Filters CLI outputs before they enter the prompt history
-      Intercepts Bash tool calls and compresses output before it enters the prompt
-
-Layer 2 — Prompt Simplification (caveman-skill)
-  └── Forces sessions into a minimal, verbose-free response mode.
-      Reduces output bloat in long sessions.
-
-Layer 3 - Global Instruction Files (CLAUDE.md + AGENTS.md)
-  └── Keeps personal behavior rules consistent across tools
-      Claude Code uses ~/.claude/CLAUDE.md
-      Codex uses ~/.codex/AGENTS.md
-      RTK guidance is included by reference instead of pasted inline
-
-Layer 4 - Project Instruction Seeding
-  └── Creates project-local CLAUDE.md and AGENTS.md when missing
-      Runs from a Claude Code SessionStart hook
-      Uses templates instead of hand-copying instructions per repo
-
-Layer 5 - AI Ignore Boundaries
-  └── Keeps token-heavy and sensitive files out of agent context by default
-      Maintains .gitignore, .codexignore, and .claude/settings.local.json
-      Blocks secrets, lockfiles, logs, coverage, build output, dependencies, local databases, and AI-only binary assets
-~~~
-
-**Key principle:** Configure hooks at the shell level rather than relying on natural language prompts to instruct the agent to "compress output." Prompt-level instructions consume tokens and achieve only 70–85% compliance. Shell hooks achieve 100% coverage with zero token overhead.
-
-
-# Repo Files
-
-This repo includes the files needed to install and maintain the instruction setup:
-
-- `scripts/bootstrap.sh` - remote macOS/Linux/WSL bootstrapper.
-- `scripts/bootstrap.ps1` - remote Windows PowerShell bootstrapper.
-- `scripts/install.sh` - macOS/Linux/WSL installer for tools, global files, templates, and the Claude Code SessionStart hook.
-- `scripts/install.ps1` - native Windows PowerShell installer.
-- `scripts/seed-project-instructions.sh` - shell project seeding hook.
-- `scripts/seed-project-instructions.ps1` - PowerShell project seeding hook.
-- `scripts/optimize-ai.sh` - shell project ignore optimizer for `.gitignore`, `.codexignore`, and `.claude/settings.local.json`.
-- `scripts/optimize-ai.ps1` - PowerShell project ignore optimizer.
-- `templates/CLAUDE.global.md` - global Claude Code instruction template.
-- `templates/AGENTS.global.md` - global Codex instruction template.
-- `templates/CLAUDE.project-template.md` - project-local Claude Code template.
-- `templates/AGENTS.project-template.md` - project-local Codex template.
-- `config/claude-settings-sessionstart.json` - standalone macOS/Linux/WSL Claude Code hook snippet.
-- `config/claude-settings-sessionstart.windows.json` - standalone Windows PowerShell Claude Code hook snippet.
-
-Installer behavior:
-
-- Creates missing target files.
-- Writes a machine-readable manifest to `~/.agents/install_manifest.json`.
-- Records managed created or modified files, directories, settings entries, generated tool references, and installer-owned versus user-owned artifacts.
-- Skips existing global Claude/Codex instruction files unless the global-instruction overwrite option is selected.
-- Skips existing managed files when they differ unless an overwrite option is selected.
-- Installs the seeding scripts to `~/.agents/scripts/`.
-- Installs the AI ignore optimizer scripts to `~/.agents/scripts/`.
-- Installs RTK globally, then auto-detects installed agents and runs per-agent RTK init commands when needed.
-- Writes persistent Caveman config, runs the unified Caveman installer, and adds per-agent fallbacks for detected non-Claude agents.
-- Adds the Claude Code `SessionStart` hook if it is missing.
-- When a project is seeded, updates `.gitignore`, `.codexignore`, and `.claude/settings.local.json` with token-bloat exclusions.
-- Use `--overwrite` only when you intentionally want to replace existing target files.
-
-Uninstall behavior:
-
-- Uses `~/.agents/install_manifest.json` as the source of truth when available.
-- Deletes files only when the manifest records them as installer-created full files.
-- Preserves user-owned `CLAUDE.md`, `AGENTS.md`, settings files, and other user-owned files unless a removable managed section is recorded.
-- Falls back to legacy cleanup rules when the manifest is missing or has no records for a selected component, and reports that fallback.
-- Prompts for components with `global-instructions`, `reset-global-instructions`, `project-instructions`, `project-templates`, `seeding`, `ignore-optimizer`, `rtk`, `caveman`, or `all available`.
-- Interactive uninstall first asks whether to reset all instruction files or only project instruction sections.
-- `global-instructions` removes manifest-owned instruction files, or preserves user-owned instruction files.
-- `reset-global-instructions` explicitly blanks `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`.
-- `project-instructions` scans first-level projects in the configured project directory and removes managed Token-Saver and workflow sections from project-local `CLAUDE.md` and `AGENTS.md`; it never deletes those files.
-- `project-templates` removes `~/.claude/CLAUDE.project-template.md` and `~/.codex/AGENTS.project-template.md`.
-- `seeding` removes token-saver seeding scripts and matching Claude `SessionStart` hooks.
-- `ignore-optimizer` removes token-saver optimizer scripts.
-- `rtk` runs RTK uninstall commands for detected agents and removes installer-managed `RTK.md` files.
-- `caveman` runs Caveman uninstall commands, removes Caveman config, known Claude settings entries, known Codex config entries, skills, and Gemini extension when available.
-- Uninstall never writes `.new` files.
-
-# AI Ignore Optimization
-
-The seeding hook runs the optimizer for first-level projects inside your configured project directory. You can also run it manually from a project root:
-
-~~~sh
-bash ~/.agents/scripts/optimize-ai.sh
-~~~
-
-~~~powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\.agents\scripts\optimize-ai.ps1
-~~~
-
-The optimizer adds managed blocks for:
-
-- Secrets: `.env`, `.env.*`.
-- Lockfiles: `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `poetry.lock`.
-- Build and cache output: `dist/`, `build/`, `out/`, `.next/`, `.nuxt/`.
-- Dependencies and virtual environments: `node_modules/`, `vendor/`, `.venv/`, `venv/`.
-- Logs, coverage, and local data: `*.log`, `coverage/`, `.nyc_output/`, `*.db`, `*.sqlite`, `*.sqlite3`.
-- AI-only binary and media exclusions in `.codexignore`: images, archives, audio, video, and PDFs.
-
-The `.gitignore` block intentionally avoids broad image, PDF, and media patterns because many repositories need source assets committed. Those file types are added to `.codexignore` instead so agents avoid reading them while Git can still track intentional assets.
-
-# Pre-Reqs
-Assuming you have your AI tool installed, you will need Node.js if you choose to install Caveman because the Caveman installer uses `npx`. Python is not required by this repo's installer. Open your terminal in your home directory, usually `~` on macOS/Linux/WSL or `%USERPROFILE%` on Windows.
+```
 
-### 1. Node.js aks npm
+Run the PowerShell installer:
 
-GitHub Link: [https://github.com/npm/cli](https://github.com/npm/cli)
+```powershell
+pwsh -NoProfile -File ./scripts/install.ps1
+```
 
-**macOS / Linux**
-- Pres cmd + space and search Terminal 
-- Run the following in your home directory
-~~~sh
-#homebrew
-brew install node
-~~~
+Use a narrower project scope for project seeding:
 
-**Windows**
-- Open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
-- Run the following command:
-~~~sh
-# Download and install Chocolatey:
-powershell -c "irm https://community.chocolatey.org/install.ps1|iex"
-
-# Download and install Node.js:
-choco install nodejs
-~~~
-
-|
-
-|
-
-# Layer 1: rtk (Rust Token Killer)
-GitHub Link: [GitHub: rtk-ai/rtk](https://github.com/rtk-ai/rtk)
-
-Intercepts CLI tool calls (e.g., `git diff`, `cargo test`, `docker ps`) and filters output before it enters the prompt. Achieves **60–92% token reduction** on common commands with under 10ms latency.
+```bash
+bash scripts/install.sh --project-scope "$HOME/Documents/git"
+```
 
-> **Important:** rtk only intercepts Bash tool calls. Native agent tools (`Read`, `Grep`, `Glob`) bypass the hook — use `cat`, `rg`, `find` via Bash if you need rtk filtering on those operations.
+## One-Command Install
 
-### Manual install
+Use these commands when installing from the published pinned snapshot instead
+of a local clone.
 
-**macOS / Linux:**
-- Run the following in your home directory
-~~~sh
-brew install rtk
-~~~
+Shell:
 
-**Windows (PowerShell):**
-- Open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
-~~~powershell
-winget install rtk-ai.rtk
-~~~
+```bash
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash
+```
 
-> **Windows note:** Install [WSL 2](https://learn.microsoft.com/en-us/windows/wsl/install) before proceeding. The Bash hook that intercepts shell commands requires a Unix shell. Without WSL, the hook is unavailable and rtk falls back to injecting instructions into `CLAUDE.md`, which increases prompt tokens rather than reducing them.
+PowerShell:
 
-### Step 2: Initialize (Global Hook)
+```powershell
+irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.ps1 | iex
+```
 
-**macOS / Linux / WSL:**
-- Run the following in your home directory
-~~~sh
-rtk init --global
-~~~
+Non-interactive shell install:
 
-**Windows (limited mode, no hook):**
-- Open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
-~~~sh
-rtk init --global
-~~~
+```bash
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash -s -- --non-interactive
+```
 
-This injects a pre-tool Bash hook so commands like `git status` are automatically rewritten to `rtk git status` without any further configuration. On Windows without WSL, the hook is unavailable; RTK falls back to prompt-level guidance and explicit `rtk <cmd>` usage. Use WSL for transparent shell rewrite.
+Remote uninstall:
 
-The installer uses this same pattern automatically: global setup first, then detected-agent fallback setup. If you need to run a fallback manually:
-~~~sh
-# 1. Install for your AI tool
-rtk init -g                     # Claude Code / Copilot (default)
-rtk init -g --gemini            # Gemini CLI
-rtk init -g --codex             # Codex (OpenAI)
-rtk init -g --agent cursor      # Cursor
-rtk init --agent opencode       # OpenCode
-rtk init --agent openclaw       # OpenClaw
-rtk init --agent pi             # Pi
-rtk init --agent windsurf       # Windsurf
-rtk init --agent cline          # Cline / Roo Code
-rtk init --agent kilocode       # Kilo Code
-rtk init --agent antigravity    # Google Antigravity
-rtk init --agent hermes         # Hermes
+```bash
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash -s -- --uninstall
+```
 
-# 2. Restart your AI tool, then test
-git status  # Automatically rewritten to rtk git status
-~~~
+## Remote Bootstrap
 
-### Step 3: VS Code Extension
+The bootstrap scripts are thin entry points. They download a pinned archive,
+verify its checksum, and then execute the installer from that archive.
 
-Open the **Extensions** tab in VS Code (`Ctrl+Shift+X` / `Cmd+Shift+X`), search **rtk inspector**, and install the extension by **PeterMEFrandsen**.
+Shell:
 
-|
+```bash
+bash scripts/bootstrap.sh --dry-run
+```
 
-|
-# Layer 2: Caveman Skill (Claude Code)
-GitHub Link: [GitHub: juliusbrussee/caveman](https://github.com/juliusbrussee/caveman)
+PowerShell:
 
-Adds a `/caveman` slash command that forces Claude Code into a minimal, verbose-free response mode. Reduces output bloat in long sessions.
+```powershell
+pwsh -NoProfile -File ./scripts/bootstrap.ps1 -DryRun
+```
 
-The installer writes `~/.config/caveman/config.json` with `defaultMode` set to `ultra`. Unpinned remote Caveman installer commands are skipped by default; pass `--allow-unverified-downloads` / `-AllowUnverifiedDownloads` only if you explicitly accept the legacy remote execution risk. Some agents still require per-session activation if their native integration does not support always-on hooks.
+Update the pinned commit and checksum in the bootstrap scripts together when
+publishing a new remote installer snapshot.
 
-### Manual install
+## Main Options
 
-**macOS / Linux / WSL:**
-- Run the following in your home directory
-~~~sh
-curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash
-~~~
+Shell options use long flags. PowerShell uses the same names in PascalCase.
 
-**Windows (PowerShell):**
-- Open Command Prompt or PowerShell as an Administrator (Right-click -> Run as Administrator).
-~~~sh
-irm https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.ps1 | iex
-~~~
+| Purpose | Shell |
+|---------|-------|
+| Non-interactive defaults | `--non-interactive` |
+| Preview actions | `--dry-run` |
+| Set project seed scope | `--project-scope <path>` |
+| Overwrite managed files | `--overwrite` |
+| Overwrite global instructions | `--overwrite-global-instructions` |
+| Overwrite project templates | `--overwrite-project-templates` |
+| Skip RTK | `--skip-rtk` |
+| Skip Caveman | `--skip-caveman` |
+| Select AI apps | `--ai-apps claude,codex` |
+| Select asset groups | `--assets rtk,caveman,global-instructions,project-instructions,ai-ignore-boundaries` |
+| Select Caveman mode | `--caveman-mode ultra` |
+| Permit legacy remote installers | `--allow-unverified-downloads` |
+| Uninstall | `--uninstall` |
+| Uninstall selected components | `--uninstall-components <list>` |
 
-If the global install doesn't work you can add it per AI tool 
-~~~sh
-npx skills add JuliusBrussee/caveman -a antigravity
-npx skills add JuliusBrussee/caveman -a codex
-claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman
-gemini extensions install https://github.com/JuliusBrussee/caveman
-~~~
-|
+By default, unverified RTK and Caveman remote fallback commands are skipped.
+Use `--allow-unverified-downloads` only when you intentionally accept those
+legacy remote installer paths.
 
-|
-# Layer 3: Global Instruction Files
+## Components
 
-Use global instruction files for personal defaults that should apply across repositories. The repo versions live in:
+### Global Instructions
 
-- `templates/CLAUDE.global.md`
-- `templates/AGENTS.global.md`
+Templates in `templates/*.global.md` install to the user's Claude and Codex
+global instruction locations. Existing files are skipped by default unless an
+overwrite flag is provided.
 
-Installed locations:
+### Project Templates
 
-- Claude Code: `~/.claude/CLAUDE.md`
-- Codex: `~/.codex/AGENTS.md`
+Templates in `templates/*.project-template.md` install to the user's Claude and
+Codex template locations. The seeding hook uses these templates to create
+project-local instruction files when missing.
 
-Keep these files concise. Put repository-specific commands, conventions, and gotchas in project-local instruction files instead.
+### Project Seeding
 
-### Shared global sections
+`scripts/seed-project-instructions.sh` and
+`scripts/seed-project-instructions.ps1` identify the first-level project under
+`PROJECT_SCOPE` and create missing `CLAUDE.md` and `AGENTS.md` files from the
+installed templates.
 
-Both global files now use the same core structure:
+The shell seeder also invokes `optimize-ai.sh` when available so local ignore
+boundaries are present.
 
-- **Response Style:** professional, neutral, concise, main conclusion first, no filler, no emojis, no sycophantic openers.
-- **Reasoning and Clarification:** challenge weak assumptions, ask clarifying questions when needed, and verify APIs, versions, flags, commit SHAs, and package names before asserting them.
-- **Skill Usage:** Superpowers skills should auto-run only for software development work, not ordinary questions, local troubleshooting, install checks, or process inspection unless explicitly requested.
-- **Software Development Guidelines:** think before coding, keep changes simple and surgical, define verifiable goals, use plan mode for non-trivial work, use subagents when useful, and pause on hacky non-trivial changes before broad refactors.
-- **Memory & Knowledge:** use native agent memory for recall, the Obsidian vault for long-form human and agent knowledge, and automatic session logs or remember-style tooling for session journal data.
+### AI Ignore Boundaries
 
-### RTK include
+`scripts/optimize-ai.*` maintains common token-bloat exclusions in:
 
-RTK creates and manages its own reference file when installed and initialized. Keep global instruction files small by referencing that installed RTK file instead of copying RTK guidance into this repo.
+- `.gitignore`
+- `.codexignore`
+- `.claude/settings.local.json`
 
-- Claude Code ends with `@RTK.md`
-- Codex has an **RTK Usage** section that points to the RTK reference file under the current user's home directory.
+It skips symlinked project roots and symlinked managed targets.
 
-In `templates/AGENTS.global.md`, this is stored as:
+### RTK
 
-~~~md
-@{{HOME}}/.codex/RTK.md
-~~~
+The installer can initialize RTK for selected AI apps, disable RTK telemetry,
+and wire the Claude `PreToolUse` hook for `rtk hook claude`.
 
-The installer replaces `{{HOME}}` with the current user's actual home directory when writing `~/.codex/AGENTS.md`. This repo does not install `RTK.md`; run `rtk init` first so RTK creates the referenced file.
+### Caveman
 
-This keeps global instruction files smaller while preserving the token-saving shell guidance.
+The installer writes `~/.config/caveman/config.json` with the selected default
+mode. Legacy Caveman install commands require `--allow-unverified-downloads`.
 
-|
+## Uninstall
 
-|
+Preview uninstall:
 
-# Layer 4: Project Instruction Seeding
+```bash
+bash scripts/install.sh --dry-run --uninstall
+```
 
-Use project-local instruction files for repository-specific details. Repo templates:
+Non-interactive uninstall of all available components:
 
-- `templates/CLAUDE.project-template.md`
-- `templates/AGENTS.project-template.md`
+```bash
+bash scripts/install.sh --non-interactive --uninstall
+```
 
-Installed locations:
+Target selected components:
 
-- Claude Code template: `~/.claude/CLAUDE.project-template.md`
-- Codex template: `~/.codex/AGENTS.project-template.md`
+```bash
+bash scripts/install.sh --uninstall --uninstall-components project-templates,seeding
+```
 
-Each template includes:
+Supported component names include:
 
-- Project purpose, language/framework, and key entry points.
-- Build, test, lint, and run commands.
-- Repo-specific conventions and gotchas.
-- A development workflow section that defers to Superpowers for relevant software development work.
-- A precedence note: project-local instructions override skills where they conflict.
-- A reminder that durable learnings belong in memory or the Obsidian vault, not in project instruction files.
+- `global-instructions`
+- `reset-global-instructions`
+- `project-instructions`
+- `project-templates`
+- `seeding`
+- `ignore-optimizer`
+- `rtk`
+- `caveman`
 
-### Seeding hook
+When the install manifest exists, uninstall uses it to distinguish
+installer-created artifacts from user-owned files. Legacy fallback cleanup is
+scoped to known managed paths.
 
-The seeding hook creates project-local instruction files when they are missing.
+## Tests
 
-Repo script:
+Run the full shell test set:
 
-~~~sh
-scripts/seed-project-instructions.sh
-~~~
+```bash
+for test in tests/*.sh; do bash "$test"; done
+```
 
-Installed script:
+Common focused checks:
 
-~~~sh
-~/.agents/scripts/seed-project-instructions.sh
-~/.agents/scripts/seed-project-instructions.ps1
-~~~
+```bash
+bash tests/install-dry-run.sh
+bash tests/security-regression.sh
+bash tests/install-visible-output.sh
+bash tests/install-uninstall-prompt.sh
+bash tests/ai-ignore-smoke.sh
+bash tests/rtk-claude-hook.sh
+```
 
-Behavior:
+Useful syntax checks:
 
-- Only runs for projects under `~/Documents` by default.
-- Override the project directory with `PROJECT_SCOPE=/path/to/projects`.
-- Ignores hidden top-level folders.
-- Detects the first project directory below the configured project directory.
-- Creates `CLAUDE.md` from `~/.claude/CLAUDE.project-template.md` if missing.
-- Creates `AGENTS.md` from `~/.codex/AGENTS.project-template.md` if missing.
-- Does not overwrite existing project instruction files.
-- Supports dry runs with `DRY_RUN=1`.
+```bash
+bash -n scripts/*.sh tests/*.sh
+```
 
-Claude Code hook entry in `~/.claude/settings.json`. Standalone repo snippets are in `config/claude-settings-sessionstart.json` and `config/claude-settings-sessionstart.windows.json`.
+PowerShell parser check:
 
-~~~json
-{
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.agents/scripts/seed-project-instructions.sh\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ]
-  }
-}
-~~~
+```powershell
+pwsh -NoProfile -Command '$errors = $null; foreach ($file in Get-ChildItem scripts/*.ps1) { $null = [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$null, [ref]$errors); if ($errors.Count) { $errors; exit 1 } }'
+```
 
-Manual test:
+## Safety Model
 
-~~~sh
-DRY_RUN=1 bash ~/.agents/scripts/seed-project-instructions.sh ~/Documents/example-project
-~~~
+- Existing global instructions and project templates are skipped by default.
+- Overwrites require explicit flags.
+- Bootstrap archives are checksum verified before execution.
+- Symlinked project roots and managed ignore targets are not written through.
+- `.env` files and generated dependency/build artifacts are excluded from
+  agent context by default.
+- Installer actions are reported in sections so skipped files and warnings stay
+  visible.

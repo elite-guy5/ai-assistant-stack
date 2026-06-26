@@ -1,152 +1,179 @@
 # Project AGENTS.md
 
-## Project Context
+> Project-specific instructions. Inherits global behavior from `~/.codex/AGENTS.md`.
 
-- Purpose:
-- Users:
-- Tech stack:
-- Architecture:
-- Constraints:
-  - Preserve user-owned files by default.
-  - Document any platform-specific limitations.
-  - Maintain backward compatibility unless explicitly approved.
-  - Keep changes scoped to the project's intended boundaries.
+## Project Info
 
-## Testing Requirements
+**Purpose**
 
-### Bug Fixes
+> `<One-line description of the project's core utility, service, or business objective>`
 
-- Reproduce the issue when practical.
-- Verify the issue is resolved.
-- Verify no regression was introduced.
+**Language / Framework**
 
-### Features
+> `<Primary languages, frameworks, runtime environments, and database engines>`
 
-- Verify intended behavior.
-- Verify existing behavior remains intact.
-- Prefer safe validation methods before modifying production behavior.
-- Maintain platform parity where applicable.
+**Key Entry Points**
 
-### Refactoring
+> `<Comma-separated list of critical source files, entry components, configuration files, or routing manifests>`
 
-- Verify behavior before and after remains unchanged.
+---
 
-Never claim success without validation.
+## Commands
 
-## Repository Rules
+| Task | Command |
+|------|---------|
+| **Build** | `<Build command>` |
+| **Test** | `<Command to execute unit, integration, or smoke tests>` |
+| **Lint** | `<Command to lint, format, or typecheck files, or note if handled globally>` |
+| **Run** | `<Command to launch the application locally, including expected host and port>` |
 
-### Build Commands
+### Global Verification Hooks
 
-text <build command(s)> 
+Always run:
 
-### Test Commands
+```bash
+ruflo format <file>
+```
 
-text <test command(s)> 
+after editing files, and:
 
-### Local Run Commands
+```bash
+ruflo lint
+```
 
-text <local execution command(s)> 
+before declaring a task complete.
 
-### Validation Commands
+---
 
-text <validation or dry-run command(s)> 
+## Conventions
 
-### Deployment Requirements
+### Testing
 
-- Document deployment process.
-- Document release requirements.
-- Document versioning requirements.
-- Document rollback expectations.
+> `<Testing conventions: test locations, frameworks, coverage expectations, and naming conventions>`
 
-## Architectural Rules
+### Coding Style & Architecture
 
-### Change Safety
+> `<Project-specific coding patterns, import rules, architecture, directory layout, and design conventions>`
 
-Before modifying behavior:
+---
 
-- Verify current behavior.
-- Verify upgrade behavior.
-- Verify rollback behavior.
-- Verify validation workflows.
-- Verify existing user workflows continue to work.
-- Verify existing public interfaces remain functional.
+## Token-Saver File Boundaries
 
-### User-Facing Behavior
+- Keep generated files, secrets, logs, coverage reports, dependency folders, local databases, and binary assets out of agent context by default.
+- Project seeding maintains:
+  - `.gitignore`
+  - `.codexignore`
+  - `.claude/settings.local.json`
 
-Preserve:
+  with common token-bloat exclusions.
+- If this repository requires broader or narrower exclusions, update the local ignore files instead of weakening the global behavior.
 
-- User prompts
-- Visible output
-- Confirmation flows
-- Progress indicators
-- Logging expectations
-- Verification steps
+---
 
-Do not suppress, remove, or alter user-facing behavior unless explicitly requested.
+# Development Workflow
 
-### Backward Compatibility
+This repository inherits the global session requirements:
 
-- Preserve public APIs unless explicitly approved.
-- Preserve public CLI flags unless explicitly approved.
-- Preserve documented workflows unless explicitly approved.
-- Preserve existing integrations unless explicitly approved.
+- Automatically load LeanCTX for AST-aware workspace scoping.
+- Automatically enable the Ruflo harness for daemon workers and trajectory learning.
+- Automatically activate the Caveman skill for conversational efficiency.
 
-### Project Boundaries
+When software development work is requested, follow the Superpowers workflow.
 
-- Keep changes within the project's intended scope.
-- Do not modify unrelated systems.
-- Do not overwrite user-owned assets without approval.
-- Respect documented ownership boundaries.
+## Standard Workflow
 
-### Data and Configuration
+### 1. Brainstorming
 
-- Preserve configuration compatibility.
-- Preserve migration compatibility.
-- Preserve existing data formats unless approved.
-- Document any breaking changes.
+- Refine the idea.
+- Obtain design approval.
+- Save the design specification to:
 
-### Dependencies
+```text
+docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md
+```
 
-- No new dependencies without approval.
-- Prefer existing project patterns before introducing new tooling.
-- Reuse established libraries and frameworks when practical.
+---
 
-### Performance and Efficiency
+### 2. Writing Plans
 
-Performance improvements must not alter behavior.
+- Break work into small, verifiable tasks.
+- Include exact file paths.
+- Define required tests.
 
-Preserve:
+Save the implementation plan to:
 
-- Functional behavior
-- User workflows
-- Validation paths
-- Security controls
-- Safety checks
+```text
+docs/superpowers/plans/YYYY-MM-DD-<feature>.md
+```
 
-Optimize implementation, not functionality.
+---
 
-## Definition of Done
+### 3. Using Git Worktrees
 
-A task is complete only when:
+- Create an isolated worktree.
+- Begin from a clean test baseline.
 
-- Requested behavior exists.
-- Validation was performed.
-- Relevant tests pass.
-- No unrelated code was modified.
-- Assumptions and risks are documented.
-- Results are summarized.
+---
 
-## Project-Specific Rules
+### 4. Subagent-Driven Development / Executing Plans
 
-Add repository-specific requirements here.
+- Execute tasks sequentially.
+- Use review checkpoints.
+- Delegate independent work to subagents where appropriate.
 
-Examples:
+---
 
-- Coding standards
-- Security requirements
-- Deployment restrictions
-- Platform-specific constraints
-- Regulatory requirements
-- Architecture conventions
-- Environment requirements
-- Repository workflows
+### 5. Test-Driven Development (Required)
+
+This repository enforces TDD by default.
+
+Follow the Red → Green → Refactor cycle:
+
+1. Write a failing test.
+2. Verify the test fails.
+3. Implement the minimum code required.
+4. Refactor while keeping tests green.
+
+---
+
+### 6. Code Review & Branch Completion
+
+Workflow:
+
+```text
+Request Code Review
+        ↓
+Address Feedback
+        ↓
+Merge / Create PR
+        ↓
+Cleanup Branches
+```
+
+---
+
+## Instruction Precedence
+
+Instruction precedence is:
+
+```text
+Local AGENTS.md
+        ↓
+Superpowers Skills
+        ↓
+Global ~/.codex/AGENTS.md
+```
+
+Project-specific overrides should be placed under the **Conventions** section whenever possible.
+
+---
+
+## Memory Management
+
+### Durable Knowledge
+
+Generalizable learnings and correction logs should be written directly to the personal Obsidian vault using the Obsidian MCP integration.
+
+### Execution Memory
+
+Persistent execution history, trajectory learning, and long-term operational memory are managed automatically by Ruflo through its AgentDB vector storage layers.
