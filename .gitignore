@@ -1,44 +1,24 @@
-# -- Local OS and editor state --
 .DS_Store
-.vscode/
-.idea/
-
-# -- Secrets and local environment --
-.env
-.env.*
-
-# -- Logs and local caches --
-*.log
-logs/
-.cache/
-
-# -- Test and coverage output --
-coverage/
-.nyc_output/
-
-# -- Build output --
-dist/
-build/
-out/
-.next/
-.nuxt/
-target/
-
-# -- Dependency and virtualenv folders --
 node_modules/
-vendor/
-.venv/
-venv/
-env/
-__pycache__/
+dayarc-app/dist/
+.env
+.dev.vars
+.wrangler/
+secrets.generated.json
+*.secrets.generated.json
+/HANDOFF.md
+/NEXT_CHAT_PROMPT.md
+dayarc-app/data/*.sqlite
+dayarc-app/data/*.sqlite-*
 
-# -- Lockfiles excluded by token-saver policy --
-package-lock.json
-pnpm-lock.yaml
-yarn.lock
-poetry.lock
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
 
-# -- Local databases --
-*.db
-*.sqlite
-*.sqlite3
+# Exclude Ruflo Vector Databases from LeanCTX AST indexing
+.ruflo/
+agentdb.rvf
+agentdb.rvf.lock

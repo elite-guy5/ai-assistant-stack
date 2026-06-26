@@ -56,3 +56,6 @@ poetry.lock
 *.mov
 *.mp3
 *.wav
+
+# -- Superpowers docs --
+docs
