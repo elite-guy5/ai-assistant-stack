@@ -21,27 +21,47 @@
 ## Commands
 
 | Task | Command |
-|------|---------|
+|---|---|
 | **Build** | `<Build command>` |
 | **Test** | `<Command to execute unit, integration, or smoke tests>` |
-| **Lint** | `<Command to lint, format, or typecheck files, or note if handled globally>` |
+| **Format** | `<Project-native formatter command, such as npm run format, pnpm format, prettier --write <file>, ruff format <file>, cargo fmt, or gofmt -w <file>>` |
+| **Lint / Typecheck** | `<Project-native lint, format-check, or typecheck command>` |
 | **Run** | `<Command to launch the application locally, including expected host and port>` |
 
-### Global Verification Hooks
+### Verification Hooks
 
-Always run:
+Do **not** assume Ruflo provides formatter or linter commands.
+
+Ruflo v3.14.2 does not expose `format` or `lint` as CLI commands, so agents must not call:
 
 ```bash
 ruflo format <file>
-```
-
-after editing files, and:
-
-```bash
 ruflo lint
 ```
 
-before declaring a task complete.
+Instead:
+
+- Use the project-native formatter after edits.
+- Use the project-native lint/typecheck/test commands before declaring work complete.
+- Use Ruflo only for supported harness, hook, memory, MCP, swarm, or orchestration commands confirmed by:
+
+```bash
+ruflo --help
+```
+
+### Required Verification Flow
+
+After editing files:
+
+```text
+1. Run the project-native formatter for changed files.
+2. Run the project-native lint/typecheck command.
+3. Run the relevant tests.
+4. Review the diff.
+5. Declare completion only after verification passes or clearly report failures.
+```
+
+If the project has no formatter, linter, or tests yet, state that explicitly and verify with the best available command.
 
 ---
 
@@ -64,9 +84,7 @@ before declaring a task complete.
   - `.gitignore`
   - `.codexignore`
   - `.claude/settings.local.json`
-
-  with common token-bloat exclusions.
-- If this repository requires broader or narrower exclusions, update the local ignore files instead of weakening the global behavior.
+- If this repository requires broader or narrower exclusions, update the local ignore files instead of weakening global behavior.
 
 ---
 
@@ -78,15 +96,15 @@ This repository inherits the global session requirements:
 - Automatically enable the Ruflo harness for daemon workers and trajectory learning.
 - Automatically activate the Caveman skill for conversational efficiency.
 
-When software development work is requested, follow the Superpowers workflow.
+When software development work is requested, follow the Superpowers workflow where relevant.
 
 ## Standard Workflow
 
 ### 1. Brainstorming
 
 - Refine the idea.
-- Obtain design approval.
-- Save the design specification to:
+- Obtain design approval when the requested change is ambiguous, broad, or architectural.
+- Save design specifications to:
 
 ```text
 docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md
@@ -98,9 +116,10 @@ docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md
 
 - Break work into small, verifiable tasks.
 - Include exact file paths.
-- Define required tests.
+- Define required tests and verification commands.
+- Use project-native formatter, lint, and test commands.
 
-Save the implementation plan to:
+Save implementation plans to:
 
 ```text
 docs/superpowers/plans/YYYY-MM-DD-<feature>.md
@@ -110,8 +129,9 @@ docs/superpowers/plans/YYYY-MM-DD-<feature>.md
 
 ### 3. Using Git Worktrees
 
-- Create an isolated worktree.
+- Create an isolated worktree when appropriate.
 - Begin from a clean test baseline.
+- Do not create worktrees for trivial one-file fixes unless requested.
 
 ---
 
@@ -119,20 +139,23 @@ docs/superpowers/plans/YYYY-MM-DD-<feature>.md
 
 - Execute tasks sequentially.
 - Use review checkpoints.
-- Delegate independent work to subagents where appropriate.
+- Delegate independent work to subagents only when useful.
+- Keep each subagent focused on one task.
 
 ---
 
-### 5. Test-Driven Development (Required)
+### 5. Test-Driven Development
 
-This repository enforces TDD by default.
+This repository prefers TDD by default for non-trivial code changes.
 
-Follow the Red → Green → Refactor cycle:
+Follow the Red → Green → Refactor cycle when practical:
 
 1. Write a failing test.
 2. Verify the test fails.
 3. Implement the minimum code required.
 4. Refactor while keeping tests green.
+
+For trivial changes, documentation-only edits, or config-only changes, use the most relevant verification command instead.
 
 ---
 
@@ -144,6 +167,8 @@ Workflow:
 Request Code Review
         ↓
 Address Feedback
+        ↓
+Run Verification
         ↓
 Merge / Create PR
         ↓
@@ -172,8 +197,8 @@ Project-specific overrides should be placed under the **Conventions** section wh
 
 ### Durable Knowledge
 
-Generalizable learnings and correction logs should be written directly to the personal Obsidian vault using the Obsidian MCP integration.
+Generalizable learnings and correction logs should be written directly to the personal Obsidian vault using the Obsidian MCP integration when available.
 
 ### Execution Memory
 
-Persistent execution history, trajectory learning, and long-term operational memory are managed automatically by Ruflo through its AgentDB vector storage layers.
+Persistent execution history, trajectory learning, and long-term operational memory are managed by Ruflo through its AgentDB vector storage layers when available.
