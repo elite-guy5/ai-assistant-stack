@@ -81,6 +81,26 @@ seeder_skips_existing_files_and_overwrite_creates_backup() {
   ls "$repo"/AGENTS.md.token-saver-backup-* >/dev/null
 }
 
+seeder_skips_project_when_any_instruction_file_exists() {
+  local home="$tmp/home-cross-skip"
+  local repo_with_agents="$tmp/cross-skip-agents"
+  local repo_with_claude="$tmp/cross-skip-claude"
+  mkdir -p "$home"
+  HOME="$home" bash "$ROOT/scripts/install.sh" --non-interactive --tools both >/dev/null
+
+  git -c init.defaultBranch=main init "$repo_with_agents" >/dev/null
+  printf 'custom agents\n' > "$repo_with_agents/AGENTS.md"
+  HOME="$home" "$home/.agents/scripts/seed-project-instructions.sh" --tools both "$repo_with_agents"
+  assert_contains "$(cat "$repo_with_agents/AGENTS.md")" "custom agents"
+  assert_not_exists "$repo_with_agents/CLAUDE.md"
+
+  git -c init.defaultBranch=main init "$repo_with_claude" >/dev/null
+  printf 'custom claude\n' > "$repo_with_claude/CLAUDE.md"
+  HOME="$home" "$home/.agents/scripts/seed-project-instructions.sh" --tools both "$repo_with_claude"
+  assert_contains "$(cat "$repo_with_claude/CLAUDE.md")" "custom claude"
+  assert_not_exists "$repo_with_claude/AGENTS.md"
+}
+
 bootstrap_rejects_tampered_archive() {
   local archive="$tmp/archive.tar.gz"
   printf 'tampered' > "$archive"
@@ -95,6 +115,7 @@ bootstrap_rejects_tampered_archive() {
 git_template_hooks_seed_future_repos
 current_repo_hook_wraps_existing_hook_and_seeds_selected_files
 seeder_skips_existing_files_and_overwrite_creates_backup
+seeder_skips_project_when_any_instruction_file_exists
 bootstrap_rejects_tampered_archive
 
 printf 'security-regression.sh: OK\n'

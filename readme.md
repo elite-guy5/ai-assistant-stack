@@ -22,8 +22,9 @@ and Git hooks that manage project instruction files.
    `~/.agents/scripts/seed-project-instructions.sh`.
 4. It installs Git template hooks and configures
    `git config --global init.templateDir ~/.agents/git-template`.
-5. New Git repositories inherit those hooks, and the hooks create `AGENTS.md`,
-   `CLAUDE.md`, or both from the project templates when the files are missing.
+5. New Git repositories inherit those hooks. The hooks create `AGENTS.md`,
+   `CLAUDE.md`, or both from the project templates only when neither
+   project instruction file already exists.
 6. Your AI tool can then fill out the seeded project file with repository
    purpose, commands, testing rules, coding standards, and context boundaries.
 
@@ -117,7 +118,8 @@ git config --global init.templateDir ~/.agents/git-template
 
 New repositories created with `git init` after installation receive the managed
 template hooks automatically. Those hooks seed `AGENTS.md`, `CLAUDE.md`, or both
-from the installed project templates when the files are missing.
+from the installed project templates only when neither project instruction file
+already exists.
 
 To seed an existing repository and install managed hooks into that repository's
 `.git/hooks/` directory, pass `--repo`:
@@ -159,7 +161,8 @@ git config --global init.templateDir ~/.agents/git-template
 
 New repositories created with `git init` receive the managed hooks. The hooks
 run the shared seeding script, detect the repository root, and create the
-selected project instruction files when they are missing:
+selected project instruction files only when neither project instruction file is
+already present:
 
 | Selected Tool | Project File |
 |---------------|--------------|
@@ -167,8 +170,10 @@ selected project instruction files when they are missing:
 | Claude Code | `CLAUDE.md` |
 | Both | `AGENTS.md` and `CLAUDE.md` |
 
-Existing project instruction files are skipped by default. When overwrite is
-explicitly requested, the old file is backed up before replacement.
+Existing project instruction files stop seeding by default: if either
+`AGENTS.md` or `CLAUDE.md` already exists, the hook does not add another project
+template file. When overwrite is explicitly requested through the seeding
+script, the old file is backed up before replacement.
 
 If a hook already exists, the installer backs it up and writes a wrapper hook
 that runs the previous hook before the managed seeding command. Managed markers

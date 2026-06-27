@@ -53,6 +53,10 @@ copy_instruction_file() {
   cp "$template" "$target"
 }
 
+project_instruction_file_exists() {
+  [ -e "$repo_root/AGENTS.md" ] || [ -e "$repo_root/CLAUDE.md" ]
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --tools)
@@ -76,6 +80,10 @@ tools="$(normalize_tools "$tools")"
 repo_root="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || true)"
 [ -n "$repo_root" ] || exit 0
 [ ! -L "$repo_root" ] || exit 0
+
+if [ "$overwrite" = "0" ] && project_instruction_file_exists; then
+  exit 0
+fi
 
 if tool_enabled codex; then
   copy_instruction_file "$HOME/.codex/AGENTS.project-template.md" "$repo_root/AGENTS.md"
