@@ -30,6 +30,154 @@ The installer never runs package-manager setup commands and never configures
 external services. Git hooks created by this project only manage `AGENTS.md`
 and `CLAUDE.md` files.
 
+## Optional Manual Codex Environment Setup Guide
+
+The following guide is copied from the Obsidian note
+`Projects/Token Saver Setup/Ultimate Codex Environment Setup Guide` so this
+repository documents the larger environment this instruction-file manager is
+designed to support.
+
+Everything in this section is optional and manual. These commands are not run
+by `scripts/install.sh`, `scripts/bootstrap.sh`, or the Git hooks installed by
+this project.
+
+### Component Overview
+
+The full local environment can include these external systems:
+
+- Ruflo as an execution harness around Claude Code and Codex, with swarms,
+  local trajectory memory, and daemon workers.
+- LeanCTX as a local context-isolation engine for shell output compression,
+  workspace mapping, and AST-aware context scoping.
+- A Codex CLI symlink that exposes the Codex Desktop application binary from
+  the terminal.
+- MCP servers for Ruflo, LeanCTX, Context7, and Obsidian.
+- Behavioral skills such as Caveman and Superpowers.
+
+### Phase 1: Terminal Dependencies and Host Utilities
+
+With Codex already installed, expose its binary globally:
+
+```bash
+sudo ln -s /Applications/Codex.app/Contents/Resources/codex /usr/local/bin/codex
+codex --version
+```
+
+Install LeanCTX manually:
+
+```bash
+brew tap yvgude/lean-ctx
+brew install lean-ctx
+which lean-ctx
+```
+
+### Phase 2: Ruflo Harness
+
+Install Ruflo and run its interactive setup wizard manually:
+
+```bash
+npx ruflo@latest init wizard
+```
+
+Suggested wizard choices from the guide:
+
+| Setting | Value |
+|---------|-------|
+| Loop Profile | Full Ruflo Loop |
+| Telemetry / Memory | Local-Only / Private |
+| Swarm Topology | Hierarchical |
+| Maximum Concurrent Agents | 5 |
+| Memory Backend | AgentDB |
+| HNSW Indexing | Yes |
+| Neural Pattern Learning | Yes |
+| Self-Learning Memory | Yes |
+| ONNX Embedding Engine | Yes |
+| Embedding Model | MiniLM L6 |
+
+Start Ruflo and register it with Codex manually:
+
+```bash
+npx ruflo start
+codex mcp add ruflo -- npx ruflo@latest mcp start
+```
+
+### Phase 3: Context7
+
+Create an account at `https://context7.com/`, copy the API key, and run:
+
+```bash
+npx ctx7 setup
+```
+
+When prompted to write system-level configuration files automatically, the
+guide recommends choosing `No` so configuration remains explicit.
+
+### Phase 4: Codex Configuration
+
+Open the Codex config:
+
+```bash
+code ~/.codex/config.toml
+```
+
+The guide uses this structure:
+
+```toml
+[features]
+hooks = true
+js_repl = false
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp@latest"]
+
+[mcp_servers.lean-ctx]
+command = "lean-ctx"
+args = ["serve"]
+```
+
+After editing, quit and reopen Codex, then open the Plugins page to verify the
+configuration parses correctly.
+
+### Phase 5: Behavioral Skills
+
+Install runtime skills manually:
+
+```bash
+npx skills add JuliusBrussee/caveman -a codex
+npx skills add superpowers -a codex
+```
+
+### Phase 6: Codebase Safety Boundaries
+
+If AgentDB, LeanCTX, or an Obsidian vault lives inside a repository, exclude
+their storage paths from source control and agent context:
+
+```gitignore
+.ruflo/
+agentdb.rvf
+agentdb.rvf.lock
+.obsidian/
+```
+
+### Phase 7: Verification Diagnostics
+
+Verify external tools manually:
+
+```bash
+lean-ctx status
+npx ruflo status
+```
+
+Then confirm:
+
+- Codex launches successfully.
+- No configuration errors appear.
+- MCP servers initialize correctly.
+- Plugins load normally.
+- LeanCTX reports a healthy status.
+- Ruflo reports an active daemon and loaded plugins.
+
 ## Requirements
 
 - macOS
