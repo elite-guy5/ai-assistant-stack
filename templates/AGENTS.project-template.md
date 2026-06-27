@@ -1,6 +1,10 @@
-# Project AGENTS.md
+# AGENTS.project-template.md
 
 > Project-specific instructions. Inherits global behavior from `~/.codex/AGENTS.md`.
+
+---
+
+# Project AGENTS.md
 
 ## Project Info
 
@@ -28,15 +32,15 @@
 | **Lint / Typecheck** | `<Project-native lint, syntax, or typecheck command>` |
 | **Run** | `<Command to run the project locally, including host and port when applicable>` |
 
+---
+
 ## Verification Requirements
 
-After editing files:
+In addition to the global verification and diff review workflows:
 
 1. Run the project-native formatter for changed files, if one exists.
 2. Run the project-native lint, syntax, or typecheck command.
-3. Run relevant tests.
-4. Review the diff.
-5. Report any failures clearly.
+3. Run relevant project-level tests.
 
 ---
 
@@ -58,9 +62,15 @@ After editing files:
 
 ## Context Boundaries
 
-Unless required for the current task, avoid loading generated artifacts,
-dependency directories, logs, coverage reports, build outputs, secrets, binary
-assets, and local databases.
+Project-specific exclusions should be maintained through repository ignore files instead of weakening global behavior.
 
-Project-specific exclusions should be maintained through repository ignore files
-instead of weakening global behavior.
+Rely on the global token-saver boundaries for standard exclusions, including:
+
+- generated artifacts
+- dependency directories
+- build outputs
+- logs
+- coverage reports
+- local databases
+- binary assets
+- secrets

@@ -1,20 +1,17 @@
-# Project CLAUDE.md
+# Project Rules & Commands
 
-> Project-specific instructions. Inherits global behavior from `~/.claude/CLAUDE.md`.
+> Inherits behavioral, tool, and operational architecture guidelines from `~/.claude/CLAUDE.md`.
 
 ## Project Info
 
 ### Purpose
-
-> `<One-line description of the project's core utility, service, or objective>`
+- `<One-line description of the project's core utility, service, or objective>`
 
 ### Language / Framework
-
-> `<Primary languages, frameworks, runtimes, and data stores>`
+- `<Primary languages, frameworks, runtimes, and data stores>`
 
 ### Key Entry Points
-
-> `<Critical source files, configuration files, routing manifests, or scripts>`
+- `<Critical source files, configuration files, routing manifests, or scripts>`
 
 ---
 
@@ -28,39 +25,32 @@
 | **Lint / Typecheck** | `<Project-native lint, syntax, or typecheck command>` |
 | **Run** | `<Command to run the project locally, including host and port when applicable>` |
 
+---
+
 ## Verification Requirements
 
-After editing files:
+Execute these steps in addition to the global verification and formatting workflows specified in `~/.claude/CLAUDE.md`:
 
-1. Run the project-native formatter for changed files, if one exists.
+1. Run the project-native formatter for all changed files, if one exists.
 2. Run the project-native lint, syntax, or typecheck command.
-3. Run relevant tests.
-4. Review the diff.
-5. Report any failures clearly.
+3. Run relevant project-level tests to validate functionality.
 
 ---
 
 ## Conventions
 
 ### Testing
-
-> `<Test locations, framework, naming conventions, and coverage expectations>`
+- `<Test locations, framework, naming conventions, and coverage expectations>`
 
 ### Coding Standards
-
-> `<Project-specific style, architecture, import rules, and directory layout>`
+- `<Project-specific style, architecture, import rules, and directory layout>`
 
 ### Project-Specific Rules
-
-> `<Business rules, workflow requirements, or repository-specific guidance>`
+- `<Business rules, workflow requirements, or repository-specific guidance>`
 
 ---
 
 ## Context Boundaries
 
-Unless required for the current task, avoid loading generated artifacts,
-dependency directories, logs, coverage reports, build outputs, secrets, binary
-assets, and local databases.
-
-Project-specific exclusions should be maintained through repository ignore files
-instead of weakening global behavior.
+- Maintain project-specific file exclusions exclusively through repository ignore files (`.gitignore`) to keep runtime evaluations clean.
+- Rely on the global token-saver boundaries for standard artifact, dependency, log, database, and secret exclusions.
