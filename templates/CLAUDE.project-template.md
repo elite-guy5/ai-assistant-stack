@@ -1,4 +1,4 @@
-# Project AGENTS.md
+# Project CLAUDE.md
 
 > Project-specific instructions. Inherits global behavior from `~/.claude/CLAUDE.md`.
 
