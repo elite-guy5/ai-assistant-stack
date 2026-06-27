@@ -57,5 +57,5 @@ poetry.lock
 *.mp3
 *.wav
 
-# -- Superpowers docs --
-docs
+# -- Local agent caches --
+.agents/

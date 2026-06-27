@@ -2,8 +2,9 @@
 set -euo pipefail
 
 PINNED_COMMIT="49253c77fb7b32786c6d63e89d38ea763310a25a"
-ARCHIVE_URL="https://github.com/elite-guy5/token-saver-setup/archive/$PINNED_COMMIT.tar.gz"
-ARCHIVE_SHA256="38c13a13a117c5e04becffcf9400ba14a75221f3ec4a8db04fa9d99da4f9cbb8"
+ARCHIVE_URL="${TOKEN_SAVER_BOOTSTRAP_URL:-https://github.com/elite-guy5/token-saver-setup/archive/$PINNED_COMMIT.tar.gz}"
+ARCHIVE_SHA256="${TOKEN_SAVER_BOOTSTRAP_SHA256:-38c13a13a117c5e04becffcf9400ba14a75221f3ec4a8db04fa9d99da4f9cbb8}"
+LOCAL_ARCHIVE="${TOKEN_SAVER_BOOTSTRAP_ARCHIVE:-}"
 tmp_dir="$(mktemp -d)"
 
 cleanup() {
@@ -13,6 +14,11 @@ trap cleanup EXIT
 
 download_archive() {
   local archive="$1"
+
+  if [ -n "$LOCAL_ARCHIVE" ]; then
+    cp "$LOCAL_ARCHIVE" "$archive"
+    return 0
+  fi
 
   if command -v curl >/dev/null 2>&1; then
     curl -fsSL "$ARCHIVE_URL" -o "$archive"
@@ -52,7 +58,12 @@ verify_archive() {
 archive="$tmp_dir/token-saver-setup.tar.gz"
 download_archive "$archive"
 verify_archive "$archive"
-tar -xzf "$archive" -C "$tmp_dir"
 
+if [ "${1:-}" = "--dry-run" ] && [ -n "$LOCAL_ARCHIVE" ]; then
+  printf 'dry-run: verified local bootstrap archive\n'
+  exit 0
+fi
+
+tar -xzf "$archive" -C "$tmp_dir"
 repo_dir="$tmp_dir/token-saver-setup-$PINNED_COMMIT"
 exec bash "$repo_dir/scripts/install.sh" "$@"

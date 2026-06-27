@@ -5,214 +5,96 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-assert_not_contains() {
-  local haystack="$1"
-  local needle="$2"
-
-  if printf '%s\n' "$haystack" | grep -Fq "$needle"; then
-    printf 'unexpected output contained: %s\n' "$needle" >&2
-    exit 1
-  fi
-}
-
 assert_contains() {
-  local haystack="$1"
-  local needle="$2"
-
-  if ! printf '%s\n' "$haystack" | grep -Fq "$needle"; then
-    printf 'expected output to contain: %s\n' "$needle" >&2
-    exit 1
-  fi
+  case "$1" in
+    *"$2"*) ;;
+    *)
+      printf 'expected output to contain: %s\noutput was:\n%s\n' "$2" "$1" >&2
+      exit 1
+      ;;
+  esac
 }
 
-stub_command() {
-  local name="$1"
-  printf '#!/usr/bin/env sh\nexit 0\n' > "$tmp/bin/$name"
-  chmod +x "$tmp/bin/$name"
+assert_exists() {
+  [ -e "$1" ] || {
+    printf 'expected path to exist: %s\n' "$1" >&2
+    exit 1
+  }
+}
+
+assert_not_exists() {
+  [ ! -e "$1" ] || {
+    printf 'expected path not to exist: %s\n' "$1" >&2
+    exit 1
+  }
+}
+
+git_template_hooks_seed_future_repos() {
+  local home="$tmp/home-template"
+  local repo="$tmp/future-repo"
+  mkdir -p "$home"
+
+  HOME="$home" bash "$ROOT/scripts/install.sh" --non-interactive --tools codex >/dev/null
+
+  HOME="$home" git -c init.defaultBranch=main init "$repo" >/dev/null
+  assert_exists "$repo/.git/hooks/post-checkout"
+
+  HOME="$home" "$home/.agents/scripts/seed-project-instructions.sh" --tools codex "$repo"
+  assert_exists "$repo/AGENTS.md"
+  assert_not_exists "$repo/CLAUDE.md"
+}
+
+current_repo_hook_wraps_existing_hook_and_seeds_selected_files() {
+  local home="$tmp/home-current"
+  local repo="$tmp/current-repo"
+  local hook
+  mkdir -p "$home"
+  git -c init.defaultBranch=main init "$repo" >/dev/null
+  hook="$repo/.git/hooks/post-checkout"
+  printf '#!/usr/bin/env bash\nprintf custom-hook\\n\n' > "$hook"
+  chmod +x "$hook"
+
+  HOME="$home" bash "$ROOT/scripts/install.sh" --non-interactive --tools claude --repo "$repo" >/dev/null
+
+  assert_exists "$repo/CLAUDE.md"
+  assert_not_exists "$repo/AGENTS.md"
+  assert_contains "$(cat "$hook")" "TOKEN_SAVER_MANAGED_HOOK_BEGIN"
+  assert_contains "$(cat "$hook")" ".token-saver-backup"
+
+  HOME="$home" bash "$ROOT/scripts/install.sh" --non-interactive --uninstall >/dev/null
+  assert_contains "$(cat "$hook")" "custom-hook"
+}
+
+seeder_skips_existing_files_and_overwrite_creates_backup() {
+  local home="$tmp/home-overwrite"
+  local repo="$tmp/overwrite-repo"
+  mkdir -p "$home"
+  HOME="$home" bash "$ROOT/scripts/install.sh" --non-interactive --tools codex >/dev/null
+  git -c init.defaultBranch=main init "$repo" >/dev/null
+  printf 'custom\n' > "$repo/AGENTS.md"
+
+  HOME="$home" "$home/.agents/scripts/seed-project-instructions.sh" --tools codex "$repo"
+  assert_contains "$(cat "$repo/AGENTS.md")" "custom"
+
+  HOME="$home" "$home/.agents/scripts/seed-project-instructions.sh" --tools codex --overwrite "$repo"
+  assert_contains "$(cat "$repo/AGENTS.md")" "Project AGENTS.md"
+  ls "$repo"/AGENTS.md.token-saver-backup-* >/dev/null
 }
 
 bootstrap_rejects_tampered_archive() {
-  local archive script output status
-
-  mkdir -p "$tmp/bootstrap/token-saver-setup-main/scripts"
-  cat > "$tmp/bootstrap/token-saver-setup-main/scripts/install.sh" <<'SH'
-#!/usr/bin/env bash
-printf 'unexpected install execution\n'
-exit 0
-SH
-  chmod +x "$tmp/bootstrap/token-saver-setup-main/scripts/install.sh"
-  archive="$tmp/tampered.tar.gz"
-  tar -czf "$archive" -C "$tmp/bootstrap" token-saver-setup-main
-
-  script="$tmp/bootstrap.sh"
-  sed "s|^ARCHIVE_URL=.*|ARCHIVE_URL=\"file://$archive\"|" "$ROOT/scripts/bootstrap.sh" > "$script"
-  chmod +x "$script"
-
-  set +e
-  output="$(bash "$script" 2>&1)"
-  status=$?
-  set -e
-
-  if [ "$status" = "0" ]; then
-    printf 'tampered bootstrap archive was accepted\n' >&2
-    printf '%s\n' "$output" >&2
-    exit 1
-  fi
-  assert_contains "$output" "checksum"
-  assert_not_contains "$output" "unexpected install execution"
-}
-
-install_defaults_skip_unverified_remote_commands() {
-  local output
-
-  mkdir -p "$tmp/bin" "$tmp/home"
-  export HOME="$tmp/home"
-  export PATH="$tmp/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-  stub_command claude
-  stub_command codex
-  stub_command gemini
-  stub_command cursor
-  stub_command npx
-
-  output="$(bash "$ROOT/scripts/install.sh" --dry-run --non-interactive)"
-  assert_not_contains "$output" "curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh"
-  assert_not_contains "$output" "claude plugin marketplace add JuliusBrussee/caveman"
-  assert_not_contains "$output" "claude plugin install caveman@caveman"
-  assert_not_contains "$output" "npx skills add JuliusBrussee/caveman"
-  assert_contains "$output" "skipping unverified"
-
-  output="$(bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --allow-unverified-downloads)"
-  assert_contains "$output" "curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh"
-  assert_contains "$output" "claude plugin marketplace add JuliusBrussee/caveman"
-  assert_contains "$output" "npx skills add JuliusBrussee/caveman -a codex --yes --global"
-}
-
-powershell_defaults_skip_unverified_remote_commands() {
-  command -v pwsh >/dev/null 2>&1 || return 0
-
-  local output
-  mkdir -p "$tmp/ps-bin" "$tmp/ps-home"
-  export HOME="$tmp/ps-home"
-  export TOKEN_SAVER_HOME="$tmp/ps-home"
-  export PATH="$tmp/ps-bin:/usr/bin:/bin:/usr/sbin:/sbin"
-  stub_command claude
-  stub_command codex
-  stub_command gemini
-  stub_command cursor
-  stub_command npx
-
-  output="$(pwsh -NoProfile -File "$ROOT/scripts/install.ps1" -DryRun -NonInteractive)"
-  assert_not_contains "$output" "latest rtk-x86_64-pc-windows-msvc.zip release asset"
-  assert_not_contains "$output" "claude plugin marketplace add JuliusBrussee/caveman"
-  assert_not_contains "$output" "npx skills add JuliusBrussee/caveman"
-  assert_contains "$output" "skipping unverified"
-
-  output="$(pwsh -NoProfile -File "$ROOT/scripts/install.ps1" -DryRun -NonInteractive -AllowUnverifiedDownloads)"
-  assert_contains "$output" "latest rtk-x86_64-pc-windows-msvc.zip release asset"
-  assert_contains "$output" "claude plugin marketplace add JuliusBrussee/caveman"
-  assert_contains "$output" "npx skills add JuliusBrussee/caveman -a codex --yes --global"
-}
-
-seed_rejects_symlinked_project_root() {
-  local scope outside templates
-
-  scope="$tmp/projects"
-  outside="$tmp/outside"
-  templates="$tmp/templates"
-  mkdir -p "$scope" "$outside" "$templates"
-  ln -s "$outside" "$scope/example"
-  printf '# Claude\n' > "$templates/CLAUDE.md"
-  printf '# Codex\n' > "$templates/AGENTS.md"
-
-  PROJECT_SCOPE="$scope" CLAUDE_TEMPLATE="$templates/CLAUDE.md" CODEX_TEMPLATE="$templates/AGENTS.md" \
-    bash "$ROOT/scripts/seed-project-instructions.sh" "$scope/example/src"
-
-  if [ -e "$outside/CLAUDE.md" ] || [ -e "$outside/AGENTS.md" ] || [ -e "$outside/.gitignore" ]; then
-    printf 'seed project wrote through symlinked project root\n' >&2
-    exit 1
-  fi
-}
-
-optimizer_rejects_symlinked_targets() {
-  local project outside
-
-  project="$tmp/safe-project"
-  outside="$tmp/outside-target"
-  mkdir -p "$project/.claude" "$outside"
-  ln -s "$outside/gitignore" "$project/.gitignore"
-  ln -s "$outside/settings.local.json" "$project/.claude/settings.local.json"
-
-  bash "$ROOT/scripts/optimize-ai.sh" "$project"
-
-  if [ -e "$outside/gitignore" ] || [ -e "$outside/settings.local.json" ]; then
-    printf 'optimizer wrote through symlinked managed target\n' >&2
-    exit 1
-  fi
-}
-
-powershell_rejects_symlinked_paths() {
-  command -v pwsh >/dev/null 2>&1 || return 0
-
-  local scope outside templates project ps_project ps_outside
-
-  scope="$tmp/ps-projects"
-  outside="$tmp/ps-outside"
-  templates="$tmp/ps-templates"
-  mkdir -p "$scope" "$outside" "$templates"
-  ln -s "$outside" "$scope/example"
-  printf '# Claude\n' > "$templates/CLAUDE.md"
-  printf '# Codex\n' > "$templates/AGENTS.md"
-
-  PROJECT_SCOPE="$scope" CLAUDE_TEMPLATE="$templates/CLAUDE.md" CODEX_TEMPLATE="$templates/AGENTS.md" \
-    pwsh -NoProfile -File "$ROOT/scripts/seed-project-instructions.ps1" -Cwd "$scope/example/src"
-
-  if [ -e "$outside/CLAUDE.md" ] || [ -e "$outside/AGENTS.md" ] || [ -e "$outside/.gitignore" ]; then
-    printf 'PowerShell seed project wrote through symlinked project root\n' >&2
+  local archive="$tmp/archive.tar.gz"
+  printf 'tampered' > "$archive"
+  if TOKEN_SAVER_BOOTSTRAP_ARCHIVE="$archive" TOKEN_SAVER_BOOTSTRAP_SHA256="0000" bash "$ROOT/scripts/bootstrap.sh" --dry-run >"$tmp/bootstrap.out" 2>"$tmp/bootstrap.err"; then
+    printf 'tampered bootstrap archive unexpectedly succeeded\n' >&2
     exit 1
   fi
 
-  ps_project="$tmp/ps-safe-project"
-  ps_outside="$tmp/ps-outside-target"
-  mkdir -p "$ps_project/.claude" "$ps_outside"
-  ln -s "$ps_outside/gitignore" "$ps_project/.gitignore"
-  ln -s "$ps_outside/settings.local.json" "$ps_project/.claude/settings.local.json"
-
-  pwsh -NoProfile -File "$ROOT/scripts/optimize-ai.ps1" -Project "$ps_project"
-
-  if [ -e "$ps_outside/gitignore" ] || [ -e "$ps_outside/settings.local.json" ]; then
-    printf 'PowerShell optimizer wrote through symlinked managed target\n' >&2
-    exit 1
-  fi
+  assert_contains "$(cat "$tmp/bootstrap.err")" "setup archive checksum mismatch"
 }
 
-powershell_seeds_regular_project() {
-  command -v pwsh >/dev/null 2>&1 || return 0
-
-  local scope templates project
-
-  scope="$tmp/ps-regular-projects"
-  templates="$tmp/ps-regular-templates"
-  project="$scope/example"
-  mkdir -p "$project" "$templates"
-  printf '# Claude\n' > "$templates/CLAUDE.md"
-  printf '# Codex\n' > "$templates/AGENTS.md"
-
-  PROJECT_SCOPE="$scope" CLAUDE_TEMPLATE="$templates/CLAUDE.md" CODEX_TEMPLATE="$templates/AGENTS.md" \
-    pwsh -NoProfile -File "$ROOT/scripts/seed-project-instructions.ps1" -Cwd "$project/src"
-
-  test -f "$project/CLAUDE.md"
-  test -f "$project/AGENTS.md"
-  test -f "$project/.gitignore"
-  test -f "$project/.codexignore"
-  test -f "$project/.claude/settings.local.json"
-}
-
+git_template_hooks_seed_future_repos
+current_repo_hook_wraps_existing_hook_and_seeds_selected_files
+seeder_skips_existing_files_and_overwrite_creates_backup
 bootstrap_rejects_tampered_archive
-install_defaults_skip_unverified_remote_commands
-powershell_defaults_skip_unverified_remote_commands
-seed_rejects_symlinked_project_root
-optimizer_rejects_symlinked_targets
-powershell_rejects_symlinked_paths
-powershell_seeds_regular_project
 
 printf 'security-regression.sh: OK\n'

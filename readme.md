@@ -1,183 +1,131 @@
 # Token Saver Setup
 
-Installer and project seeding scripts for token-efficient AI agent workspaces.
+macOS-only instruction-file manager for Codex and Claude Code.
 
-This repository is not a general Apple Silicon setup checklist. It is the
-automation layer that installs and maintains AI-agent instruction files,
-project templates, Claude seeding hooks, RTK/Caveman helper configuration, and
-common ignore boundaries for Claude, Codex, and related tools.
+This project installs agent instruction files and Git hook automation. It does
+not install command-line tools, package managers, editor extensions, plugins,
+skills, external protocol servers, or other third-party software.
 
-## What It Does
+## What It Installs
 
-- Installs global instruction files:
-  - `~/.claude/CLAUDE.md`
-  - `~/.codex/AGENTS.md`
-- Installs project instruction templates:
-  - `~/.claude/CLAUDE.project-template.md`
-  - `~/.codex/AGENTS.project-template.md`
-- Installs project seeding scripts under `~/.agents/scripts/`.
-- Wires a Claude `SessionStart` hook so new sessions can seed project-local
-  `CLAUDE.md` and `AGENTS.md` files when they are missing.
-- Installs or initializes optional RTK integration for selected AI apps.
-- Writes Caveman default configuration and can run legacy Caveman installers
-  when explicitly allowed.
-- Installs AI ignore boundary helpers for generated files, secrets,
-  dependencies, logs, coverage, local databases, and binary assets.
-- Records installer-owned artifacts in `~/.agents/install_manifest.json` for
-  safer uninstall behavior.
+- Codex global instructions: `~/.codex/AGENTS.md`
+- Codex project template: `~/.codex/AGENTS.project-template.md`
+- Claude Code global instructions: `~/.claude/CLAUDE.md`
+- Claude Code project template: `~/.claude/CLAUDE.project-template.md`
+- Shared seeding script: `~/.agents/scripts/seed-project-instructions.sh`
+- Git template hooks:
+  - `~/.agents/git-template/hooks/post-checkout`
+  - `~/.agents/git-template/hooks/post-merge`
+
+The Git template hooks seed instruction files into repositories created after
+installation. During interactive install, the script also offers to seed and
+install managed hooks in the current repository when it is run from inside one.
+
+## What It Does Not Install
+
+This project does not install or configure third-party tools. Optional agent
+ecosystem tools must be installed manually by the user outside this installer.
+
+The installer never runs package-manager setup commands and never configures
+external services. Git hooks created by this project only manage `AGENTS.md`
+and `CLAUDE.md` files.
 
 ## Requirements
 
-- macOS, Linux, or Windows PowerShell environment.
-- Bash for `scripts/install.sh`.
-- PowerShell 7+ for `scripts/install.ps1` on Windows or parity checks.
-- Node for structured JSON edits to Claude settings and install manifests.
-- Optional: Homebrew or an existing `rtk` binary for RTK setup.
-- Optional: `expect` for interactive prompt regression tests.
+- macOS
+- Bash
+- Git
+- `curl` or `wget` only when using `scripts/bootstrap.sh`
+
+No JavaScript runtime, package manager, Python runtime, or external agent tool
+is required by the local installer.
 
 ## Quick Start
 
-Preview the default install without changing files:
-
-```bash
-bash scripts/install.sh --dry-run --non-interactive
-```
-
-Run the default shell installer:
+Interactive install:
 
 ```bash
 bash scripts/install.sh
 ```
 
-Run the PowerShell installer:
-
-```powershell
-pwsh -NoProfile -File ./scripts/install.ps1
-```
-
-Use a narrower project scope for project seeding:
+Codex only:
 
 ```bash
-bash scripts/install.sh --project-scope "$HOME/Documents/git"
+bash scripts/install.sh --tools codex
 ```
 
-## One-Command Install
-
-Use these commands when installing from the published pinned snapshot instead
-of a local clone.
-
-Shell:
+Claude Code only:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash
+bash scripts/install.sh --tools claude
 ```
 
-PowerShell:
-
-```powershell
-irm https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.ps1 | iex
-```
-
-Non-interactive shell install:
+Both tools:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash -s -- --non-interactive
+bash scripts/install.sh --tools both
 ```
 
-Remote uninstall:
+Non-interactive preview:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/49253c77fb7b32786c6d63e89d38ea763310a25a/scripts/bootstrap.sh | bash -s -- --uninstall
+bash scripts/install.sh --dry-run --non-interactive --tools both
 ```
 
-## Remote Bootstrap
+Non-interactive mode requires `--tools codex`, `--tools claude`, or
+`--tools both` so automation cannot silently choose a target.
 
-The bootstrap scripts are thin entry points. They download a pinned archive,
-verify its checksum, and then execute the installer from that archive.
+## Git Hook Behavior
 
-Shell:
+The installer writes managed hooks into `~/.agents/git-template/hooks/` and sets
+the global Git template directory:
 
 ```bash
-bash scripts/bootstrap.sh --dry-run
+git config --global init.templateDir ~/.agents/git-template
 ```
 
-PowerShell:
+New repositories created with `git init` receive the managed hooks. The hooks
+run the shared seeding script, detect the repository root, and create the
+selected project instruction files when they are missing:
 
-```powershell
-pwsh -NoProfile -File ./scripts/bootstrap.ps1 -DryRun
+| Selected Tool | Project File |
+|---------------|--------------|
+| Codex | `AGENTS.md` |
+| Claude Code | `CLAUDE.md` |
+| Both | `AGENTS.md` and `CLAUDE.md` |
+
+Existing project instruction files are skipped by default. When overwrite is
+explicitly requested, the old file is backed up before replacement.
+
+If a hook already exists, the installer backs it up and writes a wrapper hook
+that runs the previous hook before the managed seeding command. Managed markers
+prevent duplicate hook entries when the installer is rerun.
+
+## Current Repository Setup
+
+To seed and install managed hooks in an existing repository:
+
+```bash
+bash scripts/install.sh --tools both --repo /path/to/repo
 ```
 
-Update the pinned commit and checksum in the bootstrap scripts together when
-publishing a new remote installer snapshot.
+Interactive installs ask whether to apply the same setup to the current
+repository when the installer is run from inside a Git worktree.
 
-## Main Options
+## Options
 
-Shell options use long flags. PowerShell uses the same names in PascalCase.
-
-| Purpose | Shell |
-|---------|-------|
-| Non-interactive defaults | `--non-interactive` |
-| Preview actions | `--dry-run` |
-| Set project seed scope | `--project-scope <path>` |
-| Overwrite managed files | `--overwrite` |
-| Overwrite global instructions | `--overwrite-global-instructions` |
-| Overwrite project templates | `--overwrite-project-templates` |
-| Skip RTK | `--skip-rtk` |
-| Skip Caveman | `--skip-caveman` |
-| Select AI apps | `--ai-apps claude,codex` |
-| Select asset groups | `--assets rtk,caveman,global-instructions,project-instructions,ai-ignore-boundaries` |
-| Select Caveman mode | `--caveman-mode ultra` |
-| Permit legacy remote installers | `--allow-unverified-downloads` |
-| Uninstall | `--uninstall` |
-| Uninstall selected components | `--uninstall-components <list>` |
-
-By default, unverified RTK and Caveman remote fallback commands are skipped.
-Use `--allow-unverified-downloads` only when you intentionally accept those
-legacy remote installer paths.
-
-## Components
-
-### Global Instructions
-
-Templates in `templates/*.global.md` install to the user's Claude and Codex
-global instruction locations. Existing files are skipped by default unless an
-overwrite flag is provided.
-
-### Project Templates
-
-Templates in `templates/*.project-template.md` install to the user's Claude and
-Codex template locations. The seeding hook uses these templates to create
-project-local instruction files when missing.
-
-### Project Seeding
-
-`scripts/seed-project-instructions.sh` and
-`scripts/seed-project-instructions.ps1` identify the first-level project under
-`PROJECT_SCOPE` and create missing `CLAUDE.md` and `AGENTS.md` files from the
-installed templates.
-
-The shell seeder also invokes `optimize-ai.sh` when available so local ignore
-boundaries are present.
-
-### AI Ignore Boundaries
-
-`scripts/optimize-ai.*` maintains common token-bloat exclusions in:
-
-- `.gitignore`
-- `.codexignore`
-- `.claude/settings.local.json`
-
-It skips symlinked project roots and symlinked managed targets.
-
-### RTK
-
-The installer can initialize RTK for selected AI apps, disable RTK telemetry,
-and wire the Claude `PreToolUse` hook for `rtk hook claude`.
-
-### Caveman
-
-The installer writes `~/.config/caveman/config.json` with the selected default
-mode. Legacy Caveman install commands require `--allow-unverified-downloads`.
+| Option | Purpose |
+|--------|---------|
+| `--tools codex` | Install only Codex instruction files and hooks. |
+| `--tools claude` | Install only Claude Code instruction files and hooks. |
+| `--tools both` | Install both instruction-file sets. |
+| `--repo <path>` | Also seed and install managed hooks in an existing repo. |
+| `--dry-run` | Print actions without changing files. |
+| `--non-interactive` | Disable prompts; requires `--tools`. |
+| `--overwrite` | Back up and replace existing target files. |
+| `--overwrite-global-instructions` | Back up and replace global instruction files. |
+| `--overwrite-project-templates` | Back up and replace project templates. |
+| `--uninstall` | Remove installer-managed files and hook entries. |
 
 ## Uninstall
 
@@ -187,71 +135,43 @@ Preview uninstall:
 bash scripts/install.sh --dry-run --uninstall
 ```
 
-Non-interactive uninstall of all available components:
+Run uninstall:
 
 ```bash
 bash scripts/install.sh --non-interactive --uninstall
 ```
 
-Target selected components:
+Uninstall removes only artifacts recorded by this installer: managed global
+instruction files, project templates, the shared seeding script, Git template
+hooks, managed current-repo hook entries, and this installer’s
+`init.templateDir` setting. It does not delete repository-local `AGENTS.md` or
+`CLAUDE.md` files after they have been created.
+
+## Remote Bootstrap
+
+The bootstrap script downloads a pinned archive, verifies its checksum, and
+executes the local Bash installer from that archive.
 
 ```bash
-bash scripts/install.sh --uninstall --uninstall-components project-templates,seeding
+bash scripts/bootstrap.sh --dry-run --non-interactive --tools both
 ```
 
-Supported component names include:
+Update the pinned commit and checksum together before publishing a new remote
+installer snapshot.
 
-- `global-instructions`
-- `reset-global-instructions`
-- `project-instructions`
-- `project-templates`
-- `seeding`
-- `ignore-optimizer`
-- `rtk`
-- `caveman`
+## Development
 
-When the install manifest exists, uninstall uses it to distinguish
-installer-created artifacts from user-owned files. Legacy fallback cleanup is
-scoped to known managed paths.
-
-## Tests
-
-Run the full shell test set:
-
-```bash
-for test in tests/*.sh; do bash "$test"; done
-```
-
-Common focused checks:
-
-```bash
-bash tests/install-dry-run.sh
-bash tests/security-regression.sh
-bash tests/install-visible-output.sh
-bash tests/install-uninstall-prompt.sh
-bash tests/ai-ignore-smoke.sh
-bash tests/rtk-claude-hook.sh
-```
-
-Useful syntax checks:
+Run syntax checks:
 
 ```bash
 bash -n scripts/*.sh tests/*.sh
 ```
 
-PowerShell parser check:
+Run the regression suite:
 
-```powershell
-pwsh -NoProfile -Command '$errors = $null; foreach ($file in Get-ChildItem scripts/*.ps1) { $null = [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$null, [ref]$errors); if ($errors.Count) { $errors; exit 1 } }'
+```bash
+for test in tests/*.sh; do bash "$test"; done
 ```
 
-## Safety Model
-
-- Existing global instructions and project templates are skipped by default.
-- Overwrites require explicit flags.
-- Bootstrap archives are checksum verified before execution.
-- Symlinked project roots and managed ignore targets are not written through.
-- `.env` files and generated dependency/build artifacts are excluded from
-  agent context by default.
-- Installer actions are reported in sections so skipped files and warnings stay
-  visible.
+There is no compiled build and no project-native formatter configured. Preserve
+the existing shell and Markdown style when editing files.

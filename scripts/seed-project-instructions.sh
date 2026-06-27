@@ -1,81 +1,86 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DEFAULT_PROJECT_SCOPE="{{PROJECT_SCOPE}}"
-case "$DEFAULT_PROJECT_SCOPE" in
-  "{{"*"}}") DEFAULT_PROJECT_SCOPE="$HOME/Documents" ;;
-esac
+tools="${TOKEN_SAVER_TOOLS:-both}"
+overwrite=0
+cwd="$PWD"
 
-SCOPE="${PROJECT_SCOPE:-$DEFAULT_PROJECT_SCOPE}"
-SCOPE_INPUT="$SCOPE"
-CLAUDE_TEMPLATE="${CLAUDE_TEMPLATE:-$HOME/.claude/CLAUDE.project-template.md}"
-CODEX_TEMPLATE="${CODEX_TEMPLATE:-$HOME/.codex/AGENTS.project-template.md}"
-cwd="${1:-$PWD}"
-dry_run="${DRY_RUN:-0}"
-
-resolve_dir() {
-  (cd -P "$1" 2>/dev/null && pwd)
+die() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
 }
 
-SCOPE="$(resolve_dir "$SCOPE")" || exit 0
-
-case "$cwd/" in
-  "$SCOPE_INPUT"/*/) rel="${cwd#"$SCOPE_INPUT"/}" ;;
-  "$SCOPE"/*/) rel="${cwd#"$SCOPE"/}" ;;
-  *) exit 0 ;;
-esac
-
-child="${rel%%/*}"
-[ -n "$child" ] || exit 0
-
-case "$child" in
-  .*) exit 0 ;;
-esac
-
-project="$SCOPE/$child"
-[ ! -L "$project" ] || exit 0
-[ -d "$project" ] || exit 0
-project="$(resolve_dir "$project")" || exit 0
-
-case "$project/" in
-  "$SCOPE"/*/) ;;
-  *) exit 0 ;;
-esac
-
-target_is_safe() {
-  local target="$1"
-  local parent current
-
-  [ ! -L "$target" ] || return 1
-  parent="$(dirname "$target")"
-  current="$parent"
-  while [ "$current" != "$project" ] && [ "$current" != "/" ] && [ -n "$current" ]; do
-    [ ! -L "$current" ] || return 1
-    current="$(dirname "$current")"
-  done
-  return 0
+normalize_tools() {
+  local value="$1"
+  value="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+  case "$value" in
+    codex|agent|agents) printf 'codex' ;;
+    claude|claude-code|claudecode) printf 'claude' ;;
+    both|all|codex,claude|claude,codex) printf 'both' ;;
+    *) die "invalid --tools value: $1" ;;
+  esac
 }
 
-copy_if_missing() {
+tool_enabled() {
+  case "$tools:$1" in
+    both:*|codex:codex|claude:claude) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+backup_path() {
+  local path="$1"
+  printf '%s.token-saver-backup-%s' "$path" "$(date +%Y%m%d%H%M%S)"
+}
+
+copy_instruction_file() {
   local template="$1"
   local target="$2"
+  local backup
 
   [ -f "$template" ] || return 0
-  target_is_safe "$target" || return 0
-  [ ! -e "$target" ] || return 0
+  [ ! -L "$target" ] || return 0
 
-  if [ "$dry_run" = "1" ]; then
-    printf 'would create %s from %s\n' "$target" "$template"
-    return 0
+  if [ -e "$target" ]; then
+    if [ "$overwrite" = "1" ]; then
+      backup="$(backup_path "$target")"
+      cp "$target" "$backup"
+    else
+      return 0
+    fi
   fi
 
   cp "$template" "$target"
 }
 
-copy_if_missing "$CLAUDE_TEMPLATE" "$project/CLAUDE.md"
-copy_if_missing "$CODEX_TEMPLATE" "$project/AGENTS.md"
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --tools)
+      [ "$#" -gt 1 ] || die "missing value for --tools"
+      tools="$(normalize_tools "$2")"
+      shift
+      ;;
+    --tools=*) tools="$(normalize_tools "${1#*=}")" ;;
+    --overwrite) overwrite=1 ;;
+    --help|-h)
+      printf 'Usage: seed-project-instructions.sh [--tools codex|claude|both] [--overwrite] [path]\n'
+      exit 0
+      ;;
+    --*) die "unknown option: $1" ;;
+    *) cwd="$1" ;;
+  esac
+  shift
+done
 
-optimizer="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/optimize-ai.sh"
-if [ -f "$optimizer" ]; then
-  bash "$optimizer" "$project"
+tools="$(normalize_tools "$tools")"
+repo_root="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || true)"
+[ -n "$repo_root" ] || exit 0
+[ ! -L "$repo_root" ] || exit 0
+
+if tool_enabled codex; then
+  copy_instruction_file "$HOME/.codex/AGENTS.project-template.md" "$repo_root/AGENTS.md"
+fi
+
+if tool_enabled claude; then
+  copy_instruction_file "$HOME/.claude/CLAUDE.project-template.md" "$repo_root/CLAUDE.md"
 fi

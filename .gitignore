@@ -18,7 +18,6 @@ dayarc-app/data/*.sqlite-*
 /playwright/.cache/
 /playwright/.auth/
 
-# Exclude Ruflo Vector Databases from LeanCTX AST indexing
-.ruflo/
-agentdb.rvf
-agentdb.rvf.lock
+# Local agent caches
+.agents/
+.cache/
