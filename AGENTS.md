@@ -174,26 +174,64 @@ ignore files and verify them with `git check-ignore -v`.
 
 # Development Workflow
 
-This repository inherits global workflow requirements from `~/.codex/AGENTS.md`.
-Use the narrower project rules below when they apply.
+This repository inherits the global session requirements:
+
+- Automatically load LeanCTX for AST-aware workspace scoping.
+- Automatically enable the Ruflo harness for daemon workers and trajectory
+  learning.
+- Automatically activate the Caveman skill for conversational efficiency.
+
+When software development work is requested, follow the Superpowers workflow
+where relevant.
 
 ## Standard Workflow
 
-### 1. Clarify Scope
+### 1. Brainstorming
 
-- For docs, ignore, and template work, identify the exact file family before
-  editing.
-- For installer or hook changes, state whether the change affects global files,
-  project template files, Git template hooks, current-repo hooks, uninstall, or
-  tests.
+- Refine the idea.
+- Obtain design approval when the requested change is ambiguous, broad, or
+  architectural.
+- Save design specifications using the current system date to:
 
-### 2. Plan Only When Useful
+```text
+docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md
+```
 
-- Use a written plan for multi-file installer, hook, template, or test changes.
-- Skip formal planning for narrow docs-only edits, typo fixes, and one-file
-  configuration updates.
+---
 
-### 3. Isolate Runtime State
+### 2. Writing Plans
+
+- Break work into small, verifiable tasks.
+- Include exact file paths.
+- Define required tests and verification commands.
+- Use project-native formatter, lint, and test commands.
+- Save implementation plans using the current system date to:
+
+```text
+docs/superpowers/plans/YYYY-MM-DD-<feature>.md
+```
+
+---
+
+### 3. Using Git Worktrees
+
+- Create an isolated worktree when appropriate.
+- Begin from a clean test baseline.
+- Do not create worktrees for trivial one-file fixes unless requested.
+
+---
+
+### 4. Multi-Agent Orchestration (Optional)
+
+- Feed the generated implementation plan files directly into the `ruflo-swarm`
+  engine for execution.
+- **Execution Topology:** Allow Ruflo to execute independent, parallel subagents
+  across the workspace using isolated git worktrees. Highly dependent tasks or
+  sequential logic changes must be processed linearly.
+- Use review checkpoints at the end of major milestones.
+- Keep each subagent tightly focused on one atomic task.
+
+#### Runtime State Boundaries
 
 - Keep `~/.ruflo/` as local machine runtime state, and keep `.ruflo`,
   `.claude-flow`, `.swarm`, `agentdb.rvf`, `agentdb.rvf.lock`, and
@@ -201,18 +239,38 @@ Use the narrower project rules below when they apply.
 - Do not move or delete runtime databases while Ruflo or Codex MCP processes
   have them open.
 
-### 4. Multi-Agent Orchestration
+#### Ruflo Dispatch Policy
 
-- Use Ruflo MCP orchestration only when persistent agents, swarm coordination,
-  or AgentDB memory are materially useful.
-- Do not spawn additional agents for docs-only work, ignore-file maintenance,
-  formatting, or trivial single-file changes.
+For complete software development work, use Superpowers to clarify or write the
+implementation plan, then dispatch suitable work through Ruflo.
+
+Spawn Ruflo agents when the plan includes any of these conditions:
+
+- three or more separable implementation, test, documentation, or review tasks
+- changes spanning multiple subsystems
+- parallel investigation that can reduce elapsed time
+- persistent task state that should survive across turns or sessions
+- long-running debugging, migration, or verification work
+- explicit review checkpoints between implementation phases
+
+Default flow:
+
+```text
+1. Use Superpowers to clarify the goal or write the implementation plan.
+2. Split the plan into atomic tasks with clear file ownership and verification.
+3. Spawn Ruflo-tracked agents for independent tasks.
+4. Keep sequential or tightly coupled work in the main agent.
+5. Use the main agent as supervisor and final reviewer.
+6. Store operational findings in Ruflo AgentDB.
+```
+
+Do not spawn Ruflo agents for docs-only edits, one-file fixes, simple config
+changes, command output checks, formatting, linting, or tasks where all steps
+must be performed sequentially.
 
 #### Model Routing
 
-Default to the least expensive execution path that can complete the task
-accurately. Keeping work inline is cheaper than spawning an agent when the task
-is small, deterministic, and low-risk.
+Default to the least expensive model capable of completing the task accurately.
 
 `AGENTS.md` cannot change the active Codex session model by itself. These rules
 apply when deciding whether to stay inline, change the Codex model with the
@@ -220,6 +278,7 @@ Codex UI or CLI, or route work through a Ruflo agent. Do not document or request
 non-Codex vendor model aliases for Codex work.
 
 | Task Type | Default Execution | Codex Model Guidance |
+|-----------|-------------------|----------------------|
 |-----------|-------------------|----------------------|
 | Docs-only edits, ignore-file updates, typo fixes, command checks | Inline, no spawned agent | Keep current model; do not escalate |
 | Targeted search, summarization, simple verification, low-risk cleanup | Inline first; spawned agent only if useful for persistence | Prefer `gpt-5.4-mini` when selecting a cheaper Codex model |
@@ -243,17 +302,53 @@ Avoid stronger or higher-reasoning Codex models for:
 - trivial single-file edits
 - repository status checks or command output inspection
 
+Avoid spawning additional agents for the same low-risk task classes unless
+persistent task state or parallelism is materially useful.
+
 When using Ruflo, record the routing reason in the task or agent prompt so the
 model choice is auditable later.
 
-### 5. Test-Driven Changes
+---
 
-- For non-trivial installer or hook behavior changes, add or update a shell test
-  first when practical.
-- For docs-only and ignore-boundary changes, verify with `git diff --check` and
-  `git check-ignore -v` instead of running unrelated checks.
+### 5. Test-Driven Development
 
-### 6. Branch Completion
+This repository prefers TDD by default for non-trivial code changes.
+
+Follow the Red -> Green -> Refactor cycle when practical:
+
+1. Write a failing test.
+2. Verify the test fails inside Ruflo's sandbox harness. If a subagent
+   encounters sequential test loop failures, route the telemetry directly into
+   Superpowers' `systematic-debugging` engine.
+3. Implement the minimum code required.
+4. Refactor while keeping tests green.
+
+For trivial changes, documentation-only edits, or config-only changes, use the
+most relevant verification command instead.
+
+For non-trivial installer or hook behavior changes, add or update a shell test
+first when practical.
+
+For docs-only and ignore-boundary changes, verify with `git diff --check` and
+`git check-ignore -v` instead of running unrelated checks.
+
+---
+
+### 6. Code Review & Branch Completion
+
+Workflow:
+
+```text
+Request Code Review
+        ↓
+Address Feedback
+        ↓
+Run Verification
+        ↓
+Merge / Create PR
+        ↓
+Cleanup Branches
+```
 
 - Review `git diff` before reporting completion.
 - Mention unrelated dirty files separately; do not revert or normalize them
