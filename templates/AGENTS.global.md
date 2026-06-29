@@ -76,7 +76,10 @@
 
 ### Superpowers
 
-Invoke automatically **only** for software development work:
+Superpowers is optional. Invoke it only when the user explicitly requests it or
+when the active session already requires it.
+
+Use Superpowers as a structured workflow layer for:
 
 - writing code
 - editing code
@@ -87,7 +90,7 @@ Invoke automatically **only** for software development work:
 - code review
 - creating or editing skills
 
-Do **not** invoke Superpowers automatically for:
+Do not invoke Superpowers by default for:
 
 - ordinary questions
 - explanations
@@ -96,8 +99,6 @@ Do **not** invoke Superpowers automatically for:
 - installation verification
 - process inspection
 - other non-development tasks
-
-Unless explicitly requested.
 
 ### Sandbox Boundary
 

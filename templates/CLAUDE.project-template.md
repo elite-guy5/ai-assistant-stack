@@ -105,43 +105,18 @@ This repository inherits the global Claude Code session requirements:
 - Use LeanCTX for AST-aware workspace scoping and compressed context when available.
 - Use Ruflo for daemon workers, task orchestration, swarm state, and trajectory learning when available and useful.
 - Activate Caveman for conversational efficiency while keeping code, commands, paths, APIs, flags, and errors exact.
-- Use Superpowers only for software development work unless explicitly requested.
+- Treat Superpowers as optional. Invoke it only when explicitly requested or
+  when the active session already requires it.
+
+When Superpowers is manually invoked, follow the active Superpowers skill
+workflow, including its spec, plan, worktree, and verification requirements.
+
+When Superpowers is not in use, follow this repository's normal development and
+verification rules.
 
 ## Standard Workflow
 
-### 1. Brainstorming
-
-- Refine the idea.
-- Obtain design approval when the requested change is ambiguous, broad, or architectural.
-- Save design specifications using the current system date to:
-
-```text
-docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md
-```
-
-Skip this step for trivial fixes, simple documentation edits, and direct verification requests.
-
-### 2. Writing Plans
-
-- Break work into small, verifiable tasks.
-- Include exact file paths.
-- Define required tests and verification commands.
-- Use project-native formatter, lint, typecheck, and test commands.
-- Save implementation plans using the current system date to:
-
-```text
-docs/superpowers/plans/YYYY-MM-DD-<feature>.md
-```
-
-Skip saved plan documents unless the work is broad enough to benefit from a durable plan.
-
-### 3. Using Git Worktrees
-
-- Create an isolated worktree when appropriate for risky or long-running work.
-- Begin from a clean test baseline when the task can affect behavior.
-- Do not create worktrees for trivial one-file fixes unless requested.
-
-### 4. Multi-Agent Orchestration
+### 1. Multi-Agent Orchestration
 
 - Use Ruflo or Claude subagents only when persistent task state, parallel investigation, or isolation materially helps.
 - Allow independent subagents to work in parallel only when their tasks do not share mutable files or sequential dependencies.
@@ -151,9 +126,11 @@ Skip saved plan documents unless the work is broad enough to benefit from a dura
 
 #### Ruflo Dispatch Policy
 
-For complete software development work, use Superpowers to clarify or write the
-implementation plan, then dispatch suitable work through Ruflo or Claude
-subagents.
+Ruflo can be used with or without Superpowers. When Superpowers is manually
+invoked for non-trivial, separable work, dispatch suitable Ruflo-tracked agents
+or Claude subagents. When Superpowers is not in use, dispatch agents directly
+when persistent task state, parallel investigation, isolation, or review
+checkpoints materially help.
 
 Spawn Ruflo-tracked agents when the plan includes any of these conditions:
 
@@ -167,8 +144,8 @@ Spawn Ruflo-tracked agents when the plan includes any of these conditions:
 Default flow:
 
 ```text
-1. Use Superpowers to clarify the goal or write the implementation plan.
-2. Split the plan into atomic tasks with clear file ownership and verification.
+1. Clarify the goal or use the active Superpowers plan when one exists.
+2. Split the work into atomic tasks with clear file ownership and verification.
 3. Spawn Ruflo-tracked agents for independent tasks.
 4. Keep sequential or tightly coupled work in the main agent.
 5. Use the main agent as supervisor and final reviewer.
@@ -212,7 +189,7 @@ Avoid stronger or higher-cost Claude models for:
 
 When model availability is unclear, use Claude Code's `/model` picker or current settings instead of guessing exact model IDs.
 
-### 5. Test-Driven Development
+### 2. Test-Driven Development
 
 This repository prefers TDD by default for non-trivial code changes.
 
@@ -225,7 +202,7 @@ Follow the Red, Green, Refactor cycle when practical:
 
 For trivial changes, documentation-only edits, or config-only changes, use the most relevant verification command instead.
 
-### 6. Code Review and Branch Completion
+### 3. Code Review and Branch Completion
 
 Workflow:
 

@@ -98,45 +98,21 @@ This repository inherits the global session requirements:
 - Automatically enable the Ruflo harness for daemon workers and trajectory learning.
 - Automatically activate the Caveman skill for conversational efficiency.
 
-When software development work is requested, follow the Superpowers workflow where relevant.
+Superpowers is optional. Invoke it only when the user explicitly requests it or
+when the active session already requires it. Otherwise use this repository's
+standard workflow and verification requirements.
+
+When Superpowers is manually invoked, follow the active Superpowers skill
+workflow, including its spec, plan, worktree, and verification requirements.
+
+When Superpowers is not in use, follow this repository's normal development and
+verification rules.
+
+---
 
 ## Standard Workflow
 
-### 1. Brainstorming
-
-- Refine the idea.
-- Obtain design approval when the requested change is ambiguous, broad, or architectural.
-- Save design specifications using the current system date to:
-
-```text
-docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md
-```
-
----
-
-### 2. Writing Plans
-
-- Break work into small, verifiable tasks.
-- Include exact file paths.
-- Define required tests and verification commands.
-- Use project-native formatter, lint, and test commands.
-- Save implementation plans using the current system date to:
-
-```text
-docs/superpowers/plans/YYYY-MM-DD-<feature>.md
-```
-
----
-
-### 3. Using Git Worktrees
-
-- Create an isolated worktree when appropriate.
-- Begin from a clean test baseline.
-- Do not create worktrees for trivial one-file fixes unless requested.
-
----
-
-### 4. Multi-Agent Orchestration (Optional)
+### 1. Multi-Agent Orchestration (Optional)
 
 - Feed the generated implementation plan files directly into the `ruflo-swarm` engine for execution.
 - **Execution Topology:** Allow Ruflo to execute independent, parallel subagents across the workspace using isolated git worktrees. Highly dependent tasks or sequential logic changes must be processed linearly.
@@ -145,8 +121,11 @@ docs/superpowers/plans/YYYY-MM-DD-<feature>.md
 
 #### Ruflo Dispatch Policy
 
-For complete software development work, use Superpowers to clarify or write the
-implementation plan, then dispatch suitable work through Ruflo.
+Ruflo can be used with or without Superpowers. When Superpowers is manually
+invoked for non-trivial, separable work, dispatch suitable Ruflo-tracked agents.
+When Superpowers is not in use, dispatch Ruflo agents directly when persistent
+task state, parallel investigation, isolation, or review checkpoints materially
+help.
 
 Spawn Ruflo agents when the plan includes any of these conditions:
 
@@ -160,8 +139,8 @@ Spawn Ruflo agents when the plan includes any of these conditions:
 Default flow:
 
 ```text
-1. Use Superpowers to clarify the goal or write the implementation plan.
-2. Split the plan into atomic tasks with clear file ownership and verification.
+1. Clarify the goal or use the active Superpowers plan when one exists.
+2. Split the work into atomic tasks with clear file ownership and verification.
 3. Spawn Ruflo-tracked agents for independent tasks.
 4. Keep sequential or tightly coupled work in the main agent.
 5. Use the main agent as supervisor and final reviewer.
@@ -210,14 +189,14 @@ persistent task state or parallelism is materially useful.
 
 ---
 
-### 5. Test-Driven Development
+### 2. Test-Driven Development
 
 This repository prefers TDD by default for non-trivial code changes.
 
 Follow the Red → Green → Refactor cycle when practical:
 
 1. Write a failing test.
-2. Verify the test fails inside Ruflo's sandbox harness. If a subagent encounters sequential test loop failures, route the telemetry directly into Superpowers' `systematic-debugging` engine.
+2. Verify the test fails inside Ruflo's sandbox harness. If a subagent encounters sequential test loop failures, use the active debugging workflow; when Superpowers is already in use, route the telemetry into its `systematic-debugging` workflow.
 3. Implement the minimum code required.
 4. Refactor while keeping tests green.
 
@@ -225,7 +204,7 @@ For trivial changes, documentation-only edits, or config-only changes, use the m
 
 ---
 
-### 6. Code Review & Branch Completion
+### 3. Code Review & Branch Completion
 
 Workflow:
 
@@ -250,7 +229,7 @@ Instruction precedence is:
 ```text
 Local AGENTS.md
         ↓
-Superpowers Skills
+Applicable skills, including Superpowers when invoked
         ↓
 Global ~/.codex/AGENTS.md
 ```
