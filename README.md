@@ -65,6 +65,19 @@ install managed hooks in the current repository when it is run from inside one.
   commands, tests, coding standards, project-specific rules, and context
   boundaries.
 
+## Manual Agent Stack Setup Guides
+
+The installer does not install LeanCTX, Ruflo, Caveman, Superpowers, MCP
+servers, plugins, or external agent tools. Use these guides when configuring
+those optional tools manually:
+
+- [Codex agent stack setup](docs/codex-agent-stack-setup.md) explains how to
+  configure LeanCTX, Ruflo, Caveman, and Superpowers so `AGENTS.md` files work
+  effectively without tool conflicts.
+- [Claude agent stack setup](docs/claude-agent-stack-setup.md) explains the
+  equivalent Claude Code setup for `CLAUDE.md`, Claude settings, MCP servers,
+  hooks, and skills.
+
 ## What It Does Not Install
 
 This project does not install or configure third-party tools. Optional agent
@@ -374,13 +387,17 @@ npx skills add superpowers -a codex
 
 ### Phase 6: Codebase Safety Boundaries
 
-If AgentDB, LeanCTX, or an Obsidian vault lives inside a repository, exclude
-their storage paths from source control and agent context:
+Prefer storing Ruflo AgentDB and RuVector state under `~/.ruflo/`, next to
+`~/.codex/`, rather than inside a project checkout. If compatibility symlinks or
+runtime state paths exist inside a repository, exclude them from source control
+and agent context:
 
 ```gitignore
+.ruflo
 .ruflo/
 agentdb.rvf
 agentdb.rvf.lock
+ruvector.db
 .obsidian/
 ```
 

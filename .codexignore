@@ -1,6 +1,7 @@
 # -- Secrets and local environment --
 .env
 .env.*
+.claude/settings.local.json
 
 # -- Logs and local caches --
 *.log
@@ -59,3 +60,12 @@ poetry.lock
 
 # -- Local agent caches --
 .agents/
+.ruflo
+.ruflo/
+.claude-flow/
+.claude-flow
+.swarm/
+.swarm
+agentdb.rvf
+agentdb.rvf.lock
+ruvector.db

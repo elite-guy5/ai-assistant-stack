@@ -80,12 +80,13 @@ If the project has no formatter, linter, or tests yet, state that explicitly and
 ## Token-Saver File Boundaries
 
 - Keep generated files, secrets, logs, coverage reports, dependency folders, local databases, and binary assets out of agent context by default.
-- Project seeding maintains:
+- Projects should maintain:
   - `.gitignore`
   - `.codexignore`
-  - `.claude/settings.local.json`
+  - `.claude/settings.json`
 
 - If this repository requires broader or narrower exclusions, update the local ignore files instead of weakening global behavior.
+- Keep `.claude/settings.local.json` for private machine-local Claude settings only, and do not commit it.
 
 ---
 
@@ -142,19 +143,52 @@ docs/superpowers/plans/YYYY-MM-DD-<feature>.md
 - Use review checkpoints at the end of major milestones.
 - Keep each subagent tightly focused on one atomic task.
 
+#### Ruflo Dispatch Policy
+
+For complete software development work, use Superpowers to clarify or write the
+implementation plan, then dispatch suitable work through Ruflo.
+
+Spawn Ruflo agents when the plan includes any of these conditions:
+
+- three or more separable implementation, test, documentation, or review tasks
+- changes spanning multiple subsystems
+- parallel investigation that can reduce elapsed time
+- persistent task state that should survive across turns or sessions
+- long-running debugging, migration, or verification work
+- explicit review checkpoints between implementation phases
+
+Default flow:
+
+```text
+1. Use Superpowers to clarify the goal or write the implementation plan.
+2. Split the plan into atomic tasks with clear file ownership and verification.
+3. Spawn Ruflo-tracked agents for independent tasks.
+4. Keep sequential or tightly coupled work in the main agent.
+5. Use the main agent as supervisor and final reviewer.
+6. Store operational findings in Ruflo AgentDB.
+```
+
+Do not spawn Ruflo agents for docs-only edits, one-file fixes, simple config
+changes, command output checks, formatting, linting, or tasks where all steps
+must be performed sequentially.
+
 #### Model Routing
 
 Default to the least expensive model capable of completing the task accurately.
 
-| Role | Recommended Model |
-|------|-------------------|
-| Planner / Supervisor | Strongest reasoning model |
-| Implementation | Mid-tier model |
-| Testing / Verification | Mid-tier model |
-| Documentation | Lightweight model |
-| Final Review | Strongest reasoning model |
+`AGENTS.md` cannot change the active Codex session model by itself. These rules
+apply when deciding whether to stay inline, change the Codex model with the
+Codex UI or CLI, or route work through an orchestration agent. Do not document
+or request non-Codex vendor model aliases for Codex work.
 
-Escalate to the strongest reasoning model when:
+| Task Type | Default Execution | Codex Model Guidance |
+|-----------|-------------------|----------------------|
+| Docs-only edits, ignore-file updates, typo fixes, command checks | Inline, no spawned agent | Keep current model; do not escalate |
+| Targeted search, summarization, simple verification, low-risk cleanup | Inline first; spawned agent only if useful for persistence | Prefer `gpt-5.4-mini` when selecting a cheaper Codex model |
+| Focused implementation, shell test updates, moderate debugging | Inline or orchestrated agent when parallelism or persistent task state helps | Use current default `gpt-5.5` unless a cheaper model is clearly enough |
+| Multi-file design, architecture, migration strategy, security review, final review | Main-thread review or orchestrated agent with strongest reasoning | Use `gpt-5.5` with higher reasoning effort when available |
+
+Escalate to `gpt-5.5` with higher reasoning effort only when:
 
 - requirements are ambiguous
 - architectural decisions are required
@@ -163,12 +197,16 @@ Escalate to the strongest reasoning model when:
 - repeated verification failures occur
 - performing the final code review
 
-Avoid spawning additional agents for:
+Avoid stronger or higher-reasoning Codex models for:
 
 - documentation-only work
 - formatting or linting
 - simple configuration changes
 - trivial single-file edits
+- repository status checks or command output inspection
+
+Avoid spawning additional agents for the same low-risk task classes unless
+persistent task state or parallelism is materially useful.
 
 ---
 

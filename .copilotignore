@@ -1,4 +1,5 @@
 package-lock.json
+.claude/settings.local.json
 pnpm-lock.yaml
 yarn.lock
 node_modules/
@@ -13,3 +14,13 @@ target/
 *.log
 *.db
 .cache/
+.agents/
+.ruflo
+.ruflo/
+.claude-flow/
+.claude-flow
+.swarm/
+.swarm
+agentdb.rvf
+agentdb.rvf.lock
+ruvector.db

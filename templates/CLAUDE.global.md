@@ -1,4 +1,4 @@
-# Global Agent Configuration
+# Global Claude Code Configuration
 
 ## Response Style
 
@@ -9,10 +9,10 @@
 - Present the main conclusion first, followed by a brief explanation of the reasoning.
 - Stay closely aligned with the question; do not drift into tangents or expansions beyond what was asked.
 - Avoid filler, unnecessary disclaimers, or overly long explanations.
-- Combine practical advice with conceptual understanding.
+- Combine practical advice with conceptual understanding when useful.
 - Maintain thorough reasoning but concise output.
 - Do not use sycophantic openers or closing fluff.
-- Do not use emojis or em-dashes.
+- Do not use emojis or em dashes.
 
 ---
 
@@ -30,29 +30,47 @@
 @~/.claude/LEAN-CTX.md
 ```
 
-### Harness & Orchestration Layer
+Claude Code reads `CLAUDE.md` as persistent instruction context. Use Claude Code settings and hooks for technical enforcement. Do not treat this file as a hard security boundary.
 
-#### Ruflo & LeanCTX
+---
 
-##### Meta-Harness Operations
+# Claude Agent Execution Rules
 
-- Route all active workflow loops, swarms, background daemon workers, and cross-session memory transactions through registered Ruflo MCP server hooks.
+## Harness and Orchestration Layer
 
-##### Context & AST Isolation
+### Claude Code Configuration Boundaries
 
-- Route all file reading, structural workspace analysis, and code sweeps through LeanCTX MCP server infrastructure.
-- LeanCTX manages token-saving compression natively via local AST parsing.
+- Use `~/.claude/CLAUDE.md` for global behavioral guidance.
+- Use `CLAUDE.md` or `.claude/CLAUDE.md` for project guidance.
+- Use `CLAUDE.local.md` for private project preferences and keep it out of Git.
+- Use `~/.claude/settings.json` for user settings.
+- Use `.claude/settings.json` for team-shared project settings.
+- Use `.claude/settings.local.json` for local permissions, machine-specific settings, and sensitive path boundaries.
+- Use `.mcp.json` for team-shared project MCP servers when appropriate.
 
-##### Memory Synchronization
+### Ruflo and LeanCTX Ownership
 
-- Track local code symbols via LeanCTX.
-- Update Ruflo HNSW-indexed vector memory, AgentDB, with session trajectories and successful design patterns.
+- Route active workflow loops, swarms, background daemon workers, and cross-session memory transactions through registered Ruflo MCP tools when Ruflo is available.
+- Route file reading, structural workspace analysis, code search, tree scans, and compressed command output through LeanCTX MCP tools when LeanCTX is available.
+- Keep LeanCTX responsible for context and AST-aware workspace scoping.
+- Keep Ruflo responsible for orchestration, task state, swarm coordination, hooks, and AgentDB trajectory memory.
+- Do not use Ruflo for normal file reads, formatting, linting, or trivial status checks.
+- Do not use LeanCTX for agent orchestration or long-running swarm state.
 
-##### Hook Protection
+### MCP Tool Routing Guardrails
 
-- Never execute LeanCTX onboard directly in the shell.
-- Ruflo must own the terminal hook environment.
-- Restrict LeanCTX to its editor-level MCP context to avoid terminal loop collisions.
+- Prefer LeanCTX tools such as `ctx_read`, `ctx_tree`, `ctx_search`, `ctx_shell`, or `ctx_call` over raw file reads and broad shell output when those tools are registered.
+- Use Ruflo MCP tools only when persistent orchestration, memory, hooks, or multi-agent coordination is materially useful.
+- Keep MCP server names distinct so Claude Code can namespace tool definitions cleanly.
+- Verify MCP availability from Claude Code before relying on a server. A binary on `PATH` does not prove the MCP server is active.
+
+### Hook Protection
+
+- Use Claude Code hooks for mechanical enforcement such as blocking dangerous commands, protecting secrets, recording session events, or invoking deterministic helper scripts.
+- Do not use hooks for vague guidance that belongs in `CLAUDE.md`.
+- Keep hook commands small, deterministic, idempotent, and easy to debug.
+- Confirm referenced helper files exist before enabling hooks that call them.
+- Do not let LeanCTX shell hooks and Ruflo shell hooks both claim the same lifecycle event unless the order is explicit.
 
 ---
 
@@ -76,6 +94,7 @@ Keep the following completely intact and uncompressed:
 - APIs
 - flags
 - error output
+- test output that must remain verbatim
 
 ### Superpowers
 
@@ -98,47 +117,35 @@ Do not invoke Superpowers automatically for:
 - local machine troubleshooting
 - installation verification
 - process inspection
+- simple documentation edits
 
-Unless explicitly requested.
+unless explicitly requested.
 
----
+### Sandbox Boundary
 
-## Sandbox Boundary
-
-Execute all shell commands, testing scripts, and compilation routines initiated during a Superpowers task within Ruflo's sandbox harness to preserve:
-
-- telemetry
-- audit trails
-- cost tracking
+- Run commands through Ruflo only when a Ruflo sandbox, hook, or orchestration path is actually configured and useful for the task.
+- Otherwise use the project-native verification commands listed in the project `CLAUDE.md`.
+- Do not invent Ruflo formatter or linter commands.
 
 ---
 
 ## Token-Saver File Boundaries
 
-Prefer targeted commands instead of opening large generated files:
+- Prefer targeted `rg`, `sed`, `git diff`, and package-manager metadata commands instead of opening large generated files.
+- Do not read the following unless explicitly required:
+  - lockfiles
+  - dependency folders
+  - build outputs
+  - coverage dumps
+  - logs
+  - local databases
+  - binary assets
 
-- `rg`
-- `sed`
-- `git diff`
-- package-manager metadata commands
+### Secret Protection
 
-Do not read the following unless explicitly required:
-
-- lockfiles
-- dependency folders
-- build outputs
-- coverage dumps
-- logs
-- local databases
-- binary assets
-
----
-
-## Secret Protection
-
-Treat `.env` and `.env.*` as strict secrets.
-
-Do not open, summarize, or copy their contents.
+- Treat `.env` and `.env.*` as strict secrets.
+- Do not open, summarize, or copy their contents.
+- Use Claude Code settings, permissions, and hooks for hard enforcement of secret-read blocks.
 
 ### Exception Protocol
 
@@ -151,92 +158,62 @@ If an ignored file is genuinely required:
 
 # Software Development Guidelines
 
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
+
 ## General Rules
 
 - Read existing files before writing new code.
 - Do not re-read files unless they have changed.
 - Skip files larger than 100 KB unless explicitly required.
-
----
+- Touch only what maps directly to the user's request.
 
 ## 1. Think Before Coding
 
-Do not assume or hide confusion.
-
-Surface tradeoffs openly.
-
-Before implementing:
-
-- State assumptions explicitly.
-- Ask questions if uncertain.
+- Do not assume.
+- Do not hide confusion.
+- Surface tradeoffs.
+- State assumptions explicitly before implementing.
+- Ask questions when the task is genuinely ambiguous.
 - Present multiple interpretations instead of silently choosing one.
-- Propose a simpler approach if it exists.
 - Push back when warranted.
-- Stop and ask immediately if something is unclear.
 
 ### Exception
 
-Fix direct errors or failing tests directly if the cause is obvious from logs.
+When the cause is obvious from logs, errors, or failing tests:
 
----
+- Fix it directly.
+- Ask questions only if the cause is genuinely ambiguous.
 
 ## 2. Simplicity First
 
 Write the minimum code required to solve the problem.
 
-Exclude:
-
-- speculative features
-- unnecessary abstractions
-- unused configurability
-- impossible-scenario error handling
-
-Rewrite code immediately if 200 lines can be reduced to 50.
-
-Simplify if a senior engineer would consider the solution overcomplicated.
-
----
+- No speculative features.
+- No unnecessary abstractions.
+- No unused configurability.
+- No impossible-scenario error handling.
+- Simplify if a senior engineer would consider the solution overcomplicated.
 
 ## 3. Surgical Changes
-
-Touch only what is necessary to complete the task.
 
 When editing existing code:
 
 - Do not improve adjacent code.
 - Do not refactor unrelated code.
-- Match the pre-existing style exactly.
+- Match the existing style.
 - Mention unrelated dead code without removing it.
-
-Remove only the imports, variables, or functions made unused by your own edits.
-
-Do not remove pre-existing dead code.
-
----
+- Remove only imports, variables, or functions made unused by your own edits.
+- Do not remove pre-existing dead code unless requested.
 
 ## 4. Goal-Driven Execution
 
 Define success criteria before implementation.
 
-For validations:
+Examples:
 
-- Write failing tests first.
-
-For bug fixes:
-
-- Reproduce bugs with a test first.
-
-For refactors:
-
-- Verify behavior before and after.
-
-### Multi-Step Verification Template
-
-```text
-Step
-  -> verify:
-     check
-```
+- Validation work: write a failing test first, then make it pass.
+- Bug fixes: reproduce with a test or focused command, then fix.
+- Refactors: verify behavior before and after.
 
 Never declare completion without explicit verification:
 
@@ -245,21 +222,23 @@ Never declare completion without explicit verification:
 - compare behavior
 - review the diff
 
-Run `ruflo format <file>` immediately after editing any file.
+### Verification and Formatting
 
-Run `ruflo lint` before declaring any task complete.
-
----
+- Use the project-native formatter after edits when one exists.
+- Use the project-native lint, typecheck, and test commands before declaring work complete.
+- Do not call `ruflo format <file>` or `ruflo lint` unless `npx --yes ruflo@latest --help` confirms those commands exist in the installed Ruflo version.
+- If the project has no formatter, linter, or tests, state that and run the best available verification command.
 
 ## 5. Plan Mode
 
-Use Plan Mode for:
+Use Claude Code plan mode for:
 
 - tasks with three or more steps
 - architectural decisions
 - significant verification work
+- multi-file changes with unclear risk
 
-Skip Plan Mode for trivial fixes.
+Skip plan mode for trivial fixes and simple documentation updates.
 
 If execution diverges:
 
@@ -267,13 +246,9 @@ If execution diverges:
 2. Re-plan.
 3. Continue.
 
-Write detailed specifications upfront when ambiguity exists.
-
----
-
 ## 6. Subagents
 
-Use subagents to:
+Use subagents when they:
 
 - reduce main-context noise
 - enable parallel investigation
@@ -282,47 +257,38 @@ Use subagents to:
 Guidelines:
 
 - Limit each subagent to one task.
-- Use parallel subagents only when tasks are completely independent.
-
----
+- Use parallel subagents only when tasks are independent.
+- Subagents must not write to shared Obsidian notes.
 
 ## 7. Demand Elegance
 
-For non-trivial work, pause and check for a more elegant solution.
+For non-trivial work, pause and check whether a simpler or cleaner solution exists.
 
 If a fix feels hacky:
 
-- Propose cleaner alternatives.
+- propose the cleaner alternative
+- do not automatically refactor beyond scope
+- implement only what was requested
 
-Do not automatically refactor beyond scope.
+## 8. Memory and Knowledge Management
 
-Suggest improvements, but implement only what was requested.
+- Store durable instructions in the narrowest appropriate `CLAUDE.md` file.
+- Use Claude Code auto memory for learned preferences and repeated corrections when enabled.
+- Use `CLAUDE.local.md` for private project preferences.
+- Track local workspace state via LeanCTX when available.
+- Store long-term trajectory and swarm memory in Ruflo AgentDB when Ruflo is available.
+- Write generalizable correction logs and domain knowledge to the personal Obsidian vault using the Obsidian MCP integration when available.
+- Restrict Obsidian writing to the supervising agent.
+- Subagents must record operational memories in AgentDB, not Obsidian.
 
 ---
 
-## 8. Memory & Knowledge Management
+## Success Indicators
 
-Store information strictly in its canonical location.
+These guidelines are successful when they produce:
 
-Track local workspace state via LeanCTX.
-
-Store long-term trajectories in Ruflo AgentDB.
-
-Interact with the Obsidian vault using official MCP commands:
-
-- `obsidian_global_search`
-- `read_note`
-- `Notes`
-- `append_to_file`
-
-Do not use manual filesystem scripts.
-
-Restrict Obsidian writing to the supervising agent.
-
-Subagents must record memories exclusively in AgentDB.
-
-Following a user correction:
-
-- Write general behavioral improvements to Obsidian feedback directories.
-- Write domain knowledge to the appropriate Obsidian note.
-- Do not create separate lessons files.
+- smaller, cleaner diffs
+- fewer unnecessary rewrites
+- simpler implementations
+- clarifying questions before implementation when ambiguity matters
+- verified solutions rather than assumed ones

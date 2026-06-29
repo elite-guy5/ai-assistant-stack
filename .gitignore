@@ -1,4 +1,5 @@
 .DS_Store
+.claude/settings.local.json
 node_modules/
 dayarc-app/dist/
 .env
@@ -10,6 +11,7 @@ secrets.generated.json
 /NEXT_CHAT_PROMPT.md
 dayarc-app/data/*.sqlite
 dayarc-app/data/*.sqlite-*
+docs/superpowers
 
 # Playwright
 /test-results/
@@ -20,4 +22,13 @@ dayarc-app/data/*.sqlite-*
 
 # Local agent caches
 .agents/
+.ruflo
+.ruflo/
+.claude-flow/
+.claude-flow
+.swarm/
+.swarm
+agentdb.rvf
+agentdb.rvf.lock
+ruvector.db
 .cache/
