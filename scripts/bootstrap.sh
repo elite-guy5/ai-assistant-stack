@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PINNED_COMMIT="49253c77fb7b32786c6d63e89d38ea763310a25a"
-ARCHIVE_URL="${TOKEN_SAVER_BOOTSTRAP_URL:-https://github.com/elite-guy5/token-saver-setup/archive/$PINNED_COMMIT.tar.gz}"
-ARCHIVE_SHA256="${TOKEN_SAVER_BOOTSTRAP_SHA256:-38c13a13a117c5e04becffcf9400ba14a75221f3ec4a8db04fa9d99da4f9cbb8}"
+BOOTSTRAP_REF="${TOKEN_SAVER_BOOTSTRAP_REF:-${TOKEN_SAVER_BOOTSTRAP_COMMIT:-main}}"
+ARCHIVE_URL="${TOKEN_SAVER_BOOTSTRAP_URL:-https://github.com/elite-guy5/token-saver-setup/archive/$BOOTSTRAP_REF.tar.gz}"
+ARCHIVE_SHA256="${TOKEN_SAVER_BOOTSTRAP_SHA256:-}"
 LOCAL_ARCHIVE="${TOKEN_SAVER_BOOTSTRAP_ARCHIVE:-}"
 tmp_dir="$(mktemp -d)"
 
@@ -38,6 +38,8 @@ verify_archive() {
   local archive="$1"
   local actual=""
 
+  [ -n "$ARCHIVE_SHA256" ] || return 0
+
   if command -v shasum >/dev/null 2>&1; then
     actual="$(shasum -a 256 "$archive" | awk '{print $1}')"
   elif command -v sha256sum >/dev/null 2>&1; then
@@ -55,6 +57,28 @@ verify_archive() {
   fi
 }
 
+extract_archive() {
+  local archive="$1"
+  local candidate=""
+  local repo_dir=""
+  local repo_count=0
+
+  tar -xzf "$archive" -C "$tmp_dir"
+
+  for candidate in "$tmp_dir"/token-saver-setup-*; do
+    [ -d "$candidate" ] || continue
+    repo_dir="$candidate"
+    repo_count=$((repo_count + 1))
+  done
+
+  if [ "$repo_count" -ne 1 ]; then
+    printf 'error: setup archive did not extract to one token-saver-setup directory\n' >&2
+    exit 1
+  fi
+
+  printf '%s\n' "$repo_dir"
+}
+
 archive="$tmp_dir/token-saver-setup.tar.gz"
 download_archive "$archive"
 verify_archive "$archive"
@@ -64,6 +88,5 @@ if [ "${1:-}" = "--dry-run" ] && [ -n "$LOCAL_ARCHIVE" ]; then
   exit 0
 fi
 
-tar -xzf "$archive" -C "$tmp_dir"
-repo_dir="$tmp_dir/token-saver-setup-$PINNED_COMMIT"
+repo_dir="$(extract_archive "$archive")"
 exec bash "$repo_dir/scripts/install.sh" "$@"

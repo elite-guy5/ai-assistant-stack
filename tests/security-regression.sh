@@ -112,10 +112,26 @@ bootstrap_rejects_tampered_archive() {
   assert_contains "$(cat "$tmp/bootstrap.err")" "setup archive checksum mismatch"
 }
 
+bootstrap_runs_local_archive_without_required_checkout() {
+  local archive="$tmp/bootstrap-local.tar.gz"
+  local home="$tmp/home-bootstrap"
+  local archive_root="$tmp/token-saver-setup-main"
+  mkdir -p "$home" "$archive_root"
+  cp -R "$ROOT/scripts" "$archive_root/scripts"
+  cp -R "$ROOT/templates" "$archive_root/templates"
+  tar -czf "$archive" -C "$tmp" token-saver-setup-main
+
+  HOME="$home" TOKEN_SAVER_BOOTSTRAP_ARCHIVE="$archive" bash "$ROOT/scripts/bootstrap.sh" --non-interactive --tools codex --dry-run >"$tmp/bootstrap-local.out"
+
+  assert_contains "$(cat "$tmp/bootstrap-local.out")" "Selected tools: codex"
+  assert_contains "$(cat "$tmp/bootstrap-local.out")" "Install complete"
+}
+
 git_template_hooks_seed_future_repos
 current_repo_hook_wraps_existing_hook_and_seeds_selected_files
 seeder_skips_existing_files_and_overwrite_creates_backup
 seeder_skips_project_when_any_instruction_file_exists
 bootstrap_rejects_tampered_archive
+bootstrap_runs_local_archive_without_required_checkout
 
 printf 'security-regression.sh: OK\n'

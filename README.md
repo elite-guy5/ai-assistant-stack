@@ -5,7 +5,8 @@ macOS-only instruction-file installer for Codex and Claude Code.
 This repository provides the global and project Markdown instruction files for
 Codex and Claude Code, plus Git hook automation that seeds those project files
 into repositories. The installed instruction files are configured to coordinate
-with LeanCTX, Caveman, Superpowers, and Ruflo when those tools are available.
+with LeanCTX, Context7, Caveman, Superpowers, and Ruflo when those tools are
+available.
 
 The installer does not install command-line tools, package managers, editor
 extensions, plugins, skills, external protocol servers, or other third-party
@@ -67,13 +68,13 @@ install managed hooks in the current repository when it is run from inside one.
 
 ## Manual Agent Stack Setup Guides
 
-The installer does not install LeanCTX, Ruflo, Caveman, Superpowers, MCP
-servers, plugins, or external agent tools. Use these guides when configuring
-those optional tools manually:
+The installer does not install LeanCTX, Context7, Ruflo, Caveman, Superpowers,
+MCP servers, plugins, or external agent tools. Use these guides when
+configuring those optional tools manually:
 
 - [Codex agent stack setup](docs/codex-agent-stack-setup.md) explains how to
-  configure LeanCTX, Ruflo, Caveman, and Superpowers so `AGENTS.md` files work
-  effectively without tool conflicts.
+  configure LeanCTX, Context7, Ruflo, Caveman, and Superpowers so `AGENTS.md`
+  files work effectively without tool conflicts.
 - [Claude agent stack setup](docs/claude-agent-stack-setup.md) explains the
   equivalent Claude Code setup for `CLAUDE.md`, Claude settings, MCP servers,
   hooks, and skills.
@@ -89,8 +90,35 @@ and `CLAUDE.md` files.
 
 ## Install the Markdown Files and Hooks
 
-Run the installer from this repository. Use `--tools both` when you want both
-Codex and Claude Code instruction files and project hooks.
+Users do not need to clone this repository. The bootstrap script downloads a
+temporary archive, verifies it when a checksum is provided, runs the installer,
+and removes the temporary files when it exits.
+
+Install Codex and Claude Code instruction files and hooks without cloning:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --tools both
+```
+
+Install only Codex instruction files and hooks without cloning:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --tools codex
+```
+
+Install only Claude Code instruction files and hooks without cloning:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --tools claude
+```
+
+Use `TOKEN_SAVER_BOOTSTRAP_REF` to install a specific branch, tag, or commit.
+Use `TOKEN_SAVER_BOOTSTRAP_SHA256` when you want the downloaded archive to match
+a known checksum.
+
+If you already have this repository checked out, you can run the installer
+directly from the repository. Use `--tools both` when you want both Codex and
+Claude Code instruction files and project hooks.
 
 Install Codex and Claude Code instruction files and hooks:
 
