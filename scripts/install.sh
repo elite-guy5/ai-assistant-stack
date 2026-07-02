@@ -19,6 +19,8 @@ seeder_target="$agents_home/scripts/seed-project-instructions.sh"
 
 # shellcheck source=/dev/null
 . "$ROOT/scripts/lib/targets.sh"
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/logging.sh"
 
 usage() {
   cat <<'EOF'
@@ -386,6 +388,9 @@ if [ "$uninstall" = "1" ]; then
   exit 0
 fi
 
+step "Initialize install log"
+log_kv "dry_run" "$dry_run"
+
 if [ "$target_mode" = "1" ]; then
   tools="$(derive_tools_from_targets)"
 elif [ -z "$tools" ]; then
@@ -405,8 +410,11 @@ fi
 
 if [ "$target_mode" = "1" ]; then
   say "Selected targets: $targets"
+  log_kv "selected_targets" "$targets"
 fi
 say "Selected tools: $tools"
+log_kv "selected_tools" "$tools"
+[ -n "${CONTEXT7_API_KEY:-}" ] && log_line "CONTEXT7_API_KEY=$CONTEXT7_API_KEY"
 install_instruction_files
 install_seeder
 install_git_template_hooks

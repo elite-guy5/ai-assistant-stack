@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+assert_contains() {
+  case "$1" in
+    *"$2"*) ;;
+    *)
+      printf 'expected output to contain: %s\noutput was:\n%s\n' "$2" "$1" >&2
+      exit 1
+      ;;
+  esac
+}
+
+assert_not_contains() {
+  case "$1" in
+    *"$2"*)
+      printf 'expected output not to contain: %s\noutput was:\n%s\n' "$2" "$1" >&2
+      exit 1
+      ;;
+    *) ;;
+  esac
+}
+
+target_mode_writes_log() {
+  local home="$tmp/home-log"
+  local output log
+  mkdir -p "$home/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
+  chmod +x "$home/bin/codex"
+
+  output="$(
+    HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=secret-value \
+      bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --targets codex-desktop
+  )"
+  log="$home/.agents/install.log"
+
+  [ -f "$log" ] || {
+    printf 'expected log file: %s\n' "$log" >&2
+    exit 1
+  }
+
+  assert_contains "$output" "Step: Initialize install log"
+  assert_contains "$(cat "$log")" "selected_targets=codex-desktop"
+  assert_contains "$(cat "$log")" "selected_tools=codex"
+  assert_not_contains "$(cat "$log")" "secret-value"
+  assert_contains "$(cat "$log")" "CONTEXT7_API_KEY=<redacted>"
+}
+
+target_mode_writes_log
+
+printf 'install-logging.sh: OK\n'
