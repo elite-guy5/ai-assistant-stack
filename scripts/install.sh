@@ -17,13 +17,20 @@ state_file="${TOKEN_SAVER_STATE:-$agents_home/install_state}"
 git_template_dir="$agents_home/git-template"
 seeder_target="$agents_home/scripts/seed-project-instructions.sh"
 
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/targets.sh"
+
 usage() {
   cat <<'EOF'
 Usage: bash scripts/install.sh [options]
 
 Options:
+  --targets <list>         Comma-separated target surfaces:
+                           codex-desktop,codex-vscode,claude-desktop,claude-vscode.
+                           Derives --tools automatically.
   --tools <codex|claude|both>
-                           Tools to configure. Required with --non-interactive.
+                           Legacy instruction-file tools to configure.
+                           Required with --non-interactive when --targets is absent.
   --repo <path>            Also seed and install managed hooks in this Git repo.
   --non-interactive        Do not prompt.
   --dry-run                Print actions without changing files.
@@ -345,6 +352,16 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     --tools=*) tools="$(normalize_tools "${1#*=}")" ;;
+    --targets)
+      [ "$#" -gt 1 ] || die "missing value for --targets"
+      targets="$(normalize_targets "$2")"
+      target_mode=1
+      shift
+      ;;
+    --targets=*)
+      targets="$(normalize_targets "${1#*=}")"
+      target_mode=1
+      ;;
     --repo)
       [ "$#" -gt 1 ] || die "missing value for --repo"
       repo_path="$2"
@@ -369,11 +386,13 @@ if [ "$uninstall" = "1" ]; then
   exit 0
 fi
 
-if [ -z "$tools" ]; then
+if [ "$target_mode" = "1" ]; then
+  tools="$(derive_tools_from_targets)"
+elif [ -z "$tools" ]; then
   if [ "$non_interactive" = "1" ]; then
-    die "--tools is required in non-interactive mode"
+    die "--targets or --tools is required in non-interactive mode"
   fi
-  prompt_tools
+  prompt_targets
 fi
 
 if [ "$non_interactive" = "0" ] && [ -z "$apply_current_repo" ]; then
@@ -384,6 +403,9 @@ if [ "$non_interactive" = "0" ] && [ -z "$apply_current_repo" ]; then
   fi
 fi
 
+if [ "$target_mode" = "1" ]; then
+  say "Selected targets: $targets"
+fi
 say "Selected tools: $tools"
 install_instruction_files
 install_seeder

@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+
+targets=""
+target_mode=0
+
+normalize_targets() {
+  local raw="$1"
+  local normalized=""
+  local item
+  local old_ifs="$IFS"
+
+  raw="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+  [ -n "$raw" ] || die "missing value for --targets"
+
+  IFS=','
+  for item in $raw; do
+    case "$item" in
+      codex-desktop|codex-vscode|claude-desktop|claude-vscode) ;;
+      *) IFS="$old_ifs"; die "invalid --targets value: $item" ;;
+    esac
+    case ",$normalized," in
+      *",$item,"*) ;;
+      *) normalized="${normalized:+$normalized,}$item" ;;
+    esac
+  done
+  IFS="$old_ifs"
+
+  printf '%s\n' "$normalized"
+}
+
+target_enabled() {
+  case ",$targets," in
+    *",$1,"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+derive_tools_from_targets() {
+  local has_codex=0
+  local has_claude=0
+
+  target_enabled codex-desktop && has_codex=1
+  target_enabled codex-vscode && has_codex=1
+  target_enabled claude-desktop && has_claude=1
+  target_enabled claude-vscode && has_claude=1
+
+  case "$has_codex:$has_claude" in
+    1:1) printf 'both\n' ;;
+    1:0) printf 'codex\n' ;;
+    0:1) printf 'claude\n' ;;
+    *) die "no supported targets selected" ;;
+  esac
+}
+
+prompt_targets() {
+  local choice
+
+  cat <<'EOF'
+Which AI surfaces should this installer configure?
+  1) Codex Desktop
+  2) Codex VS Code
+  3) Claude Desktop
+  4) Claude VS Code
+  5) All
+Enter comma-separated selections [5]:
+EOF
+  printf 'Selection [5]: '
+  read -r choice
+  choice="${choice:-5}"
+
+  case "$choice" in
+    1) targets="codex-desktop" ;;
+    2) targets="codex-vscode" ;;
+    3) targets="claude-desktop" ;;
+    4) targets="claude-vscode" ;;
+    5) targets="codex-desktop,codex-vscode,claude-desktop,claude-vscode" ;;
+    *)
+      choice="$(printf '%s' "$choice" | sed 's/1/codex-desktop/g; s/2/codex-vscode/g; s/3/claude-desktop/g; s/4/claude-vscode/g; s/5/codex-desktop,codex-vscode,claude-desktop,claude-vscode/g')"
+      targets="$(normalize_targets "$choice")"
+      ;;
+  esac
+
+  targets="$(normalize_targets "$targets")"
+  target_mode=1
+  tools="$(derive_tools_from_targets)"
+}
