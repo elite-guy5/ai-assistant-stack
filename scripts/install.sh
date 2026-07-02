@@ -25,6 +25,8 @@ seeder_target="$agents_home/scripts/seed-project-instructions.sh"
 . "$ROOT/scripts/lib/preflight.sh"
 # shellcheck source=/dev/null
 . "$ROOT/scripts/lib/ruflo-state.sh"
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/stack-tools.sh"
 
 usage() {
   cat <<'EOF'
@@ -61,7 +63,11 @@ die() {
 
 run() {
   if [ "$dry_run" = "1" ]; then
-    printf 'dry-run: %s\n' "$*"
+    if command -v redact_text >/dev/null 2>&1; then
+      printf 'dry-run: %s\n' "$*" | redact_text
+    else
+      printf 'dry-run: %s\n' "$*"
+    fi
     return 0
   fi
   "$@"
@@ -415,6 +421,7 @@ log_kv "selected_tools" "$tools"
 if [ "$target_mode" = "1" ]; then
   preflight_targets
   report_ruflo_state
+  install_stack_tools
 fi
 
 if [ "$non_interactive" = "0" ] && [ -z "$apply_current_repo" ]; then
