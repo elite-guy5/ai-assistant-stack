@@ -21,6 +21,8 @@ seeder_target="$agents_home/scripts/seed-project-instructions.sh"
 . "$ROOT/scripts/lib/targets.sh"
 # shellcheck source=/dev/null
 . "$ROOT/scripts/lib/logging.sh"
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/preflight.sh"
 
 usage() {
   cat <<'EOF'
@@ -400,6 +402,18 @@ elif [ -z "$tools" ]; then
   prompt_targets
 fi
 
+if [ "$target_mode" = "1" ]; then
+  say "Selected targets: $targets"
+  log_kv "selected_targets" "$targets"
+fi
+say "Selected tools: $tools"
+log_kv "selected_tools" "$tools"
+[ -n "${CONTEXT7_API_KEY:-}" ] && log_line "CONTEXT7_API_KEY=$CONTEXT7_API_KEY"
+
+if [ "$target_mode" = "1" ]; then
+  preflight_targets
+fi
+
 if [ "$non_interactive" = "0" ] && [ -z "$apply_current_repo" ]; then
   current_root="$(git_root_for "$PWD")"
   if [ -n "$current_root" ] && prompt_yes_no "Also install hooks and seed the current repo at $current_root?" "yes"; then
@@ -408,13 +422,6 @@ if [ "$non_interactive" = "0" ] && [ -z "$apply_current_repo" ]; then
   fi
 fi
 
-if [ "$target_mode" = "1" ]; then
-  say "Selected targets: $targets"
-  log_kv "selected_targets" "$targets"
-fi
-say "Selected tools: $tools"
-log_kv "selected_tools" "$tools"
-[ -n "${CONTEXT7_API_KEY:-}" ] && log_line "CONTEXT7_API_KEY=$CONTEXT7_API_KEY"
 install_instruction_files
 install_seeder
 install_git_template_hooks
