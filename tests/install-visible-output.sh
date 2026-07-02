@@ -31,6 +31,28 @@ install_output_names_instruction_file_actions() {
   assert_contains "$output" "Configured git init.templateDir"
 }
 
+target_install_output_names_stack_actions() {
+  local home="$tmp/home-target-output"
+  local output
+  mkdir -p "$home/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
+  chmod +x "$home/bin/codex"
+
+  output="$(
+    HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key \
+      bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --targets codex-desktop
+  )"
+
+  assert_contains "$output" "Step: Preflight selected targets"
+  assert_contains "$output" "Step: Install LeanCTX"
+  assert_contains "$output" "Step: Configure Context7"
+  assert_contains "$output" "Step: Configure Ruflo"
+  assert_contains "$output" "Step: Install Caveman"
+  assert_contains "$output" "Step: Install Superpowers"
+  assert_contains "$output" "Install complete"
+}
+
 install_output_names_instruction_file_actions
+target_install_output_names_stack_actions
 
 printf 'install-visible-output.sh: OK\n'
