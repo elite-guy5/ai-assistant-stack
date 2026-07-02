@@ -67,6 +67,8 @@ dry_run_prints_stack_steps_for_codex() {
   assert_contains "$output" "Step: Install Caveman"
   assert_contains "$output" "Step: Install Superpowers"
   assert_contains "$output" "codex mcp add context7"
+  assert_contains "$output" "codex mcp add ruflo"
+  assert_contains "$output" "RUFLO_HOME=\"$home/.ruflo\" npx --yes ruflo@latest init"
   assert_contains "$output" "--api-key <redacted>"
 }
 

@@ -43,7 +43,11 @@ configure_context7() {
 configure_ruflo() {
   step "Configure Ruflo"
   ensure_ruflo_home
-  run_logged env RUFLO_HOME="$ruflo_home" npx --yes ruflo@latest init
+  run_logged sh -c "cd \"$HOME\" && RUFLO_HOME=\"$ruflo_home\" npx --yes ruflo@latest init"
+
+  if tool_enabled codex; then
+    run_logged codex mcp add ruflo -- npx -y ruflo@latest mcp start
+  fi
 
   if tool_enabled claude; then
     run_logged claude mcp add ruflo -- npx ruflo@latest mcp start
