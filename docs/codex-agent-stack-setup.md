@@ -1,17 +1,19 @@
 # Codex Agent Stack Setup
 
-Use this guide to configure LeanCTX, Ruflo, Caveman, and Superpowers so
-`AGENTS.md` files work without tool-routing conflicts.
+Use this guide to configure LeanCTX, Context7, Ruflo, Caveman, and Superpowers
+so `AGENTS.md` files work without tool-routing conflicts.
 
 ## Goal
 
 - LeanCTX owns file reading, code search, tree scans, and shell-output
   compression.
+- Context7 owns current documentation lookup for libraries, frameworks, SDKs,
+  APIs, CLIs, and cloud services.
 - Ruflo owns persistent orchestration, swarm state, AgentDB memory, and
   long-running agent coordination.
 - Caveman owns conversational compression only.
-- Superpowers owns development workflows only when software development work is
-  requested.
+- Superpowers owns development workflows only when the user manually invokes
+  that workflow in a session.
 
 Do not make every layer responsible for every task. Conflicts happen when
 LeanCTX, Ruflo, hooks, skills, and instruction files all try to control the same
@@ -106,6 +108,28 @@ Expected outcome:
 - Tool profile is `minimal`.
 - Fixed overhead is under the configured token budget.
 
+## Context7 Setup
+
+Context7 is the documentation lookup layer. Configure it separately from
+LeanCTX and Ruflo.
+
+Before running the installer, create a Context7 API key and expose it to the
+install session:
+
+```bash
+export CONTEXT7_API_KEY="your-context7-api-key"
+```
+
+Configure Context7 for Codex with:
+
+```bash
+codex mcp add context7 -- npx -y @upstash/context7-mcp --api-key "$CONTEXT7_API_KEY"
+```
+
+Do not commit the API key to any repository. If `CONTEXT7_API_KEY` is missing,
+the installer must stop before Context7 configuration and print these
+instructions.
+
 ## Ruflo Setup
 
 Ruflo should be available to Codex through MCP first. Use CLI status as a
@@ -181,30 +205,20 @@ it override verification, routing, model selection, or safety rules.
 
 ## Superpowers Setup
 
-Superpowers is a workflow layer for software development tasks.
+Superpowers is a workflow layer for software development tasks. Invoke it
+manually in a session when the task needs that workflow.
 
-Invoke Superpowers automatically only for:
+Use Superpowers for:
 
-- writing or editing code
-- implementing features
-- fixing bugs
-- refactoring
-- testing
-- code review
-- creating or editing skills
+- implementation planning
+- executing an approved plan
+- systematic debugging
+- test-driven development
+- requesting or receiving code review
 
-Do not auto-invoke it for:
-
-- ordinary questions
-- explanations
-- configuration checks
-- local machine troubleshooting
-- installation verification
-- process inspection
-- docs-only cleanup unless the user explicitly requests the workflow
-
-This keeps cheap tasks cheap and prevents heavy process scaffolding from
-crowding the context.
+Do not auto-invoke Superpowers just because the task is software development.
+The user should explicitly request the workflow, or an already-active
+Superpowers workflow should require the next Superpowers skill.
 
 ## Ownership Matrix
 
@@ -212,9 +226,10 @@ crowding the context.
 |---------|-------|---------|----------------|
 | `AGENTS.md` | Codex instructions | Durable repo behavior, commands, verification, routing policy | Runtime databases or secrets |
 | LeanCTX MCP | Context and reads | `ctx_read`, `ctx_tree`, `ctx_search`, compressed shell output | Agent orchestration |
+| Context7 MCP | Current docs | Library, framework, SDK, API, CLI, and cloud-service documentation | Local code search or business logic debugging |
 | Ruflo MCP | Orchestration | Agents, swarms, task state, AgentDB memory | Formatting, linting, raw file reads |
 | Caveman | Response style | Concise narrative | Code, commands, errors, routing |
-| Superpowers | Dev workflow | Non-trivial implementation and review workflows | Status checks, docs-only edits, simple config checks |
+| Superpowers | Manual dev workflow | Explicitly requested implementation and review workflows | Automatic activation for every software task |
 | `.codexignore` | Agent context boundary | Excluding token-heavy or sensitive files from Codex context | Source-control policy |
 | `.gitignore` | Source-control boundary | Keeping runtime state and generated files untracked | Agent context by itself |
 
@@ -254,7 +269,8 @@ Avoid stronger or higher-reasoning models for:
 1. Use LeanCTX before native file reads when LeanCTX MCP tools are available.
 2. Use Ruflo only when persistent orchestration or memory is useful.
 3. Keep Caveman out of code, command, and error text.
-4. Keep Superpowers limited to software development workflows.
+4. Keep Superpowers manual-only unless an active Superpowers workflow requires
+   the next skill.
 5. Keep runtime state ignored and out of agent context.
 6. Verify claims with real commands before documenting them.
 7. Prefer project-native checks over invented harness commands.

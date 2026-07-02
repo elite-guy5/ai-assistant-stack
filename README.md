@@ -1,32 +1,37 @@
 # Token Saver Setup
 
-macOS-only instruction-file installer for Codex and Claude Code.
+macOS-only target-aware installer for Codex and Claude Code environments.
 
-This repository provides the global and project Markdown instruction files for
-Codex and Claude Code, plus Git hook automation that seeds those project files
-into repositories. The installed instruction files are configured to coordinate
-with LeanCTX, Context7, Caveman, Superpowers, and Ruflo when those tools are
-available.
+This repository installs the recommended local agent stack for selected Codex
+and Claude Code surfaces, plus the global and project Markdown instruction
+files and Git hook automation that seed project instruction files into
+repositories.
 
-The installer does not install command-line tools, package managers, editor
-extensions, plugins, skills, external protocol servers, or other third-party
-software. It only installs Markdown instruction files, a shared seeding script,
-and Git hooks that manage project instruction files.
+The target-aware install flow installs and configures the agent-stack tools
+recommended by this repository after selected AI client prerequisites pass.
+Selected AI clients and VS Code are prerequisites; this installer does not
+install Codex, Claude, or VS Code.
 
 ## How It Works
 
-1. The installer copies global instruction files into `~/.codex/AGENTS.md` and
+1. The installer prompts for one or more target surfaces, or accepts
+   `--targets` in non-interactive mode.
+2. It verifies selected AI clients and the VS Code `code` CLI before making
+   changes.
+3. It installs and configures the recommended stack tools: LeanCTX, Context7,
+   Ruflo, Caveman, and Superpowers.
+4. It copies global instruction files into `~/.codex/AGENTS.md` and
    `~/.claude/CLAUDE.md`.
-2. It copies project templates into `~/.codex/AGENTS.project-template.md` and
+5. It copies project templates into `~/.codex/AGENTS.project-template.md` and
    `~/.claude/CLAUDE.project-template.md`.
-3. It installs a shared seeding script at
+6. It installs a shared seeding script at
    `~/.agents/scripts/seed-project-instructions.sh`.
-4. It installs Git template hooks and configures
+7. It installs Git template hooks and configures
    `git config --global init.templateDir ~/.agents/git-template`.
-5. New Git repositories inherit those hooks. The hooks create `AGENTS.md`,
+8. New Git repositories inherit those hooks. The hooks create `AGENTS.md`,
    `CLAUDE.md`, or both from the project templates only when neither
    project instruction file already exists.
-6. Your AI tool can then fill out the seeded project file with repository
+9. Your AI tool can then fill out the seeded project file with repository
    purpose, commands, testing rules, coding standards, and context boundaries.
 
 Existing repository-local `AGENTS.md` and `CLAUDE.md` files are preserved by
@@ -34,6 +39,11 @@ default.
 
 ## What It Installs
 
+- LeanCTX configuration
+- Context7 MCP configuration
+- Ruflo MCP and runtime-state configuration
+- Caveman skill/plugin configuration
+- Superpowers skill/plugin configuration
 - Codex global instructions: `~/.codex/AGENTS.md`
 - Codex project template: `~/.codex/AGENTS.project-template.md`
 - Claude Code global instructions: `~/.claude/CLAUDE.md`
@@ -60,17 +70,15 @@ install managed hooks in the current repository when it is run from inside one.
 - The global files require Caveman as a compression skill for conversational
   narrative, prompt instructions, and logs while preserving code, paths, flags,
   APIs, and error output exactly.
-- The global files route software development work through Superpowers
-  workflows when relevant.
+- The global files keep Superpowers manual-only unless the user explicitly
+  requests that workflow in a session.
 - Project templates give each repository a local place for purpose, language,
   commands, tests, coding standards, project-specific rules, and context
   boundaries.
 
-## Manual Agent Stack Setup Guides
+## Agent Stack Setup Guides
 
-The installer does not install LeanCTX, Context7, Ruflo, Caveman, Superpowers,
-MCP servers, plugins, or external agent tools. Use these guides when
-configuring those optional tools manually:
+The installer follows these guides when configuring stack tools:
 
 - [Codex agent stack setup](docs/codex-agent-stack-setup.md) explains how to
   configure LeanCTX, Context7, Ruflo, Caveman, and Superpowers so `AGENTS.md`
@@ -79,46 +87,77 @@ configuring those optional tools manually:
   equivalent Claude Code setup for `CLAUDE.md`, Claude settings, MCP servers,
   hooks, and skills.
 
-## What It Does Not Install
+## Prerequisites
 
-This project does not install or configure third-party tools. Optional agent
-ecosystem tools must be installed manually by the user outside this installer.
+Selected AI clients and VS Code are prerequisites, not install targets.
 
-The installer never runs package-manager setup commands and never configures
-external services. Git hooks created by this project only manage `AGENTS.md`
-and `CLAUDE.md` files.
+| Target | Required prerequisites |
+|--------|------------------------|
+| `codex-desktop` | Codex client or `codex` CLI |
+| `codex-vscode` | Codex client or `codex` CLI, VS Code `code` CLI |
+| `claude-desktop` | Claude client or `claude` CLI |
+| `claude-vscode` | Claude client or `claude` CLI, VS Code `code` CLI |
 
-## Install the Markdown Files and Hooks
+If a selected prerequisite is missing, the installer stops before making
+changes and prints the missing prerequisite list.
+
+Context7 configuration requires an API key in the install environment:
+
+```bash
+export CONTEXT7_API_KEY="your-context7-api-key"
+```
+
+If `CONTEXT7_API_KEY` is missing, the installer stops before Context7
+configuration and prints setup instructions.
+
+## One-Command Install
 
 Users do not need to clone this repository. The bootstrap script downloads a
 temporary archive, verifies it when a checksum is provided, runs the installer,
 and removes the temporary files when it exits.
 
-Install Codex and Claude Code instruction files and hooks without cloning:
+Interactive target-aware install:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --tools both
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash
 ```
 
-Install only Codex instruction files and hooks without cloning:
+Non-interactive target-aware install:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --tools codex
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --targets codex-desktop,codex-vscode
 ```
 
-Install only Claude Code instruction files and hooks without cloning:
+Supported targets:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --tools claude
-```
+- `codex-desktop`
+- `codex-vscode`
+- `claude-desktop`
+- `claude-vscode`
 
 Use `TOKEN_SAVER_BOOTSTRAP_REF` to install a specific branch, tag, or commit.
 Use `TOKEN_SAVER_BOOTSTRAP_SHA256` when you want the downloaded archive to match
 a known checksum.
 
-If you already have this repository checked out, you can run the installer
-directly from the repository. Use `--tools both` when you want both Codex and
-Claude Code instruction files and project hooks.
+Installer logs are written to:
+
+```text
+~/.agents/install.log
+```
+
+## Legacy Instruction-File Install
+
+The `--tools` flow remains available for compatibility when you only want
+instruction files, templates, the seeding script, and Git hooks.
+
+Install Codex and Claude Code instruction files and hooks without stack setup:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --tools both
+```
+
+If you already have this repository checked out for development, you can run the
+installer directly from the repository.
 
 Install Codex and Claude Code instruction files and hooks:
 
@@ -302,9 +341,10 @@ The following guide is copied from the Obsidian note
 repository documents the larger environment this instruction-file manager is
 designed to support.
 
-Everything in this section is optional and manual. These commands are not run
-by `scripts/install.sh`, `scripts/bootstrap.sh`, or the Git hooks installed by
-this project.
+This section is a manual reference for the larger local environment this
+installer configures. The target-aware installer follows the stack setup guides
+above; use the commands below only when diagnosing or configuring a machine by
+hand.
 
 ### Component Overview
 

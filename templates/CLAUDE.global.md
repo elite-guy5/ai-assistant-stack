@@ -64,6 +64,13 @@ Claude Code reads `CLAUDE.md` as persistent instruction context. Use Claude Code
 - Keep MCP server names distinct so Claude Code can namespace tool definitions cleanly.
 - Verify MCP availability from Claude Code before relying on a server. A binary on `PATH` does not prove the MCP server is active.
 
+### Context7
+
+Use Context7 MCP for current documentation when working with libraries,
+frameworks, SDKs, APIs, CLIs, and cloud services. Do not use Context7 for
+general programming concepts, refactoring from local code, or business logic
+debugging.
+
 ### Hook Protection
 
 - Use Claude Code hooks for mechanical enforcement such as blocking dangerous commands, protecting secrets, recording session events, or invoking deterministic helper scripts.
@@ -98,29 +105,9 @@ Keep the following completely intact and uncompressed:
 
 ### Superpowers
 
-Superpowers is optional. Invoke it only when explicitly requested or when the
-active session already requires it.
-
-Use Superpowers as a structured workflow layer for:
-
-- writing code
-- editing code
-- implementing features
-- fixing bugs
-- refactoring
-- testing
-- code review
-- creating or editing skills
-
-Do not invoke Superpowers by default for:
-
-- ordinary questions
-- explanations
-- configuration checks
-- local machine troubleshooting
-- installation verification
-- process inspection
-- simple documentation edits
+Invoke Superpowers manually when a task explicitly requests the workflow or
+when an already-active Superpowers workflow requires the next Superpowers skill.
+Do not auto-invoke Superpowers just because the task is software development.
 
 ### Sandbox Boundary
 

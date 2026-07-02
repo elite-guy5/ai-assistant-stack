@@ -46,6 +46,13 @@
 - **Agent Coordination & Memory:** ALWAYS route task planning, sub-agent spawns, swarm coordination, and cross-session memory tracking through available Ruflo MCP tools such as `swarm_init`, `agent_spawn`, `agent_execute`, `hooks_worker_detect`, and `memory_retrieve`.
 - **Context Footprint Optimization:** Keep LeanCTX on its minimal tool profile (`lean-ctx tools minimal`) and use `ctx_call` for non-core LeanCTX capabilities so tool definitions do not crowd out Ruflo's swarm capabilities in Codex's system prompt.
 
+### Context7
+
+Use Context7 MCP for current documentation when working with libraries,
+frameworks, SDKs, APIs, CLIs, and cloud services. Do not use Context7 for
+general programming concepts, refactoring from local code, or business logic
+debugging.
+
 ### Context & AST Isolation
 
 - Route all file reading, structural workspace analysis, and code sweeps through the LeanCTX MCP server infrastructure.
@@ -76,29 +83,9 @@
 
 ### Superpowers
 
-Superpowers is optional. Invoke it only when the user explicitly requests it or
-when the active session already requires it.
-
-Use Superpowers as a structured workflow layer for:
-
-- writing code
-- editing code
-- implementing features
-- fixing bugs
-- refactoring
-- testing
-- code review
-- creating or editing skills
-
-Do not invoke Superpowers by default for:
-
-- ordinary questions
-- explanations
-- configuration checks
-- local machine troubleshooting
-- installation verification
-- process inspection
-- other non-development tasks
+Invoke Superpowers manually when a task explicitly requests the workflow or
+when an already-active Superpowers workflow requires the next Superpowers skill.
+Do not auto-invoke Superpowers just because the task is software development.
 
 ### Sandbox Boundary
 

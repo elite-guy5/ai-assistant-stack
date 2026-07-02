@@ -12,10 +12,12 @@ model names.
 - MCP servers are registered through Claude Code MCP configuration, not
   `~/.codex/config.toml`.
 - LeanCTX handles file and context compression.
+- Context7 handles current documentation lookup for libraries, frameworks,
+  SDKs, APIs, CLIs, and cloud services.
 - Ruflo handles orchestration, swarm state, AgentDB memory, and hooks when
   explicitly configured for Claude Code.
 - Caveman remains response compression only.
-- Superpowers remains a software-development workflow layer.
+- Superpowers remains a manually invoked software-development workflow layer.
 
 ## Required Claude Files
 
@@ -122,6 +124,28 @@ If Claude Code hooks also run shell commands, do not let LeanCTX shell hooks and
 Ruflo shell hooks both claim ownership of the same lifecycle event without a
 clear order.
 
+## Context7 For Claude Code
+
+Context7 is the documentation lookup layer for current library, framework, SDK,
+API, CLI, and cloud-service docs.
+
+Before running the installer, create a Context7 API key and expose it to the
+install session:
+
+```bash
+export CONTEXT7_API_KEY="your-context7-api-key"
+```
+
+Configure Context7 for Claude Code with:
+
+```bash
+claude mcp add --scope user --header "CONTEXT7_API_KEY: $CONTEXT7_API_KEY" --transport http context7 https://mcp.context7.com/mcp
+```
+
+Do not commit the API key to any repository. If `CONTEXT7_API_KEY` is missing,
+the installer must stop before Context7 configuration and print these
+instructions.
+
 ## Ruflo For Claude Code
 
 Use Ruflo for:
@@ -211,24 +235,20 @@ Never compress:
 
 ## Superpowers For Claude Code
 
-Use Superpowers only for software development work:
+Superpowers is a workflow layer for software development tasks. Invoke it
+manually in a session when the task needs that workflow.
 
-- implementation
-- bug fixing
-- refactoring
-- testing
-- code review
-- skill creation or editing
+Use Superpowers for:
 
-Do not invoke it automatically for:
+- implementation planning
+- executing an approved plan
+- systematic debugging
+- test-driven development
+- requesting or receiving code review
 
-- installation checks
-- local process inspection
-- simple documentation edits
-- ordinary explanations
-- config status checks
-
-This prevents unnecessary workflow overhead and token use.
+Do not auto-invoke Superpowers just because the task is software development.
+The user should explicitly request the workflow, or an already-active
+Superpowers workflow should require the next Superpowers skill.
 
 ## Claude Model Routing
 
@@ -255,7 +275,8 @@ models instead of guessing model IDs.
 2. Keep LeanCTX responsible for context and reads.
 3. Keep Ruflo responsible for persistent orchestration and memory.
 4. Keep Caveman responsible for prose compression only.
-5. Keep Superpowers responsible for software-development workflows only.
+5. Keep Superpowers manual-only unless an active Superpowers workflow requires
+   the next skill.
 6. Keep hooks deterministic and narrowly scoped.
 7. Keep runtime databases ignored and out of agent context.
 8. Verify helper files exist before enabling hooks that reference them.
