@@ -121,8 +121,14 @@ bootstrap_runs_local_archive_without_required_checkout() {
   cp -R "$ROOT/templates" "$archive_root/templates"
   tar -czf "$archive" -C "$tmp" token-saver-setup-main
 
-  HOME="$home" TOKEN_SAVER_BOOTSTRAP_ARCHIVE="$archive" bash "$ROOT/scripts/bootstrap.sh" --non-interactive --tools codex --dry-run >"$tmp/bootstrap-local.out"
+  mkdir -p "$home/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
+  chmod +x "$home/bin/codex"
 
+  HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key TOKEN_SAVER_BOOTSTRAP_ARCHIVE="$archive" \
+    bash "$ROOT/scripts/bootstrap.sh" --non-interactive --targets codex-desktop --dry-run >"$tmp/bootstrap-local.out"
+
+  assert_contains "$(cat "$tmp/bootstrap-local.out")" "Selected targets: codex-desktop"
   assert_contains "$(cat "$tmp/bootstrap-local.out")" "Selected tools: codex"
   assert_contains "$(cat "$tmp/bootstrap-local.out")" "Install complete"
 }
