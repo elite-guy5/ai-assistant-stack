@@ -6,58 +6,59 @@
 
 ### Purpose
 
-macOS-only installer for Codex and Claude Code instruction files plus Git hook
-automation that seeds project-level instruction files into Git repositories.
+AI Assistant Stack is a Bash-based installer and bootstrapper for configuring token-efficient AI coding environments across Codex and Claude Code.
+
+It installs and manages global instruction files, project templates, repository seeding hooks, and optional stack tooling for LeanCTX, Context7, Caveman, and Superpowers.
 
 ### Language / Framework
 
-Bash, Markdown instruction templates, Git hook scripts, and shell-based
-regression tests.
+- Primary language: Bash shell scripts.
+- Documentation and templates: Markdown.
+- Runtime environment: macOS-oriented POSIX shell environment with Git; `scripts/bootstrap.sh` also requires `curl` or `wget` for remote archive installs.
+- External tools configured or invoked: `lean-ctx`, `codex`, `claude`, `code`, `npx`, Git hooks, and Context7 MCP setup commands.
+- No application framework, package manager manifest, compiled build, or database layer is configured in this repository.
 
 ### Key Entry Points
 
-`scripts/install.sh`, `scripts/bootstrap.sh`,
-`scripts/seed-project-instructions.sh`, `templates/AGENTS.global.md`,
-`templates/AGENTS.project-template.md`, `templates/CLAUDE.global.md`,
-`templates/CLAUDE.project-template.md`, and `tests/*.sh`.
+- `README.md`: user-facing install, uninstall, bootstrap, and development guide.
+- `scripts/bootstrap.sh`: clone-free remote bootstrap entry point.
+- `scripts/install.sh`: main installer, uninstall flow, dry-run behavior, and hook installation logic.
+- `scripts/lib/targets.sh`: target selection and `--targets` to `--tools` derivation.
+- `scripts/lib/preflight.sh`: selected-target prerequisite checks.
+- `scripts/lib/stack-tools.sh`: LeanCTX, Context7, Caveman, and Superpowers setup.
+- `scripts/lib/logging.sh`: install logging and redaction helpers.
+- `scripts/seed-project-instructions.sh`: project instruction file seeding logic.
+- `templates/AGENTS.global.md`, `templates/AGENTS.project-template.md`, `templates/CLAUDE.global.md`, `templates/CLAUDE.project-template.md`: installed instruction templates.
+- `docs/codex-agent-stack-setup.md`, `docs/claude-agent-stack-setup.md`: stack setup references used by the README and installer behavior.
+- `tests/*.sh`: shell regression suite for installer behavior, targets, preflight, logging, hooks, bootstrap, and security-sensitive flows.
+- `.gitignore`, `.codexignore`, `.copilotignore`, `.claude/settings.json`: local context and secret-boundary configuration.
 
 ---
 
-## Development Commands
+## Commands
 
 | Task | Command |
 |------|---------|
-| **Build** | No compiled build; scripts are interpreted. |
+| **Build** | No compiled build is configured. Use `bash -n scripts/*.sh tests/*.sh` as the syntax/build-equivalent check. |
 | **Test** | `for test in tests/*.sh; do bash "$test"; done` |
-| **Format** | No project-native formatter is configured. Preserve existing shell and Markdown style. |
+| **Format** | No project-native formatter is configured. Preserve the existing Bash and Markdown style. |
 | **Lint / Typecheck** | `bash -n scripts/*.sh tests/*.sh` |
-| **Run** | `bash scripts/install.sh --dry-run --non-interactive --tools both` |
-
-## Verification Requirements
-
-After code changes:
-
-1. Run `bash -n scripts/*.sh tests/*.sh`.
-2. Run `for test in tests/*.sh; do bash "$test"; done`.
-3. Run the repository scan requested by the task when scope changes affect
-   removed setup surfaces.
-4. Run `git diff --check`.
-5. Report failures directly instead of claiming success.
+| **Run** | No local server is provided. Use `bash scripts/install.sh --dry-run --non-interactive --tools both` for a local installer preview, or `bash scripts/bootstrap.sh --dry-run --non-interactive --tools both` for bootstrap-path verification. |
 
 ### Required Verification Flow
 
 After editing files:
 
 ```text
-1. Run the relevant project-native check for the changed files.
-2. Run shell syntax checks when scripts or tests changed.
-3. Run the shell regression suite when installer, hook, or template behavior changed.
+1. Run the project-native formatter for changed files, if configured.
+2. Run the project-native lint or typecheck command, if configured.
+3. Run the relevant tests.
 4. Review the diff.
 5. Declare completion only after verification passes or clearly report failures.
 ```
 
-For documentation-only edits, `git diff --check -- <changed-files>` is the
-minimum required verification.
+If the project has no formatter, linter, or tests yet, state that explicitly and
+verify with the best available command.
 
 ---
 
@@ -65,76 +66,46 @@ minimum required verification.
 
 ### Testing
 
-- Tests live under `tests/*.sh` and run with Bash.
-- Tests create temporary homes and repositories so installer behavior is checked
-  without mutating the real machine.
-- Cover installer safety, tool selection, Git template hook behavior,
-  current-repo hook wrapping, seeding, uninstall, bootstrap checksum checks, and
-  removed setup surfaces.
+- Tests live in `tests/*.sh` and are plain Bash scripts with `set -euo pipefail`.
+- Each test script creates temporary homes, repositories, archives, or stub executables as needed so installer behavior can be verified without mutating the real user environment.
+- Run one focused test with `bash tests/<name>.sh`.
+- Run the full regression suite with `for test in tests/*.sh; do bash "$test"; done`.
+- Run `bash -n scripts/*.sh tests/*.sh` before or with behavior tests after editing shell files.
+- High-value regression coverage includes:
+  - `tests/install-dry-run.sh` for non-interactive and dry-run behavior.
+  - `tests/install-targets.sh` for target normalization and tool derivation.
+  - `tests/install-preflight.sh` for fail-fast prerequisite checks.
+  - `tests/install-stack-tools.sh` for stack setup command paths.
+  - `tests/security-regression.sh` for managed hook behavior, archive checksum handling, clone-free bootstrap, and piped-bootstrap execution.
 
 ### Coding Style & Architecture
 
-- Keep scripts POSIX/Bash-style and aligned with the existing shell patterns.
-- Keep installer behavior in `scripts/install.sh`; keep project-file seeding in
-  `scripts/seed-project-instructions.sh`; keep bootstrap download/checksum
-  behavior in `scripts/bootstrap.sh`.
-- Keep reusable instruction text in `templates/*.md` and avoid hardcoding
-  duplicate instruction bodies in scripts.
-- Maintain the split between global instruction templates and project template
-  files for both Codex and Claude Code.
-- Prefer explicit, idempotent managed-marker updates for Git hooks and generated
-  instruction files.
-- Avoid adding package-manager, plugin, protocol-server, or external CLI setup
-  paths unless the repository scope is explicitly expanded.
-
-### Coding Standards
-
-- Keep the installer Bash-only and macOS-focused.
-- Do not add package-manager, plugin, skill, protocol-server, or external CLI
-  setup paths unless the task explicitly expands installer scope.
-- Preserve user-owned files by default. Overwrite only when an explicit
-  overwrite flag is provided, and create backups before replacement.
-- Keep hooks idempotent by using managed markers.
-- Keep hooks limited to `AGENTS.md` and `CLAUDE.md` project instruction files.
-- Do not delete repo-local instruction files during uninstall.
-
-### Project-Specific Rules
-
-- Interactive install asks whether to configure Codex, Claude Code, or both.
-- Non-interactive install requires `--tools codex`, `--tools claude`, or
-  `--tools both`.
-- Future repository support is provided through Git template hooks under
-  `~/.agents/git-template/hooks/`.
-- Existing repositories are configured only when the user passes `--repo` or
-  accepts the interactive current-repo prompt.
-- This checkout is used to validate Codex-focused instruction and hook setup.
-  Keep repo guidance centered on Codex unless the task explicitly targets
-  Claude Code templates.
-- LeanCTX tool-footprint setup for this environment uses
-  `lean-ctx tools minimal`. Do not document `lean-ctx config set mode lazy`
-  unless that command has been re-verified against the installed LeanCTX
-  version.
+- Keep installer logic in Bash and match the existing `set -euo pipefail` style.
+- Keep shared helper logic in `scripts/lib/*.sh`; source helpers from `scripts/install.sh` rather than duplicating target, preflight, logging, or stack-tool logic.
+- Keep `scripts/bootstrap.sh` limited to archive download, optional checksum verification, archive extraction, prompt TTY handling, and dispatch to `scripts/install.sh`.
+- Keep instruction-file seeding behavior in `scripts/seed-project-instructions.sh`; it should skip existing project instruction files unless overwrite is explicit.
+- Preserve dry-run behavior by routing filesystem and external commands through the existing `run` / `run_logged` helpers where practical.
+- Preserve secret redaction for Context7 credentials and do not print raw API keys in logs, dry-run output, tests, or docs.
+- Managed Git hook content should keep `TOKEN_SAVER_MANAGED_HOOK_BEGIN` / `TOKEN_SAVER_MANAGED_HOOK_END` markers so reruns and uninstall remain deterministic.
+- Prefer explicit shell assertions inside tests over adding a test framework or package-managed dependency.
+- Keep the repository package-free unless a requested change truly requires a dependency manager.
+- Treat docs and templates as part of the product surface; changes to `README.md`, `docs/*.md`, and `templates/*.md` should stay consistent with actual installer flags and behavior.
 
 ---
 
 ## Token-Saver File Boundaries
 
-Unless required for the current task, avoid loading generated artifacts,
-dependency directories, logs, coverage reports, build outputs, secrets, binary
-assets, and local databases.
+- Keep generated files, secrets, logs, coverage reports, dependency folders,
+  local databases, and binary assets out of agent context by default.
+- Projects should maintain:
+  - `.gitignore`
+  - `.codexignore`
+  - `.claude/settings.json`
 
-Project-specific exclusions should be maintained through `.gitignore`,
-`.codexignore`, `.claude/settings.json`, and related ignore files.
-
-This repository maintains these context-boundary files:
-
-- `.gitignore`
-- `.codexignore`
-- `.claude/settings.json`
-- `.copilotignore`
-
-If this repository requires broader or narrower exclusions, update the local
-ignore files and verify them with `git check-ignore -v` when relevant.
+- If this repository requires broader or narrower exclusions, update the local
+  ignore files instead of weakening global behavior.
+- Keep `.claude/settings.local.json` for private machine-local Claude settings
+  only, and do not commit it.
 
 ---
 
@@ -202,10 +173,6 @@ Merge or create PR
 Clean up branch
 ```
 
-- Review `git diff` before reporting completion.
-- Mention unrelated dirty files separately; do not revert or normalize them
-  unless explicitly asked.
-
 ---
 
 ## Instruction Precedence
@@ -213,17 +180,15 @@ Clean up branch
 Instruction precedence is:
 
 ```text
-Direct user request
+Local AGENTS.md
         |
-Local project AGENTS.md
+Applicable skills, including Superpowers when invoked
         |
 Global ~/.codex/AGENTS.md
-        |
-Applicable skills and tool instructions
 ```
 
-Project-specific overrides should be placed under **Conventions** or
-**Development Workflow** whenever possible.
+Project-specific overrides should be placed under the **Conventions** section
+whenever possible.
 
 ---
 
@@ -233,7 +198,5 @@ Project-specific overrides should be placed under **Conventions** or
 
 - Generalizable learnings and correction logs should be written directly to the
   personal Obsidian vault using the Obsidian integration when available.
-- Project-specific durable notes for this repository belong under
-  `Projects/AI Assistant Stack` in the Obsidian vault.
 - Only the primary supervising agent is authorized to write or append to the
   Obsidian vault to prevent parallel write-collision locks.
