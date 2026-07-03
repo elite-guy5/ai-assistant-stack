@@ -5,7 +5,12 @@ BOOTSTRAP_REF="${TOKEN_SAVER_BOOTSTRAP_REF:-${TOKEN_SAVER_BOOTSTRAP_COMMIT:-main
 ARCHIVE_URL="${TOKEN_SAVER_BOOTSTRAP_URL:-https://github.com/elite-guy5/token-saver-setup/archive/$BOOTSTRAP_REF.tar.gz}"
 ARCHIVE_SHA256="${TOKEN_SAVER_BOOTSTRAP_SHA256:-}"
 LOCAL_ARCHIVE="${TOKEN_SAVER_BOOTSTRAP_ARCHIVE:-}"
+PROMPT_TTY="${TOKEN_SAVER_PROMPT_TTY:-0}"
 tmp_dir="$(mktemp -d)"
+
+if [ -z "${BASH_SOURCE[0]:-}" ] && [ ! -t 0 ] && [ -r /dev/tty ] && [ -w /dev/tty ]; then
+  PROMPT_TTY=1
+fi
 
 cleanup() {
   rm -rf "$tmp_dir"
@@ -89,4 +94,5 @@ if [ "${1:-}" = "--dry-run" ] && [ -n "$LOCAL_ARCHIVE" ]; then
 fi
 
 repo_dir="$(extract_archive "$archive")"
+export TOKEN_SAVER_PROMPT_TTY="$PROMPT_TTY"
 exec bash "$repo_dir/scripts/install.sh" "$@"

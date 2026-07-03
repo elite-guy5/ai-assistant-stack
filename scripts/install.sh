@@ -126,7 +126,7 @@ Which tool should this installer configure?
   3) Both
 EOF
   printf 'Selection [3]: '
-  read -r choice
+  read_prompt_value choice
   case "${choice:-3}" in
     1|codex|Codex) tools="codex" ;;
     2|claude|Claude|claude-code) tools="claude" ;;
@@ -147,7 +147,7 @@ prompt_yes_no() {
   fi
 
   printf '%s %s ' "$prompt" "$suffix"
-  read -r answer
+  read_prompt_value answer
   answer="${answer:-$default}"
   case "$answer" in
     y|Y|yes|YES) return 0 ;;

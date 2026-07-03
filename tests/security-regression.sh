@@ -133,11 +133,34 @@ bootstrap_runs_local_archive_without_required_checkout() {
   assert_contains "$(cat "$tmp/bootstrap-local.out")" "Install complete"
 }
 
+bootstrap_runs_when_script_is_piped_to_bash() {
+  local archive="$tmp/bootstrap-piped.tar.gz"
+  local home="$tmp/home-bootstrap-piped"
+  local archive_root="$tmp/token-saver-setup-piped"
+  mkdir -p "$home/bin" "$archive_root"
+  cp -R "$ROOT/scripts" "$archive_root/scripts"
+  cp -R "$ROOT/templates" "$archive_root/templates"
+  tar -czf "$archive" -C "$tmp" token-saver-setup-piped
+
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/code"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/claude"
+  chmod +x "$home/bin/codex" "$home/bin/code" "$home/bin/claude"
+
+  HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key TOKEN_SAVER_BOOTSTRAP_ARCHIVE="$archive" \
+    bash -s -- --overwrite --dry-run < "$ROOT/scripts/bootstrap.sh" >"$tmp/bootstrap-piped.out"
+
+  assert_contains "$(cat "$tmp/bootstrap-piped.out")" "Selected targets: codex-desktop,codex-vscode,claude-desktop,claude-vscode"
+  assert_contains "$(cat "$tmp/bootstrap-piped.out")" "Selected tools: both"
+  assert_contains "$(cat "$tmp/bootstrap-piped.out")" "Install complete"
+}
+
 git_template_hooks_seed_future_repos
 current_repo_hook_wraps_existing_hook_and_seeds_selected_files
 seeder_skips_existing_files_and_overwrite_creates_backup
 seeder_skips_project_when_any_instruction_file_exists
 bootstrap_rejects_tampered_archive
 bootstrap_runs_local_archive_without_required_checkout
+bootstrap_runs_when_script_is_piped_to_bash
 
 printf 'security-regression.sh: OK\n'

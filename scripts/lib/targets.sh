@@ -3,6 +3,28 @@
 targets=""
 target_mode=0
 
+read_prompt_value() {
+  local var_name="$1"
+  local value=""
+
+  if [ "${TOKEN_SAVER_PROMPT_TTY:-0}" = "1" ] && [ -r /dev/tty ] && [ -w /dev/tty ]; then
+    if IFS= read -r value 2>/dev/null < /dev/tty; then
+      printf -v "$var_name" '%s' "$value"
+      return 0
+    fi
+    value=""
+  fi
+
+  if IFS= read -r value; then
+    printf -v "$var_name" '%s' "$value"
+    return 0
+  else
+    value=""
+  fi
+
+  printf -v "$var_name" '%s' "$value"
+}
+
 normalize_targets() {
   local raw="$1"
   local normalized=""
@@ -65,7 +87,7 @@ Which AI surfaces should this installer configure?
 Enter comma-separated selections [5]:
 EOF
   printf 'Selection [5]: '
-  read -r choice
+  read_prompt_value choice
   choice="${choice:-5}"
 
   case "$choice" in
