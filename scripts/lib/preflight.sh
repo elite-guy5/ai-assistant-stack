@@ -38,7 +38,9 @@ preflight_targets() {
   fi
 
   if target_enabled claude-desktop; then
-    require_command_for_target "claude-desktop" "claude" "Install Claude Code before running this installer."
+    require_command_for_target "
+    claude-desktop" "claude" "Install Claude Code before running this installer.
+    "
   fi
 
   if target_enabled claude-vscode; then
