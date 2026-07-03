@@ -1,16 +1,27 @@
-# Token Saver Setup
+# AI Assistant Stack
 
-macOS-only target-aware installer for Codex and Claude Code instruction files,
-Git hook automation, and the selected local agent stack this repository still
-manages.
+**AI Assistant Stack** is an AI assistant stack that helps reduce token usage while improving the quality and consistency of AI-assisted development.
 
-The installer can configure LeanCTX, Context7, Caveman, and Superpowers after
-selected AI client prerequisites pass. It also installs global and project
-Markdown instruction files plus Git hooks that seed project instruction files
-into repositories.
+Instead of configuring multiple tools by hand, AI Assistant Stack installs and configures a curated development stack that works together to provide better project context, access to up-to-date documentation, and reusable AI workflows.
 
-Selected AI clients and VS Code are prerequisites. This installer does not
-install Codex, Claude Code, or VS Code.
+## What Gets Installed
+
+- **LeanCTX** for efficient project context management.
+- **Context7** for live documentation and API reference retrieval.
+- **Caveman** for reusable AI development skills and workflows.
+- **Superpowers** for additional AI productivity enhancements.
+- **Optimized AI Instruction Files** at both the global and project levels, giving AI coding assistants consistent instructions across every repository.
+- **AI Instruction Project Bootstrap** installs a Git hook that automatically seeds new Git repositories with the appropriate **AGENTS.md** and/or **CLAUDE.md** project files, ensuring every project starts with an optimized AI configuration.
+
+## Benefits
+
+- Reduce token consumption
+- Improve AI context quality
+- Standardize AI behavior across projects
+- Speed up new project setup
+- Keep project instructions synchronized automatically
+- Eliminate repetitive AI configuration
+...
 
 ## Prerequisites
 
@@ -39,28 +50,11 @@ Users do not need to clone this repository. The bootstrap script downloads a
 temporary archive, verifies it when a checksum is provided, runs the installer,
 and removes the temporary files when it exits.
 
-Interactive target-aware install:
+Install Command:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash
 ```
-
-Non-interactive target-aware install:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --targets codex-desktop,codex-vscode
-```
-
-Supported targets:
-
-- `codex-desktop`
-- `codex-vscode`
-- `claude-desktop`
-- `claude-vscode`
-
-Use `TOKEN_SAVER_BOOTSTRAP_REF` to install a specific branch, tag, or commit.
-Use `TOKEN_SAVER_BOOTSTRAP_SHA256` when you want the downloaded archive to match
-a known checksum.
 
 Installer logs are written to:
 

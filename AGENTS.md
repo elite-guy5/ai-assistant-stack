@@ -234,6 +234,6 @@ Project-specific overrides should be placed under **Conventions** or
 - Generalizable learnings and correction logs should be written directly to the
   personal Obsidian vault using the Obsidian integration when available.
 - Project-specific durable notes for this repository belong under
-  `Projects/Token Saver Setup` in the Obsidian vault.
+  `Projects/AI Assistant Stack` in the Obsidian vault.
 - Only the primary supervising agent is authorized to write or append to the
   Obsidian vault to prevent parallel write-collision locks.
