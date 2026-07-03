@@ -28,27 +28,46 @@ require_command_for_target() {
   status_ok "$command_name found for $target"
 }
 
-# Check only the prerequisites needed by the selected target surfaces.
+# Check that at least one Claude product surface is available, then verify the
+# runtime commands needed by each detected surface.
+preflight_claude() {
+  local has_cli=0
+  local has_desktop=0
+
+  claude_cli_available && has_cli=1
+  claude_desktop_available && has_desktop=1
+
+  if [ "$has_cli" = "0" ] && [ "$has_desktop" = "0" ]; then
+    preflight_die "claude" "Claude Desktop or claude CLI" "Install Claude Desktop, install the Claude Code CLI, or both."
+  fi
+
+  if [ "$has_cli" = "1" ]; then
+    log_line "preflight_ok target=claude command=claude"
+    status_ok "claude found for claude"
+  else
+    status_skipped "Claude Code CLI not found; skipping CLI-only setup"
+  fi
+
+  if [ "$has_desktop" = "1" ]; then
+    log_line "preflight_ok target=claude app=$(claude_desktop_app_path)"
+    status_ok "Claude Desktop found"
+    require_command_for_target "claude" "node" "Install Node.js so this installer can update Claude Desktop MCP configuration."
+    require_command_for_target "claude" "npx" "Install Node.js/npm so Claude Desktop can launch the Context7 MCP server."
+  else
+    status_skipped "Claude Desktop app not found; skipping Desktop MCP config"
+  fi
+}
+
+# Check only the prerequisites needed by the selected products and detected
+# product surfaces.
 preflight_targets() {
   step "Preflight selected targets"
 
-  if target_enabled codex-desktop; then
-    require_command_for_target "codex-desktop" "codex" "Install Codex before running this installer."
+  if target_enabled codex; then
+    require_command_for_target "codex" "codex" "Install Codex before running this installer."
   fi
 
-  if target_enabled codex-vscode; then
-    require_command_for_target "codex-vscode" "codex" "Install Codex before running this installer."
-    require_command_for_target "codex-vscode" "code" "Install VS Code and enable the code shell command."
-  fi
-
-  if target_enabled claude-desktop; then
-    require_command_for_target "claude-desktop" "claude" "Install the Claude Code CLI so the claude command is on PATH.
-The Claude desktop app alone does not provide the required CLI."
-  fi
-
-  if target_enabled claude-vscode; then
-    require_command_for_target "claude-vscode" "claude" "Install the Claude Code CLI so the claude command is on PATH.
-The Claude desktop app alone does not provide the required CLI."
-    require_command_for_target "claude-vscode" "code" "Install VS Code and enable the code shell command."
+  if target_enabled claude; then
+    preflight_claude
   fi
 }

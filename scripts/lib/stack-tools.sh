@@ -30,6 +30,60 @@ run_stack_command() {
   fi
 }
 
+# Merge the local Context7 MCP server into Claude Desktop's config without
+# logging the raw API key.
+configure_claude_desktop_context7() {
+  local config
+  local backup
+
+  config="$(claude_desktop_config_path)"
+  if [ "$dry_run" = "1" ]; then
+    status_dry_run "Configure Context7 for Claude Desktop $config"
+    log_line "update_claude_desktop_config=$config server=context7"
+    return 0
+  fi
+
+  if [ -e "$config" ]; then
+    backup="$(backup_path "$config")"
+    status_ok "Backing up $config to $backup"
+    mkdir -p "$(dirname "$config")"
+    cp "$config" "$backup"
+  fi
+
+  mkdir -p "$(dirname "$config")"
+  CONTEXT7_API_KEY="$CONTEXT7_API_KEY" node - "$config" <<'NODE'
+const fs = require("fs");
+
+const configPath = process.argv[2];
+const apiKey = process.env.CONTEXT7_API_KEY;
+let config = {};
+
+if (fs.existsSync(configPath) && fs.readFileSync(configPath, "utf8").trim()) {
+  config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+}
+
+if (!config || Array.isArray(config) || typeof config !== "object") {
+  throw new Error("Claude Desktop config must be a JSON object");
+}
+
+if (!config.mcpServers || Array.isArray(config.mcpServers) || typeof config.mcpServers !== "object") {
+  config.mcpServers = {};
+}
+
+config.mcpServers.context7 = {
+  command: "npx",
+  args: ["-y", "@upstash/context7-mcp"],
+  env: {
+    CONTEXT7_API_KEY: apiKey
+  }
+};
+
+fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+NODE
+  status_ok "Configure Context7 for Claude Desktop $config"
+  log_line "update_claude_desktop_config=$config server=context7"
+}
+
 # Install LeanCTX when missing and switch it to the minimal tool profile.
 install_leanctx() {
   step "Install LeanCTX"
@@ -45,7 +99,8 @@ install_leanctx() {
   fi
 }
 
-# Register the Context7 MCP server for each selected AI client.
+# Register the Context7 MCP server for each selected AI product and detected
+# product surface.
 configure_context7() {
   step "Configure Context7"
   require_context7_credentials
@@ -54,20 +109,30 @@ configure_context7() {
     run_stack_command "Configure Context7 for Codex" codex mcp add context7 -- npx -y @upstash/context7-mcp --api-key "$CONTEXT7_API_KEY"
   fi
 
-  if tool_enabled claude; then
+  if tool_enabled claude && claude_cli_available; then
     run_stack_command "Configure Context7 for Claude Code" claude mcp add --scope user --header "CONTEXT7_API_KEY: $CONTEXT7_API_KEY" --transport http context7 https://mcp.context7.com/mcp
+  elif tool_enabled claude; then
+    status_skipped "Claude Code CLI not found; skipped Claude Code Context7"
+  fi
+
+  if tool_enabled claude && claude_desktop_available; then
+    configure_claude_desktop_context7
+  elif tool_enabled claude; then
+    status_skipped "Claude Desktop app not found; skipped Desktop Context7"
   fi
 }
 
-# Install Caveman support for each selected AI client.
+# Install Caveman support for each selected AI product and detected CLI surface.
 install_caveman() {
   step "Install Caveman"
   if tool_enabled codex; then
     run_stack_command "Install Caveman for Codex" npx skills add JuliusBrussee/caveman -a codex
   fi
 
-  if tool_enabled claude; then
+  if tool_enabled claude && claude_cli_available; then
     run_stack_command "Install Caveman for Claude Code" sh -c "claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman"
+  elif tool_enabled claude; then
+    status_skipped "Claude Code CLI not found; skipped Caveman for Claude Code"
   fi
 }
 
@@ -81,10 +146,12 @@ install_superpowers() {
     run_stack_command "Link Superpowers skills for Codex" ln -sfn "$HOME/.codex/superpowers/skills" "$HOME/.agents/skills/superpowers"
   fi
 
-  if tool_enabled claude; then
+  if tool_enabled claude && claude_cli_available; then
     run_stack_command "Install Superpowers for Claude Code" sh -c "if [ -d \"$HOME/.claude/superpowers/.git\" ]; then git -C \"$HOME/.claude/superpowers\" pull; else git clone https://github.com/obra/superpowers.git \"$HOME/.claude/superpowers\"; fi"
     run_stack_command "Prepare Superpowers skills directory for Claude Code" mkdir -p "$HOME/.claude/skills"
     run_stack_command "Link Superpowers skills for Claude Code" ln -sfn "$HOME/.claude/superpowers/skills" "$HOME/.claude/skills/superpowers"
+  elif tool_enabled claude; then
+    status_skipped "Claude Code CLI not found; skipped Superpowers for Claude Code"
   fi
 }
 

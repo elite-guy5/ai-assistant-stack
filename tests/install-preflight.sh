@@ -32,55 +32,60 @@ missing_codex_stops_before_changes() {
   mkdir -p "$home"
 
   if HOME="$home" PATH="/usr/bin:/bin" CONTEXT7_API_KEY=test-key \
-    bash "$ROOT/scripts/install.sh" --non-interactive --targets codex-desktop >"$tmp/codex.out" 2>"$tmp/codex.err"; then
+    bash "$ROOT/scripts/install.sh" --non-interactive --targets codex >"$tmp/codex.out" 2>"$tmp/codex.err"; then
     printf 'missing codex unexpectedly succeeded\n' >&2
     exit 1
   fi
 
-  assert_contains "$(cat "$tmp/codex.err")" "missing prerequisite for codex-desktop: codex"
+  assert_contains "$(cat "$tmp/codex.err")" "missing prerequisite for codex: codex"
   assert_contains "$(cat "$tmp/codex.err")" "No files or configuration were changed."
   assert_not_exists "$home/.codex/AGENTS.md"
   assert_not_exists "$home/.agents/scripts/seed-project-instructions.sh"
 }
 
-# Verify Codex VS Code targets require the VS Code command in addition to Codex.
-missing_vscode_stops_before_changes() {
-  local home="$tmp/home-missing-code"
-  mkdir -p "$home/bin"
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
-  chmod +x "$home/bin/codex"
-
-  if HOME="$home" PATH="$home/bin:/usr/bin:/bin" CONTEXT7_API_KEY=test-key \
-    bash "$ROOT/scripts/install.sh" --non-interactive --targets codex-vscode >"$tmp/code.out" 2>"$tmp/code.err"; then
-    printf 'missing code unexpectedly succeeded\n' >&2
-    exit 1
-  fi
-
-  assert_contains "$(cat "$tmp/code.err")" "missing prerequisite for codex-vscode: code"
-  assert_contains "$(cat "$tmp/code.err")" "Install VS Code and enable the code shell command."
-  assert_not_exists "$home/.codex/AGENTS.md"
-}
-
-# Verify missing Claude Code stops the install before Claude files are written.
-missing_claude_stops_before_changes() {
+# Verify missing Claude surfaces stop the install before Claude files are
+# written.
+missing_claude_surfaces_stop_before_changes() {
   local home="$tmp/home-missing-claude"
   mkdir -p "$home"
 
   if HOME="$home" PATH="/usr/bin:/bin" CONTEXT7_API_KEY=test-key \
-    bash "$ROOT/scripts/install.sh" --non-interactive --targets claude-desktop >"$tmp/claude.out" 2>"$tmp/claude.err"; then
+    CLAUDE_DESKTOP_APP_PATH="$home/missing/Claude.app" \
+    bash "$ROOT/scripts/install.sh" --non-interactive --targets claude >"$tmp/claude.out" 2>"$tmp/claude.err"; then
     printf 'missing claude unexpectedly succeeded\n' >&2
     exit 1
   fi
 
-  assert_contains "$(cat "$tmp/claude.err")" "missing prerequisite for claude-desktop: claude"
-  assert_contains "$(cat "$tmp/claude.err")" "Install the Claude Code CLI so the claude command is on PATH."
-  assert_contains "$(cat "$tmp/claude.err")" "The Claude desktop app alone does not provide the required CLI."
+  assert_contains "$(cat "$tmp/claude.err")" "missing prerequisite for claude: Claude Desktop or claude CLI"
+  assert_contains "$(cat "$tmp/claude.err")" "Install Claude Desktop, install the Claude Code CLI, or both."
   assert_not_exists "$home/.claude/CLAUDE.md"
 }
 
-# Run the preflight failure scenarios.
+# Verify Claude Desktop alone is enough for the Claude product target when the
+# local MCP runtime commands are available.
+claude_desktop_without_cli_passes_preflight() {
+  local home="$tmp/home-claude-desktop-only"
+  local output
+  mkdir -p "$home/bin" "$home/Applications/Claude.app"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/node"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/npx"
+  chmod +x "$home/bin/node" "$home/bin/npx"
+
+  output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" CONTEXT7_API_KEY=test-key \
+      CLAUDE_DESKTOP_APP_PATH="$home/Applications/Claude.app" \
+      bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --targets claude
+  )"
+
+  assert_contains "$output" "OK Claude"
+  assert_contains "$output" "OK Claude Desktop found"
+  assert_contains "$output" "Skipped Claude Code CLI not found"
+  assert_contains "$output" "Dry run Configure Context7 for Claude Desktop"
+}
+
+# Run the preflight scenarios.
 missing_codex_stops_before_changes
-missing_vscode_stops_before_changes
-missing_claude_stops_before_changes
+missing_claude_surfaces_stop_before_changes
+claude_desktop_without_cli_passes_preflight
 
 printf 'install-preflight.sh: OK\n'

@@ -4,9 +4,9 @@
 # after parsing arguments or prompts.
 targets=""
 target_mode=0
-target_values=(codex-desktop codex-vscode claude-desktop claude-vscode)
-target_labels=("Codex Desktop" "Codex VS Code" "Claude Code CLI" "Claude Code VS Code")
-target_count=4
+target_values=(codex claude)
+target_labels=("Codex" "Claude")
+target_count=2
 selector_test_keys="${TOKEN_SAVER_TEST_KEYS-}"
 
 # Read one prompt response, using /dev/tty when bootstrap itself was piped into
@@ -33,12 +33,14 @@ read_prompt_value() {
   printf -v "$var_name" '%s' "$value"
 }
 
-# Normalize a comma-separated target list, reject unknown targets, and remove
-# duplicates while preserving selection order.
+# Normalize a comma-separated product target list, reject unknown targets, and
+# remove duplicates while preserving selection order. Older surface-level names
+# remain accepted as aliases for the product-level targets.
 normalize_targets() {
   local raw="$1"
   local normalized=""
   local item
+  local target
   local old_ifs="$IFS"
 
   raw="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
@@ -47,12 +49,13 @@ normalize_targets() {
   IFS=','
   for item in $raw; do
     case "$item" in
-      codex-desktop|codex-vscode|claude-desktop|claude-vscode) ;;
+      codex|codex-desktop|codex-vscode) target=codex ;;
+      claude|claude-desktop|claude-code|claude-vscode|claude-code-vscode) target=claude ;;
       *) IFS="$old_ifs"; die "invalid --targets value: $item" ;;
     esac
     case ",$normalized," in
-      *",$item,"*) ;;
-      *) normalized="${normalized:+$normalized,}$item" ;;
+      *",$target,"*) ;;
+      *) normalized="${normalized:+$normalized,}$target" ;;
     esac
   done
   IFS="$old_ifs"
@@ -60,7 +63,7 @@ normalize_targets() {
   printf '%s\n' "$normalized"
 }
 
-# Return success when the normalized target list includes a specific surface.
+# Return success when the normalized target list includes a product.
 target_enabled() {
   case ",$targets," in
     *",$1,"*) return 0 ;;
@@ -68,16 +71,14 @@ target_enabled() {
   esac
 }
 
-# Collapse selected target surfaces into the legacy tool selector used by
+# Collapse selected product targets into the legacy tool selector used by
 # instruction-file installation.
 derive_tools_from_targets() {
   local has_codex=0
   local has_claude=0
 
-  target_enabled codex-desktop && has_codex=1
-  target_enabled codex-vscode && has_codex=1
-  target_enabled claude-desktop && has_claude=1
-  target_enabled claude-vscode && has_claude=1
+  target_enabled codex && has_codex=1
+  target_enabled claude && has_claude=1
 
   case "$has_codex:$has_claude" in
     1:1) printf 'both\n' ;;
@@ -87,17 +88,17 @@ derive_tools_from_targets() {
   esac
 }
 
-# Prompt for target surfaces with a keyboard checklist. Targets intentionally
+# Prompt for products with a keyboard checklist. Targets intentionally
 # start unselected so the installer never applies to every surface by default.
 prompt_targets() {
   local focus=0
   local key selected message=""
 
   if [ -z "$selector_test_keys" ] && { [ ! -r /dev/tty ] || [ ! -w /dev/tty ]; }; then
-    die "interactive target selection requires a terminal; rerun with --targets codex-desktop,codex-vscode,claude-desktop,claude-vscode"
+    die "interactive target selection requires a terminal; rerun with --targets codex,claude"
   fi
 
-  target_selected=(0 0 0 0)
+  target_selected=(0 0)
 
   while true; do
     # Real terminal redraws replace the selector in place; captured test output
@@ -108,7 +109,7 @@ prompt_targets() {
     render_target_selector "$focus" "$message"
     message=""
 
-    read_selector_key key || die "interactive target selection requires a terminal; rerun with --targets codex-desktop,codex-vscode,claude-desktop,claude-vscode"
+    read_selector_key key || die "interactive target selection requires a terminal; rerun with --targets codex,claude"
     case "$key" in
       up)
         focus=$((focus - 1))
@@ -287,7 +288,7 @@ selector_action_from_escape() {
   esac
 }
 
-# Convert selected checklist rows back to the canonical comma-separated target
+# Convert selected checklist rows back to the canonical comma-separated product
 # list used by the non-interactive install path.
 selected_targets_value() {
   local i selected=""
@@ -297,4 +298,34 @@ selected_targets_value() {
     fi
   done
   printf '%s\n' "$selected"
+}
+
+# Return the Claude Desktop app path when one is available. Tests can override
+# detection with CLAUDE_DESKTOP_APP_PATH to keep host state isolated.
+claude_desktop_app_path() {
+  local path
+
+  if [ -n "${CLAUDE_DESKTOP_APP_PATH:-}" ]; then
+    [ -d "$CLAUDE_DESKTOP_APP_PATH" ] && printf '%s\n' "$CLAUDE_DESKTOP_APP_PATH"
+    return 0
+  fi
+
+  for path in "$HOME/Applications/Claude.app" "/Applications/Claude.app"; do
+    if [ -d "$path" ]; then
+      printf '%s\n' "$path"
+      return 0
+    fi
+  done
+}
+
+claude_desktop_available() {
+  [ -n "$(claude_desktop_app_path)" ]
+}
+
+claude_desktop_config_path() {
+  printf '%s\n' "${CLAUDE_DESKTOP_CONFIG_PATH:-$HOME/Library/Application Support/Claude/claude_desktop_config.json}"
+}
+
+claude_cli_available() {
+  command -v claude >/dev/null 2>&1
 }

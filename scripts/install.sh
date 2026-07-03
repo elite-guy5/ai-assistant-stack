@@ -36,8 +36,7 @@ usage() {
 Usage: bash scripts/install.sh [options]
 
 Options:
-  --targets <list>         Comma-separated target surfaces:
-                           codex-desktop,codex-vscode,claude-desktop,claude-vscode.
+  --targets <list>         Comma-separated product targets: codex,claude.
                            Derives --tools automatically.
   --tools <codex|claude|both>
                            Legacy instruction-file tools to configure.
@@ -453,10 +452,8 @@ fi
 if [ "$target_mode" = "1" ]; then
   phase "Selected targets"
   log_kv "selected_targets" "$targets"
-  target_enabled codex-desktop && status_ok "Codex Desktop"
-  target_enabled codex-vscode && status_ok "Codex VS Code"
-  target_enabled claude-desktop && status_ok "Claude Code CLI"
-  target_enabled claude-vscode && status_ok "Claude Code VS Code"
+  target_enabled codex && status_ok "Codex"
+  target_enabled claude && status_ok "Claude"
 fi
 phase "Selected tools"
 status_ok "$tools"

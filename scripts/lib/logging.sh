@@ -10,7 +10,7 @@ redact_text() {
   sed -E \
     -e 's/CONTEXT7_API_KEY=[^[:space:]]+/CONTEXT7_API_KEY=<redacted>/g' \
     -e 's/(--api-key)[[:space:]]+[^[:space:]]+/\1 <redacted>/g' \
-    -e 's/(CONTEXT7_API_KEY: )[^"]+/\1<redacted>/g'
+    -e 's/(CONTEXT7_API_KEY: )[^[:space:]]+/\1<redacted>/g'
 }
 
 # Append a timestamped, redacted line to the install log.

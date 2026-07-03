@@ -78,9 +78,9 @@ removed_flags_are_rejected() {
   assert_contains "$(cat "$tmp/removed.err")" "unknown option: --ai-apps"
 }
 
-# Verify interactive target selection can choose a single Codex desktop target
+# Verify interactive target selection can choose the Codex product target
 # with Space/Enter and decline current-repo hook installation through stdin.
-interactive_selection_can_choose_codex_desktop() {
+interactive_selection_can_choose_codex() {
   local home="$tmp/home-interactive"
   local output
   mkdir -p "$home/bin"
@@ -93,10 +93,10 @@ interactive_selection_can_choose_codex_desktop() {
   )"
 
   assert_contains "$output" "Select targets to configure"
-  assert_contains "$output" "> ○ Codex Desktop"
-  assert_contains "$output" "> ● Codex Desktop"
+  assert_contains "$output" "> ○ Codex"
+  assert_contains "$output" "> ● Codex"
   assert_contains "$output" "Selected targets"
-  assert_contains "$output" "OK Codex Desktop"
+  assert_contains "$output" "OK Codex"
   assert_contains "$output" "Selected tools"
   assert_contains "$output" "OK codex"
   assert_contains "$output" "$home/.codex/AGENTS.md"
@@ -107,6 +107,6 @@ interactive_selection_can_choose_codex_desktop() {
 requires_tools_in_non_interactive_mode
 dry_run_codex_only_has_no_third_party_actions
 removed_flags_are_rejected
-interactive_selection_can_choose_codex_desktop
+interactive_selection_can_choose_codex
 
 printf 'install-dry-run.sh: OK\n'

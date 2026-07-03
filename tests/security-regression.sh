@@ -144,10 +144,10 @@ bootstrap_runs_local_archive_without_required_checkout() {
   chmod +x "$home/bin/codex"
 
   HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key TOKEN_SAVER_BOOTSTRAP_ARCHIVE="$archive" \
-    bash "$ROOT/scripts/bootstrap.sh" --non-interactive --targets codex-desktop --dry-run >"$tmp/bootstrap-local.out"
+    bash "$ROOT/scripts/bootstrap.sh" --non-interactive --targets codex --dry-run >"$tmp/bootstrap-local.out"
 
   assert_contains "$(cat "$tmp/bootstrap-local.out")" "Selected targets"
-  assert_contains "$(cat "$tmp/bootstrap-local.out")" "OK Codex Desktop"
+  assert_contains "$(cat "$tmp/bootstrap-local.out")" "OK Codex"
   assert_contains "$(cat "$tmp/bootstrap-local.out")" "Selected tools"
   assert_contains "$(cat "$tmp/bootstrap-local.out")" "OK codex"
   assert_contains "$(cat "$tmp/bootstrap-local.out")" "Install complete"
@@ -169,14 +169,12 @@ bootstrap_runs_when_script_is_piped_to_bash() {
   printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/claude"
   chmod +x "$home/bin/codex" "$home/bin/code" "$home/bin/claude"
 
-  HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key TOKEN_SAVER_BOOTSTRAP_ARCHIVE="$archive" TOKEN_SAVER_TEST_KEYS=$' j j j \n' \
+  HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key TOKEN_SAVER_BOOTSTRAP_ARCHIVE="$archive" TOKEN_SAVER_TEST_KEYS=$' \033[B \n' \
     bash -s -- --overwrite --dry-run < "$ROOT/scripts/bootstrap.sh" >"$tmp/bootstrap-piped.out"
 
   assert_contains "$(cat "$tmp/bootstrap-piped.out")" "Select targets to configure"
-  assert_contains "$(cat "$tmp/bootstrap-piped.out")" "OK Codex Desktop"
-  assert_contains "$(cat "$tmp/bootstrap-piped.out")" "OK Codex VS Code"
-  assert_contains "$(cat "$tmp/bootstrap-piped.out")" "OK Claude Code CLI"
-  assert_contains "$(cat "$tmp/bootstrap-piped.out")" "OK Claude Code VS Code"
+  assert_contains "$(cat "$tmp/bootstrap-piped.out")" "OK Codex"
+  assert_contains "$(cat "$tmp/bootstrap-piped.out")" "OK Claude"
   assert_contains "$(cat "$tmp/bootstrap-piped.out")" "Selected tools"
   assert_contains "$(cat "$tmp/bootstrap-piped.out")" "OK both"
   assert_contains "$(cat "$tmp/bootstrap-piped.out")" "Install complete"

@@ -47,7 +47,7 @@ target_install_output_names_stack_actions() {
 
   output="$(
     HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key \
-      bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --targets codex-desktop
+      bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --targets codex
   )"
 
   assert_contains "$output" "Preflight selected targets"

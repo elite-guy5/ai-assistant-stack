@@ -27,13 +27,17 @@ Instead of configuring multiple tools by hand, AI Assistant Stack installs and c
 
 | Target | Required prerequisites |
 |--------|------------------------|
-| `codex-desktop` | Codex client or `codex` CLI |
-| `codex-vscode` | Codex client or `codex` CLI, VS Code `code` CLI |
-| `claude-desktop` | Claude Code CLI (`claude`) |
-| `claude-vscode` | Claude Code CLI (`claude`), VS Code `code` CLI |
+| `codex` | Codex CLI (`codex`) |
+| `claude` | Claude Desktop, Claude Code CLI (`claude`), or both |
 
 If a selected prerequisite is missing, the installer stops before making
 changes and prints the missing prerequisite list.
+
+When `claude` is selected, the installer detects installed Claude surfaces. It
+updates Claude Desktop MCP configuration when the Desktop app is present, and it
+uses `claude mcp` plus Claude plugin commands when the Claude Code CLI is
+present. If only one Claude surface is installed, the missing surface is skipped
+instead of blocking the install.
 
 Context7 configuration requires an API key in the install environment:
 
@@ -72,6 +76,8 @@ Installer logs are written to:
 - Codex project template: `~/.codex/AGENTS.project-template.md`
 - Claude Code global instructions: `~/.claude/CLAUDE.md`
 - Claude Code project template: `~/.claude/CLAUDE.project-template.md`
+- Claude Desktop Context7 MCP entry:
+  `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Shared seeding script: `~/.agents/scripts/seed-project-instructions.sh`
 - Git template hooks:
   - `~/.agents/git-template/hooks/post-checkout`
@@ -323,12 +329,15 @@ repository when the installer is run from inside a Git worktree.
 
 | Option | Purpose |
 |--------|---------|
+| `--targets codex` | Configure the Codex product stack. |
+| `--targets claude` | Configure the Claude product stack for detected Desktop and CLI surfaces. |
+| `--targets codex,claude` | Configure both product stacks. |
 | `--tools codex` | Install only Codex instruction files and hooks. |
 | `--tools claude` | Install only Claude Code instruction files and hooks. |
 | `--tools both` | Install both instruction-file sets. |
 | `--repo <path>` | Also seed and install managed hooks in an existing repo. |
 | `--dry-run` | Print actions without changing files. |
-| `--non-interactive` | Disable prompts; requires `--tools`. |
+| `--non-interactive` | Disable prompts; requires `--targets` or `--tools`. |
 | `--overwrite` | Back up and replace existing target files. |
 | `--overwrite-global-instructions` | Back up and replace global instruction files. |
 | `--overwrite-project-templates` | Back up and replace project templates. |

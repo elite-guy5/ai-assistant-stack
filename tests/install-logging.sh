@@ -39,7 +39,7 @@ target_mode_writes_log() {
 
   output="$(
     HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=secret-value \
-      bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --targets codex-desktop
+      bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --targets codex
   )"
   log="$home/.agents/install.log"
 
@@ -50,7 +50,7 @@ target_mode_writes_log() {
 
   assert_contains "$output" "Initialize install log"
   assert_contains "$output" "Log $log"
-  assert_contains "$(cat "$log")" "selected_targets=codex-desktop"
+  assert_contains "$(cat "$log")" "selected_targets=codex"
   assert_contains "$(cat "$log")" "selected_tools=codex"
   assert_contains "$(cat "$log")" "dry_run_command="
   assert_not_contains "$(cat "$log")" "secret-value"
