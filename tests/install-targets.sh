@@ -119,4 +119,35 @@ interactive_selector_uses_space_toggles() {
 
 interactive_selector_uses_space_toggles
 
+# Verify terminal arrow escape sequences move focus before Space toggles the
+# selected row. Some terminals use ESC [ B and others use ESC O B.
+interactive_selector_supports_arrow_keys() {
+  local home="$tmp/home-arrows"
+  local output
+  mkdir -p "$home/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/code"
+  chmod +x "$home/bin/codex" "$home/bin/code"
+
+  output="$(
+    printf 'n\n' | HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key TOKEN_SAVER_TEST_KEYS=$'\033[B \n' \
+      bash "$ROOT/scripts/install.sh" --dry-run
+  )"
+
+  assert_contains "$output" "> ○ Codex VS Code"
+  assert_contains "$output" "> ● Codex VS Code"
+  assert_contains "$output" "OK Codex VS Code"
+
+  output="$(
+    printf 'n\n' | HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key TOKEN_SAVER_TEST_KEYS=$'\033OB \n' \
+      bash "$ROOT/scripts/install.sh" --dry-run
+  )"
+
+  assert_contains "$output" "> ○ Codex VS Code"
+  assert_contains "$output" "> ● Codex VS Code"
+  assert_contains "$output" "OK Codex VS Code"
+}
+
+interactive_selector_supports_arrow_keys
+
 printf 'install-targets.sh: OK\n'

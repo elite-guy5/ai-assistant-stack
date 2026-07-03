@@ -188,16 +188,7 @@ read_selector_key() {
   local raw_key rest
 
   if [ -n "$selector_test_keys" ]; then
-    raw_key="${selector_test_keys:0:1}"
-    selector_test_keys="${selector_test_keys:1}"
-    case "$raw_key" in
-      '') printf -v "$__var" 'eof' ;;
-      $'\n'|$'\r') printf -v "$__var" 'enter' ;;
-      ' ') printf -v "$__var" 'space' ;;
-      j) printf -v "$__var" 'down' ;;
-      k) printf -v "$__var" 'up' ;;
-      *) printf -v "$__var" 'other' ;;
-    esac
+    consume_selector_test_key "$__var"
     return 0
   fi
 
@@ -206,27 +197,92 @@ read_selector_key() {
     return 1
   fi
 
-  # Arrow keys arrive as escape sequences, so ESC needs one short follow-up
-  # read to distinguish up/down from unrelated escape input.
+  # Arrow keys arrive as escape sequences, so ESC needs a short follow-up read
+  # to capture the terminal-specific sequence suffix.
   IFS= read -rsn1 raw_key < /dev/tty || {
     printf -v "$__var" 'eof'
     return 1
   }
   if [ "$raw_key" = $'\033' ]; then
-    IFS= read -rsn2 -t 0.05 rest < /dev/tty || rest=""
-    case "$rest" in
-      '[A') printf -v "$__var" 'up' ;;
-      '[B') printf -v "$__var" 'down' ;;
-      *) printf -v "$__var" 'other' ;;
-    esac
+    rest="$(read_escape_suffix_from_tty)"
+    selector_action_from_escape "$__var" "$rest"
+    return 0
+  fi
+  if [ -z "$raw_key" ]; then
+    printf -v "$__var" 'enter'
     return 0
   fi
 
+  selector_action_from_char "$__var" "$raw_key"
+}
+
+# Consume one test key or escape sequence from TOKEN_SAVER_TEST_KEYS. This lets
+# tests exercise the same arrow-key parser without opening /dev/tty.
+consume_selector_test_key() {
+  local __var="$1"
+  local raw_key rest
+
+  raw_key="${selector_test_keys:0:1}"
+  selector_test_keys="${selector_test_keys:1}"
+  if [ -z "$raw_key" ]; then
+    printf -v "$__var" 'eof'
+    return 0
+  fi
+  if [ "$raw_key" = $'\033' ]; then
+    rest=""
+    while [ -n "$selector_test_keys" ]; do
+      raw_key="${selector_test_keys:0:1}"
+      selector_test_keys="${selector_test_keys:1}"
+      rest="$rest$raw_key"
+      case "$raw_key" in
+        A|B|C|D|~) break ;;
+      esac
+    done
+    selector_action_from_escape "$__var" "$rest"
+    return 0
+  fi
+
+  selector_action_from_char "$__var" "$raw_key"
+}
+
+# Read the rest of an escape sequence. Terminals can send normal cursor mode
+# sequences like ESC [ B or application cursor mode sequences like ESC O B.
+read_escape_suffix_from_tty() {
+  local suffix="" char
+
+  while IFS= read -rsn1 -t 1 char < /dev/tty; do
+    suffix="$suffix$char"
+    case "$char" in
+      A|B|C|D|~) break ;;
+    esac
+  done
+  printf '%s' "$suffix"
+}
+
+# Map single-byte selector input to logical actions used by prompt_targets.
+selector_action_from_char() {
+  local __var="$1"
+  local raw_key="$2"
+
   case "$raw_key" in
-    $'\n'|$'\r') printf -v "$__var" 'enter' ;;
-    ' ') printf -v "$__var" 'space' ;;
-    j) printf -v "$__var" 'down' ;;
-    k) printf -v "$__var" 'up' ;;
+      '') printf -v "$__var" 'eof' ;;
+      $'\n'|$'\r') printf -v "$__var" 'enter' ;;
+      ' ') printf -v "$__var" 'space' ;;
+      j) printf -v "$__var" 'down' ;;
+      k) printf -v "$__var" 'up' ;;
+      *) printf -v "$__var" 'other' ;;
+  esac
+}
+
+# Map terminal escape suffixes to selector actions. Both CSI and application
+# cursor modes are supported because different terminals emit different forms.
+selector_action_from_escape() {
+  local __var="$1"
+  local rest="$2"
+
+  case "$rest" in
+    '[A'|'OA') printf -v "$__var" 'up' ;;
+    '[B'|'OB') printf -v "$__var" 'down' ;;
     *) printf -v "$__var" 'other' ;;
   esac
 }
