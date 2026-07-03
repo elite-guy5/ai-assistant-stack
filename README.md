@@ -53,7 +53,7 @@ and removes the temporary files when it exits.
 Install Command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/ai-assistant-stack/main/scripts/bootstrap.sh | bash
 ```
 
 Installer logs are written to:
