@@ -202,7 +202,7 @@ instruction files, templates, the seeding script, and Git hooks.
 Install Codex and Claude Code instruction files and hooks without stack setup:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --tools both
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/ai-assistant-stack/main/scripts/bootstrap.sh | bash -s -- --tools both
 ```
 
 If you already have this repository checked out for development, you can run the

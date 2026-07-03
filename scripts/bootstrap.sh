@@ -2,7 +2,7 @@
 set -euo pipefail
 
 BOOTSTRAP_REF="${TOKEN_SAVER_BOOTSTRAP_REF:-${TOKEN_SAVER_BOOTSTRAP_COMMIT:-main}}"
-ARCHIVE_URL="${TOKEN_SAVER_BOOTSTRAP_URL:-https://github.com/elite-guy5/token-saver-setup/archive/$BOOTSTRAP_REF.tar.gz}"
+ARCHIVE_URL="${TOKEN_SAVER_BOOTSTRAP_URL:-https://github.com/elite-guy5/ai-assistant-stack/archive/$BOOTSTRAP_REF.tar.gz}"
 ARCHIVE_SHA256="${TOKEN_SAVER_BOOTSTRAP_SHA256:-}"
 LOCAL_ARCHIVE="${TOKEN_SAVER_BOOTSTRAP_ARCHIVE:-}"
 PROMPT_TTY="${TOKEN_SAVER_PROMPT_TTY:-0}"
@@ -70,21 +70,22 @@ extract_archive() {
 
   tar -xzf "$archive" -C "$tmp_dir"
 
-  for candidate in "$tmp_dir"/token-saver-setup-*; do
-    [ -d "$candidate" ] || continue
-    repo_dir="$candidate"
-    repo_count=$((repo_count + 1))
+  for candidate in "$tmp_dir"/ai-assistant-stack-* "$tmp_dir"/token-saver-setup-*; do
+    if [ -d "$candidate" ]; then
+      repo_dir="$candidate"
+      repo_count=$((repo_count + 1))
+    fi
   done
 
   if [ "$repo_count" -ne 1 ]; then
-    printf 'error: setup archive did not extract to one token-saver-setup directory\n' >&2
+    printf 'error: setup archive did not extract to one ai-assistant-stack directory\n' >&2
     exit 1
   fi
 
   printf '%s\n' "$repo_dir"
 }
 
-archive="$tmp_dir/token-saver-setup.tar.gz"
+archive="$tmp_dir/ai-assistant-stack.tar.gz"
 download_archive "$archive"
 verify_archive "$archive"
 

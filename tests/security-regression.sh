@@ -118,11 +118,11 @@ bootstrap_rejects_tampered_archive() {
 bootstrap_runs_local_archive_without_required_checkout() {
   local archive="$tmp/bootstrap-local.tar.gz"
   local home="$tmp/home-bootstrap"
-  local archive_root="$tmp/token-saver-setup-main"
+  local archive_root="$tmp/ai-assistant-stack-main"
   mkdir -p "$home" "$archive_root"
   cp -R "$ROOT/scripts" "$archive_root/scripts"
   cp -R "$ROOT/templates" "$archive_root/templates"
-  tar -czf "$archive" -C "$tmp" token-saver-setup-main
+  tar -czf "$archive" -C "$tmp" ai-assistant-stack-main
 
   mkdir -p "$home/bin"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
@@ -139,11 +139,11 @@ bootstrap_runs_local_archive_without_required_checkout() {
 bootstrap_runs_when_script_is_piped_to_bash() {
   local archive="$tmp/bootstrap-piped.tar.gz"
   local home="$tmp/home-bootstrap-piped"
-  local archive_root="$tmp/token-saver-setup-piped"
+  local archive_root="$tmp/ai-assistant-stack-piped"
   mkdir -p "$home/bin" "$archive_root"
   cp -R "$ROOT/scripts" "$archive_root/scripts"
   cp -R "$ROOT/templates" "$archive_root/templates"
-  tar -czf "$archive" -C "$tmp" token-saver-setup-piped
+  tar -czf "$archive" -C "$tmp" ai-assistant-stack-piped
 
   printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/code"
