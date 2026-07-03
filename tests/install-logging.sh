@@ -48,9 +48,11 @@ target_mode_writes_log() {
     exit 1
   }
 
-  assert_contains "$output" "Step: Initialize install log"
+  assert_contains "$output" "Initialize install log"
+  assert_contains "$output" "Log $log"
   assert_contains "$(cat "$log")" "selected_targets=codex-desktop"
   assert_contains "$(cat "$log")" "selected_tools=codex"
+  assert_contains "$(cat "$log")" "dry_run_command="
   assert_not_contains "$(cat "$log")" "secret-value"
   assert_contains "$(cat "$log")" "CONTEXT7_API_KEY=<redacted>"
 }

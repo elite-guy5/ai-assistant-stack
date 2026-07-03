@@ -25,6 +25,7 @@ require_command_for_target() {
   fi
 
   log_line "preflight_ok target=$target command=$command_name"
+  status_ok "$command_name found for $target"
 }
 
 # Check only the prerequisites needed by the selected target surfaces.

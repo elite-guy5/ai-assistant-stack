@@ -67,13 +67,11 @@ die() {
 }
 
 # Execute a command unless --dry-run is active, in which case print the command
-# with any secrets redacted.
+# to the redacted install log instead of crowding the progress output.
 run() {
   if [ "$dry_run" = "1" ]; then
     if command -v redact_text >/dev/null 2>&1; then
-      printf 'dry-run: %s\n' "$*" | redact_text
-    else
-      printf 'dry-run: %s\n' "$*"
+      log_line "dry_run_command=$*"
     fi
     return 0
   fi
@@ -189,16 +187,16 @@ install_file() {
   if [ -e "$target" ]; then
     if [ "$replace" = "1" ]; then
       backup="$(backup_path "$target")"
-      say "Backing up $target to $backup"
+      status_ok "Backing up $target to $backup"
       run mkdir -p "$(dirname "$target")"
       run cp "$target" "$backup"
     else
-      say "Skipped existing $target"
+      status_skipped "Existing $target"
       return 0
     fi
   fi
 
-  say "Installed $target"
+  status_ok "Installed $target"
   run mkdir -p "$(dirname "$target")"
   run cp "$source" "$target"
   record_state "managed_file" "$target"
@@ -207,7 +205,7 @@ install_file() {
 
 # Install the project instruction seeding script into the shared agents home.
 install_seeder() {
-  say "Installed $seeder_target"
+  status_ok "Installed $seeder_target"
   run mkdir -p "$(dirname "$seeder_target")"
   run cp "$ROOT/scripts/seed-project-instructions.sh" "$seeder_target"
   run chmod +x "$seeder_target"
@@ -240,14 +238,14 @@ install_hook_file() {
   local backup=""
 
   if [ -f "$hook" ] && grep -q 'TOKEN_SAVER_MANAGED_HOOK_BEGIN' "$hook"; then
-    say "Updated Git $label hook $hook"
+    status_ok "Updated Git $label hook $hook"
   elif [ -e "$hook" ]; then
     backup="$(backup_path "$hook")"
-    say "Backing up existing Git $label hook to $backup"
+    status_ok "Backing up existing Git $label hook to $backup"
     run mv "$hook" "$backup"
     record_state "hook_backup" "$hook=>$backup"
   else
-    say "Installed Git $label hook $hook"
+    status_ok "Installed Git $label hook $hook"
   fi
 
   run mkdir -p "$(dirname "$hook")"
@@ -255,7 +253,7 @@ install_hook_file() {
     hook_body "$backup" > "$hook"
     chmod +x "$hook"
   else
-    printf 'dry-run: write managed hook %s\n' "$hook"
+    status_dry_run "write managed hook $hook"
   fi
   record_state "managed_hook" "$hook"
 }
@@ -265,16 +263,17 @@ install_hook_file() {
 install_git_template_hooks() {
   local previous
 
+  phase "Git hooks"
   install_hook_file "$git_template_dir/hooks/post-checkout" "template post-checkout"
   install_hook_file "$git_template_dir/hooks/post-merge" "template post-merge"
 
   previous="$(git config --global --get init.templateDir 2>/dev/null || true)"
   if [ "$previous" != "$git_template_dir" ]; then
     record_single_state "previous_init_template_dir" "${previous:-__unset__}"
-    say "Configured git init.templateDir to $git_template_dir"
+    status_ok "Configured git init.templateDir to $git_template_dir"
     run git config --global init.templateDir "$git_template_dir"
   else
-    say "git init.templateDir already points to $git_template_dir"
+    status_ok "git init.templateDir already points to $git_template_dir"
   fi
 }
 
@@ -299,7 +298,8 @@ install_current_repo_hooks() {
     *) git_dir="$root/$git_dir" ;;
   esac
 
-  say "Seeding current repo $root"
+  phase "Current repository"
+  status_ok "Seeding current repo $root"
   seed_args=("$seeder_target" --tools "$tools")
   [ "$overwrite" = "1" ] && seed_args+=(--overwrite)
   seed_args+=("$root")
@@ -313,6 +313,7 @@ install_instruction_files() {
   local global_replace="$overwrite"
   local template_replace="$overwrite"
 
+  phase "Instruction files"
   [ "$overwrite_global" = "1" ] && global_replace=1
   [ "$overwrite_templates" = "1" ] && template_replace=1
 
@@ -450,10 +451,15 @@ fi
 
 # Report the normalized selection to stdout and to the install log.
 if [ "$target_mode" = "1" ]; then
-  say "Selected targets: $targets"
+  phase "Selected targets"
   log_kv "selected_targets" "$targets"
+  target_enabled codex-desktop && status_ok "Codex Desktop"
+  target_enabled codex-vscode && status_ok "Codex VS Code"
+  target_enabled claude-desktop && status_ok "Claude Desktop"
+  target_enabled claude-vscode && status_ok "Claude VS Code"
 fi
-say "Selected tools: $tools"
+phase "Selected tools"
+status_ok "$tools"
 log_kv "selected_tools" "$tools"
 [ -n "${CONTEXT7_API_KEY:-}" ] && log_line "CONTEXT7_API_KEY=$CONTEXT7_API_KEY"
 
@@ -485,4 +491,6 @@ if [ -n "$apply_current_repo" ]; then
   install_current_repo_hooks "${repo_path:-$PWD}"
 fi
 
-say "Install complete"
+phase "Summary"
+status_ok "Install complete"
+print_log_summary

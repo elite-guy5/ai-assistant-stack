@@ -54,7 +54,8 @@ dry_run_codex_only_has_no_third_party_actions() {
     HOME="$home" bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --tools codex
   )"
 
-  assert_contains "$output" "Selected tools: codex"
+  assert_contains "$output" "Selected tools"
+  assert_contains "$output" "OK codex"
   assert_contains "$output" "$home/.codex/AGENTS.md"
   assert_contains "$output" "$home/.codex/AGENTS.project-template.md"
   assert_contains "$output" "$home/.agents/git-template/hooks/post-checkout"
@@ -78,7 +79,7 @@ removed_flags_are_rejected() {
 }
 
 # Verify interactive target selection can choose a single Codex desktop target
-# and decline current-repo hook installation.
+# with Space/Enter and decline current-repo hook installation through stdin.
 interactive_selection_can_choose_codex_desktop() {
   local home="$tmp/home-interactive"
   local output
@@ -87,12 +88,17 @@ interactive_selection_can_choose_codex_desktop() {
   chmod +x "$home/bin/codex"
 
   output="$(
-    printf '1\nn\n' | HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key bash "$ROOT/scripts/install.sh" --dry-run
+    printf 'n\n' | HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key TOKEN_SAVER_TEST_KEYS=$' \n' \
+      bash "$ROOT/scripts/install.sh" --dry-run
   )"
 
-  assert_contains "$output" "Which AI surfaces should this installer configure?"
-  assert_contains "$output" "Selected targets: codex-desktop"
-  assert_contains "$output" "Selected tools: codex"
+  assert_contains "$output" "Select targets to configure"
+  assert_contains "$output" "> ○ Codex Desktop"
+  assert_contains "$output" "> ● Codex Desktop"
+  assert_contains "$output" "Selected targets"
+  assert_contains "$output" "OK Codex Desktop"
+  assert_contains "$output" "Selected tools"
+  assert_contains "$output" "OK codex"
   assert_contains "$output" "$home/.codex/AGENTS.md"
   assert_not_contains "$output" "$home/.claude/CLAUDE.md"
 }

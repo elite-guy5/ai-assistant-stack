@@ -40,7 +40,7 @@ context7_credentials_required() {
 # secrets redacted.
 dry_run_prints_stack_steps_for_codex() {
   local home="$tmp/home-stack-codex"
-  local output
+  local output log
   mkdir -p "$home/bin"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
   chmod +x "$home/bin/codex"
@@ -49,13 +49,15 @@ dry_run_prints_stack_steps_for_codex() {
     HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key \
       bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --targets codex-desktop
   )"
+  log="$home/.agents/install.log"
 
-  assert_contains "$output" "Step: Install LeanCTX"
-  assert_contains "$output" "Step: Configure Context7"
-  assert_contains "$output" "Step: Install Caveman"
-  assert_contains "$output" "Step: Install Superpowers"
-  assert_contains "$output" "codex mcp add context7"
-  assert_contains "$output" "--api-key <redacted>"
+  assert_contains "$output" "Install LeanCTX"
+  assert_contains "$output" "Configure Context7"
+  assert_contains "$output" "Install Caveman"
+  assert_contains "$output" "Install Superpowers"
+  assert_contains "$output" "Dry run Configure Context7 for Codex"
+  assert_contains "$(cat "$log")" "codex mcp add context7"
+  assert_contains "$(cat "$log")" "--api-key <redacted>"
 }
 
 # Run the stack-tool scenarios.

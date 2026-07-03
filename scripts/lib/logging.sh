@@ -3,6 +3,7 @@
 # Keep installer logs under the shared agents home unless a test or caller
 # overrides the path.
 install_log="${TOKEN_SAVER_LOG:-$agents_home/install.log}"
+install_title_printed=0
 
 # Redact Context7 credentials from dry-run output and persisted logs.
 redact_text() {
@@ -20,10 +21,53 @@ log_line() {
   printf '%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$message" | redact_text >> "$install_log"
 }
 
-# Print and log the current high-level installer step.
+# Print the installer title once, even when many phases are reported.
+print_title() {
+  [ "$install_title_printed" = "0" ] || return 0
+  say "AI Assistant Stack Setup"
+  say ""
+  install_title_printed=1
+}
+
+# Print and log the current high-level installer phase.
+phase() {
+  print_title
+  say ""
+  say "$*"
+  log_line "phase=$*"
+}
+
+# Keep the older step API as an alias because install helpers already use it.
 step() {
-  say "Step: $*"
-  log_line "step=$*"
+  phase "$*"
+}
+
+# Print one indented status row under the current phase.
+status_line() {
+  local status="$1"
+  shift
+  say "  $status $*"
+}
+
+status_ok() {
+  status_line "OK" "$@"
+}
+
+status_skipped() {
+  status_line "Skipped" "$@"
+}
+
+status_warning() {
+  status_line "Warning" "$@"
+}
+
+status_dry_run() {
+  status_line "Dry run" "$@"
+}
+
+# End the run with the exact log path for detailed troubleshooting.
+print_log_summary() {
+  status_line "Log" "$install_log"
 }
 
 # Log a key/value pair using the common log-line format.

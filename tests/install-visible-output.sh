@@ -28,7 +28,8 @@ install_output_names_instruction_file_actions() {
     HOME="$home" bash "$ROOT/scripts/install.sh" --non-interactive --tools both
   )"
 
-  assert_contains "$output" "Selected tools: both"
+  assert_contains "$output" "Selected tools"
+  assert_contains "$output" "OK both"
   assert_contains "$output" "Installed $home/.codex/AGENTS.md"
   assert_contains "$output" "Installed $home/.claude/CLAUDE.md"
   assert_contains "$output" "Installed Git template post-checkout hook"
@@ -49,11 +50,11 @@ target_install_output_names_stack_actions() {
       bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --targets codex-desktop
   )"
 
-  assert_contains "$output" "Step: Preflight selected targets"
-  assert_contains "$output" "Step: Install LeanCTX"
-  assert_contains "$output" "Step: Configure Context7"
-  assert_contains "$output" "Step: Install Caveman"
-  assert_contains "$output" "Step: Install Superpowers"
+  assert_contains "$output" "Preflight selected targets"
+  assert_contains "$output" "Install LeanCTX"
+  assert_contains "$output" "Configure Context7"
+  assert_contains "$output" "Install Caveman"
+  assert_contains "$output" "Install Superpowers"
   assert_contains "$output" "Install complete"
 }
 
