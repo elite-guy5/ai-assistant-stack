@@ -12,30 +12,63 @@ recommended by this repository after selected AI client prerequisites pass.
 Selected AI clients and VS Code are prerequisites; this installer does not
 install Codex, Claude, or VS Code.
 
-## How It Works
+## Prerequisites
 
-1. The installer prompts for one or more target surfaces, or accepts
-   `--targets` in non-interactive mode.
-2. It verifies selected AI clients and the VS Code `code` CLI before making
-   changes.
-3. It installs and configures the recommended stack tools: LeanCTX, Context7,
-   Ruflo, Caveman, and Superpowers.
-4. It copies global instruction files into `~/.codex/AGENTS.md` and
-   `~/.claude/CLAUDE.md`.
-5. It copies project templates into `~/.codex/AGENTS.project-template.md` and
-   `~/.claude/CLAUDE.project-template.md`.
-6. It installs a shared seeding script at
-   `~/.agents/scripts/seed-project-instructions.sh`.
-7. It installs Git template hooks and configures
-   `git config --global init.templateDir ~/.agents/git-template`.
-8. New Git repositories inherit those hooks. The hooks create `AGENTS.md`,
-   `CLAUDE.md`, or both from the project templates only when neither
-   project instruction file already exists.
-9. Your AI tool can then fill out the seeded project file with repository
-   purpose, commands, testing rules, coding standards, and context boundaries.
+Selected AI clients and VS Code are prerequisites, not install targets.
 
-Existing repository-local `AGENTS.md` and `CLAUDE.md` files are preserved by
-default.
+| Target | Required prerequisites |
+|--------|------------------------|
+| `codex-desktop` | Codex client or `codex` CLI |
+| `codex-vscode` | Codex client or `codex` CLI, VS Code `code` CLI |
+| `claude-desktop` | Claude client or `claude` CLI |
+| `claude-vscode` | Claude client or `claude` CLI, VS Code `code` CLI |
+
+If a selected prerequisite is missing, the installer stops before making
+changes and prints the missing prerequisite list.
+
+Context7 configuration requires an API key in the install environment:
+
+```bash
+export CONTEXT7_API_KEY="your-context7-api-key"
+```
+
+If `CONTEXT7_API_KEY` is missing, the installer stops before Context7
+configuration and prints setup instructions.
+
+## Installation
+Users do not need to clone this repository. The bootstrap script downloads a
+temporary archive, verifies it when a checksum is provided, runs the installer,
+and removes the temporary files when it exits.
+
+Interactive target-aware install:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash
+```
+
+Non-interactive target-aware install:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --targets codex-desktop,codex-vscode
+```
+
+Supported targets:
+
+- `codex-desktop`
+- `codex-vscode`
+- `claude-desktop`
+- `claude-vscode`
+
+Use `TOKEN_SAVER_BOOTSTRAP_REF` to install a specific branch, tag, or commit.
+Use `TOKEN_SAVER_BOOTSTRAP_SHA256` when you want the downloaded archive to match
+a known checksum.
+
+Installer logs are written to:
+
+```text
+~/.agents/install.log
+```
+
 
 ## What It Installs
 
@@ -86,64 +119,6 @@ The installer follows these guides when configuring stack tools:
 - [Claude agent stack setup](docs/claude-agent-stack-setup.md) explains the
   equivalent Claude Code setup for `CLAUDE.md`, Claude settings, MCP servers,
   hooks, and skills.
-
-## Prerequisites
-
-Selected AI clients and VS Code are prerequisites, not install targets.
-
-| Target | Required prerequisites |
-|--------|------------------------|
-| `codex-desktop` | Codex client or `codex` CLI |
-| `codex-vscode` | Codex client or `codex` CLI, VS Code `code` CLI |
-| `claude-desktop` | Claude client or `claude` CLI |
-| `claude-vscode` | Claude client or `claude` CLI, VS Code `code` CLI |
-
-If a selected prerequisite is missing, the installer stops before making
-changes and prints the missing prerequisite list.
-
-Context7 configuration requires an API key in the install environment:
-
-```bash
-export CONTEXT7_API_KEY="your-context7-api-key"
-```
-
-If `CONTEXT7_API_KEY` is missing, the installer stops before Context7
-configuration and prints setup instructions.
-
-## One-Command Install
-
-Users do not need to clone this repository. The bootstrap script downloads a
-temporary archive, verifies it when a checksum is provided, runs the installer,
-and removes the temporary files when it exits.
-
-Interactive target-aware install:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash
-```
-
-Non-interactive target-aware install:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/elite-guy5/token-saver-setup/main/scripts/bootstrap.sh | bash -s -- --targets codex-desktop,codex-vscode
-```
-
-Supported targets:
-
-- `codex-desktop`
-- `codex-vscode`
-- `claude-desktop`
-- `claude-vscode`
-
-Use `TOKEN_SAVER_BOOTSTRAP_REF` to install a specific branch, tag, or commit.
-Use `TOKEN_SAVER_BOOTSTRAP_SHA256` when you want the downloaded archive to match
-a known checksum.
-
-Installer logs are written to:
-
-```text
-~/.agents/install.log
-```
 
 ## Legacy Instruction-File Install
 
@@ -304,6 +279,80 @@ instruction files, project templates, the shared seeding script, Git template
 hooks, managed current-repo hook entries, and this installer’s
 `init.templateDir` setting. It does not delete repository-local `AGENTS.md` or
 `CLAUDE.md` files after they have been created.
+
+### Stack Tool Uninstall Commands
+
+These commands come from the upstream tool repositories where the upstream
+project documents an uninstall flow. They do not uninstall Codex, Claude,
+VS Code, Node.js, npm, or Homebrew.
+
+LeanCTX ([yvgude/lean-ctx](https://github.com/yvgude/lean-ctx)):
+
+```bash
+lean-ctx uninstall
+lean-ctx uninstall --dry-run
+lean-ctx uninstall --keep-config
+curl -fsSL https://leanctx.com/install.sh | sh -s -- --uninstall
+```
+
+If LeanCTX was installed through a package manager, run the matching package
+manager uninstall after `lean-ctx uninstall` reports what remains:
+
+```bash
+brew uninstall lean-ctx
+cargo uninstall lean-ctx
+npm uninstall -g lean-ctx-bin
+pi uninstall npm:pi-lean-ctx
+```
+
+Context7 ([upstash/context7](https://github.com/upstash/context7)):
+
+```bash
+npx ctx7 remove
+npm uninstall -g ctx7
+```
+
+Caveman ([JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman)):
+
+```bash
+npx -y github:JuliusBrussee/caveman -- --uninstall
+npx skills remove caveman
+```
+
+Superpowers ([obra/superpowers](https://github.com/obra/superpowers)):
+
+The Superpowers repository does not document a general uninstall command for
+Codex or Claude Code installs. For the git-clone and symlink layout this
+repository creates, remove the cloned repository and symlinks:
+
+```bash
+rm -rf ~/.codex/superpowers ~/.agents/skills/superpowers
+rm -rf ~/.claude/superpowers ~/.claude/skills/superpowers
+```
+
+Ruflo ([ruvnet/ruflo](https://github.com/ruvnet/ruflo)):
+
+The Ruflo repository does not document a general uninstall command for the
+`npx ruflo@latest` runtime path. Its Claude plugin docs document plugin removal
+with:
+
+```text
+/plugin remove claude-flow
+```
+
+For this repository's preferred runtime-state layout, remove the local Ruflo
+runtime state after stopping active Ruflo processes:
+
+```bash
+rm -rf ~/.ruflo
+```
+
+Run the installer uninstall command as well when you want to remove the
+instruction files, templates, seeding script, and managed Git hooks:
+
+```bash
+bash scripts/install.sh --non-interactive --uninstall
+```
 
 ## Remote Bootstrap
 
