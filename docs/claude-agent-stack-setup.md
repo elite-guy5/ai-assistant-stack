@@ -14,8 +14,6 @@ model names.
 - LeanCTX handles file and context compression.
 - Context7 handles current documentation lookup for libraries, frameworks,
   SDKs, APIs, CLIs, and cloud services.
-- Ruflo handles orchestration, swarm state, AgentDB memory, and hooks when
-  explicitly configured for Claude Code.
 - Caveman remains response compression only.
 - Superpowers remains a manually invoked software-development workflow layer.
 
@@ -78,13 +76,13 @@ Do not copy Codex-only TOML configuration or OpenAI model routing into
 Claude Code MCP setup is separate from Codex MCP setup.
 
 Use Claude MCP commands or Claude MCP config files for servers such as LeanCTX
-and Ruflo. Do not put Claude MCP config in `~/.codex/config.toml`.
+and Context7. Do not put Claude MCP config in `~/.codex/config.toml`.
 
 Recommended server separation:
 
 ```text
 lean-ctx: context reads, search, shell compression
-ruflo: orchestration, agent state, memory, hooks
+context7: current documentation lookup
 ```
 
 Verify MCP from Claude Code with the Claude MCP tooling available in that
@@ -120,10 +118,6 @@ lean-ctx doctor overhead
 lean-ctx tools health
 ```
 
-If Claude Code hooks also run shell commands, do not let LeanCTX shell hooks and
-Ruflo shell hooks both claim ownership of the same lifecycle event without a
-clear order.
-
 ## Context7 For Claude Code
 
 Context7 is the documentation lookup layer for current library, framework, SDK,
@@ -146,36 +140,6 @@ Do not commit the API key to any repository. If `CONTEXT7_API_KEY` is missing,
 the installer must stop before Context7 configuration and print these
 instructions.
 
-## Ruflo For Claude Code
-
-Use Ruflo for:
-
-- persistent agents
-- task and swarm coordination
-- AgentDB memory
-- status line and hook helpers when explicitly configured
-
-Do not assume Ruflo provides formatter or linter commands:
-
-```bash
-ruflo format <file>
-ruflo lint
-```
-
-Use project-native format, lint, typecheck, and test commands instead.
-
-Verify Ruflo:
-
-```bash
-npx --yes ruflo@latest --help
-npx --yes ruflo@latest init check
-npx --yes ruflo@latest mcp tools
-```
-
-If Claude Code settings call helper scripts such as
-`.claude/helpers/hook-handler.cjs`, confirm those files exist before enabling
-hooks that reference them.
-
 ## Claude Hooks
 
 Claude hooks run at lifecycle events such as tool use, prompt submit, session
@@ -187,7 +151,7 @@ Use hooks for enforcement that `CLAUDE.md` cannot guarantee:
 - preventing reads of secret files
 - formatting after edits when a real formatter exists
 - restoring context after compaction
-- recording task and memory events
+- recording task events
 
 Do not use hooks for vague guidance. Put guidance in `CLAUDE.md`; put
 mechanical enforcement in hooks.
@@ -258,56 +222,31 @@ routing.
 
 Recommended policy:
 
-- Use the cheapest Claude model that can complete the task accurately.
-- Use cheaper or faster models for documentation, search, summaries, and simple
-  checks.
-- Use stronger reasoning models for architecture, security, data integrity,
-  cross-module changes, and final risky reviews.
-- Do not put OpenAI model names such as `gpt-5.5` or `gpt-5.4-mini` into Claude
-  model routing instructions.
+| Task Type | Guidance |
+|-----------|----------|
+| Docs-only edits, ignore-file updates, typo fixes, command checks | Use the current model or a cheaper model when available |
+| Targeted search, summarization, simple verification, low-risk cleanup | Use a low-cost model when accuracy risk is low |
+| Focused implementation, shell test updates, moderate debugging | Use a daily coding model |
+| Planning plus implementation where planning needs stronger reasoning | Use plan mode when available |
+| Multi-file design, architecture, migration strategy, security review, final risky review | Use the strongest available model when justified |
 
-When in doubt, ask Claude Code's model selector or configuration for available
-models instead of guessing model IDs.
-
-## Conflict Prevention Rules
-
-1. Keep Codex and Claude config paths separate.
-2. Keep LeanCTX responsible for context and reads.
-3. Keep Ruflo responsible for persistent orchestration and memory.
-4. Keep Caveman responsible for prose compression only.
-5. Keep Superpowers manual-only unless an active Superpowers workflow requires
-   the next skill.
-6. Keep hooks deterministic and narrowly scoped.
-7. Keep runtime databases ignored and out of agent context.
-8. Verify helper files exist before enabling hooks that reference them.
+When model availability is unclear, use Claude Code's `/model` picker or current
+settings instead of guessing exact model IDs.
 
 ## Verification Checklist
 
-Run these after Claude setup:
+After setup changes:
 
 ```bash
-claude --version
 lean-ctx doctor
 lean-ctx doctor overhead
-npx --yes ruflo@latest init check
-npx --yes ruflo@latest mcp tools
+lean-ctx tools health
+git diff --check
 ```
 
-Then verify expected shared files:
+Also run this repository's own checks after editing installer behavior:
 
 ```bash
-test -f ~/.claude/CLAUDE.md
-test -f ~/.claude/settings.json
-test -f .claude/settings.json
+bash -n scripts/*.sh tests/*.sh
+for test in tests/*.sh; do bash "$test"; done
 ```
-
-Restart Claude Code after changing settings, MCP servers, hooks, or skills.
-
-## References
-
-- Claude Code settings: `https://docs.anthropic.com/en/docs/claude-code/settings`
-- Claude Code hooks: `https://docs.anthropic.com/en/docs/claude-code/hooks`
-- Claude Code hook guide: `https://docs.anthropic.com/en/docs/claude-code/hooks-guide`
-- Claude Code MCP: `https://docs.anthropic.com/en/docs/claude-code/mcp`
-- Claude Code skills: `https://docs.anthropic.com/en/docs/claude-code/skills`
-- Claude Code memory: `https://docs.anthropic.com/en/docs/claude-code/memory`

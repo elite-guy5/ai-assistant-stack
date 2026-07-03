@@ -1,20 +1,18 @@
 # Token Saver Setup
 
-macOS-only target-aware installer for Codex and Claude Code environments.
+macOS-only target-aware installer for Codex and Claude Code instruction files,
+Git hook automation, and the selected local agent stack this repository still
+manages.
 
-This repository installs the recommended local agent stack for selected Codex
-and Claude Code surfaces, plus the global and project Markdown instruction
-files and Git hook automation that seed project instruction files into
-repositories.
+The installer can configure LeanCTX, Context7, Caveman, and Superpowers after
+selected AI client prerequisites pass. It also installs global and project
+Markdown instruction files plus Git hooks that seed project instruction files
+into repositories.
 
-The target-aware install flow installs and configures the agent-stack tools
-recommended by this repository after selected AI client prerequisites pass.
-Selected AI clients and VS Code are prerequisites; this installer does not
-install Codex, Claude, or VS Code.
+Selected AI clients and VS Code are prerequisites. This installer does not
+install Codex, Claude Code, or VS Code.
 
 ## Prerequisites
-
-Selected AI clients and VS Code are prerequisites, not install targets.
 
 | Target | Required prerequisites |
 |--------|------------------------|
@@ -36,6 +34,7 @@ If `CONTEXT7_API_KEY` is missing, the installer stops before Context7
 configuration and prints setup instructions.
 
 ## Installation
+
 Users do not need to clone this repository. The bootstrap script downloads a
 temporary archive, verifies it when a checksum is provided, runs the installer,
 and removes the temporary files when it exits.
@@ -69,12 +68,10 @@ Installer logs are written to:
 ~/.agents/install.log
 ```
 
-
 ## What It Installs
 
 - LeanCTX configuration
 - Context7 MCP configuration
-- Ruflo MCP and runtime-state configuration
 - Caveman skill/plugin configuration
 - Superpowers skill/plugin configuration
 - Codex global instructions: `~/.codex/AGENTS.md`
@@ -97,9 +94,6 @@ install managed hooks in the current repository when it is run from inside one.
   boundaries.
 - The global files tell agents to use LeanCTX for scoped code reading, search,
   AST-aware workspace analysis, and compressed shell output.
-- The global files describe Ruflo as the harness and orchestration layer for
-  workflow loops, swarms, background workers, and trajectory memory when Ruflo
-  is available.
 - The global files require Caveman as a compression skill for conversational
   narrative, prompt instructions, and logs while preserving code, paths, flags,
   APIs, and error output exactly.
@@ -113,12 +107,8 @@ install managed hooks in the current repository when it is run from inside one.
 
 The installer follows these guides when configuring stack tools:
 
-- [Codex agent stack setup](docs/codex-agent-stack-setup.md) explains how to
-  configure LeanCTX, Context7, Ruflo, Caveman, and Superpowers so `AGENTS.md`
-  files work effectively without tool conflicts.
-- [Claude agent stack setup](docs/claude-agent-stack-setup.md) explains the
-  equivalent Claude Code setup for `CLAUDE.md`, Claude settings, MCP servers,
-  hooks, and skills.
+- [Codex agent stack setup](docs/codex-agent-stack-setup.md)
+- [Claude agent stack setup](docs/claude-agent-stack-setup.md)
 
 ## Windows Stack Commands
 
@@ -127,7 +117,6 @@ or newer, Git, VS Code, and the selected AI clients first, then run the
 upstream commands below from PowerShell or from the target AI client. Commands
 come from [LeanCTX](https://github.com/yvgude/lean-ctx),
 [Context7](https://github.com/upstash/context7),
-[Ruflo](https://github.com/ruvnet/ruflo),
 [Caveman](https://github.com/JuliusBrussee/caveman), and
 [Superpowers](https://github.com/obra/superpowers).
 
@@ -151,14 +140,6 @@ Install Context7 for Codex and Claude Code:
 $env:CONTEXT7_API_KEY = "your-context7-api-key"
 npx ctx7 setup --codex --api-key $env:CONTEXT7_API_KEY
 npx ctx7 setup --claude --api-key $env:CONTEXT7_API_KEY
-```
-
-Install Ruflo and register its MCP server:
-
-```powershell
-npx ruflo@latest init wizard
-codex mcp add ruflo -- npx -y ruflo@latest mcp start
-claude mcp add ruflo -- npx ruflo@latest mcp start
 ```
 
 Install Caveman:
@@ -217,27 +198,6 @@ layout on Windows, remove the cloned repositories and linked skill folders:
 ```powershell
 Remove-Item -Recurse -Force "$env:USERPROFILE\.codex\superpowers", "$env:USERPROFILE\.agents\skills\superpowers" -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force "$env:USERPROFILE\.claude\superpowers", "$env:USERPROFILE\.claude\skills\superpowers" -ErrorAction SilentlyContinue
-```
-
-The Ruflo repository documents Claude plugin removal but does not document a
-general uninstall command for the `npx ruflo@latest` runtime path. Run this in
-Claude Code when the Claude plugin path was used:
-
-```text
-/plugin remove claude-flow
-```
-
-After stopping active Ruflo processes, remove this repository's preferred
-Windows runtime-state location:
-
-```powershell
-Remove-Item -Recurse -Force "$env:USERPROFILE\.ruflo" -ErrorAction SilentlyContinue
-```
-
-If you chose the Ruflo global npm install path, remove the package:
-
-```powershell
-npm uninstall -g ruflo
 ```
 
 ## Legacy Instruction-File Install
@@ -396,7 +356,7 @@ bash scripts/install.sh --non-interactive --uninstall
 
 Uninstall removes only artifacts recorded by this installer: managed global
 instruction files, project templates, the shared seeding script, Git template
-hooks, managed current-repo hook entries, and this installer’s
+hooks, managed current-repo hook entries, and this installer's
 `init.templateDir` setting. It does not delete repository-local `AGENTS.md` or
 `CLAUDE.md` files after they have been created.
 
@@ -450,23 +410,6 @@ rm -rf ~/.codex/superpowers ~/.agents/skills/superpowers
 rm -rf ~/.claude/superpowers ~/.claude/skills/superpowers
 ```
 
-Ruflo ([ruvnet/ruflo](https://github.com/ruvnet/ruflo)):
-
-The Ruflo repository does not document a general uninstall command for the
-`npx ruflo@latest` runtime path. Its Claude plugin docs document plugin removal
-with:
-
-```text
-/plugin remove claude-flow
-```
-
-For this repository's preferred runtime-state layout, remove the local Ruflo
-runtime state after stopping active Ruflo processes:
-
-```bash
-rm -rf ~/.ruflo
-```
-
 Run the installer uninstall command as well when you want to remove the
 instruction files, templates, seeding script, and managed Git hooks:
 
@@ -505,13 +448,8 @@ the existing shell and Markdown style when editing files.
 
 ## Optional Manual Codex Environment Setup Guide
 
-The following guide is copied from the Obsidian note
-`Projects/Token Saver Setup/Ultimate Codex Environment Setup Guide` so this
-repository documents the larger environment this instruction-file manager is
-designed to support.
-
-This section is a manual reference for the larger local environment this
-installer configures. The target-aware installer follows the stack setup guides
+The following guide is a manual reference for the larger local environment this
+installer can support. The target-aware installer follows the stack setup guides
 above; use the commands below only when diagnosing or configuring a machine by
 hand.
 
@@ -519,13 +457,11 @@ hand.
 
 The full local environment can include these external systems:
 
-- Ruflo as an execution harness around Claude Code and Codex, with swarms,
-  local trajectory memory, and daemon workers.
 - LeanCTX as a local context-isolation engine for shell output compression,
   workspace mapping, and AST-aware context scoping.
 - A Codex CLI symlink that exposes the Codex Desktop application binary from
   the terminal.
-- MCP servers for Ruflo, LeanCTX, Context7, and Obsidian.
+- MCP servers for LeanCTX, Context7, and Obsidian.
 - Behavioral skills such as Caveman and Superpowers.
 
 ### Phase 1: Terminal Dependencies and Host Utilities
@@ -545,37 +481,7 @@ brew install lean-ctx
 which lean-ctx
 ```
 
-### Phase 2: Ruflo Harness
-
-Install Ruflo and run its interactive setup wizard manually:
-
-```bash
-npx ruflo@latest init wizard
-```
-
-Suggested wizard choices from the guide:
-
-| Setting | Value |
-|---------|-------|
-| Loop Profile | Full Ruflo Loop |
-| Telemetry / Memory | Local-Only / Private |
-| Swarm Topology | Hierarchical |
-| Maximum Concurrent Agents | 5 |
-| Memory Backend | AgentDB |
-| HNSW Indexing | Yes |
-| Neural Pattern Learning | Yes |
-| Self-Learning Memory | Yes |
-| ONNX Embedding Engine | Yes |
-| Embedding Model | MiniLM L6 |
-
-Start Ruflo and register it with Codex manually:
-
-```bash
-npx ruflo start
-codex mcp add ruflo -- npx ruflo@latest mcp start
-```
-
-### Phase 3: Context7
+### Phase 2: Context7
 
 Create an account at `https://context7.com/`, copy the API key, and run:
 
@@ -583,10 +489,10 @@ Create an account at `https://context7.com/`, copy the API key, and run:
 npx ctx7 setup
 ```
 
-When prompted to write system-level configuration files automatically, the
-guide recommends choosing `No` so configuration remains explicit.
+When prompted to write system-level configuration files automatically, prefer
+explicit review of generated configuration before accepting changes.
 
-### Phase 4: Codex Configuration
+### Phase 3: Codex Configuration
 
 Open the Codex config:
 
@@ -613,7 +519,7 @@ args = ["serve"]
 After editing, quit and reopen Codex, then open the Plugins page to verify the
 configuration parses correctly.
 
-### Phase 5: Behavioral Skills
+### Phase 4: Behavioral Skills
 
 Install runtime skills manually:
 
@@ -622,29 +528,12 @@ npx skills add JuliusBrussee/caveman -a codex
 npx skills add superpowers -a codex
 ```
 
-### Phase 6: Codebase Safety Boundaries
-
-Prefer storing Ruflo AgentDB and RuVector state under `~/.ruflo/`, next to
-`~/.codex/`, rather than inside a project checkout. If compatibility symlinks or
-runtime state paths exist inside a repository, exclude them from source control
-and agent context:
-
-```gitignore
-.ruflo
-.ruflo/
-agentdb.rvf
-agentdb.rvf.lock
-ruvector.db
-.obsidian/
-```
-
-### Phase 7: Verification Diagnostics
+### Phase 5: Verification Diagnostics
 
 Verify external tools manually:
 
 ```bash
 lean-ctx status
-npx ruflo status
 ```
 
 Then confirm:
@@ -654,7 +543,6 @@ Then confirm:
 - MCP servers initialize correctly.
 - Plugins load normally.
 - LeanCTX reports a healthy status.
-- Ruflo reports an active daemon and loaded plugins.
 
 ## Requirements
 
@@ -663,5 +551,6 @@ Then confirm:
 - Git
 - `curl` or `wget` only when using `scripts/bootstrap.sh`
 
-No JavaScript runtime, package manager, Python runtime, or external agent tool
-is required by the local installer.
+The legacy instruction-file installer path does not require a JavaScript
+runtime. Target-aware stack setup invokes upstream `npx` commands for some
+optional tools.

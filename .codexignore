@@ -60,12 +60,3 @@ poetry.lock
 
 # -- Local agent caches --
 .agents/
-.ruflo
-.ruflo/
-.claude-flow/
-.claude-flow
-.swarm/
-.swarm
-agentdb.rvf
-agentdb.rvf.lock
-ruvector.db

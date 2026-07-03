@@ -12,7 +12,7 @@
 - Favor responses that combine practical advice with conceptual understanding when useful.
 - Be thorough in reasoning and concise in output.
 - Do not use sycophantic openers or closing fluff.
-- Do not use emojis or em-dashes.
+- Do not use emojis or em dashes.
 
 ---
 
@@ -34,17 +34,12 @@
 
 # Codex Agent Execution Rules
 
-## Harness & Orchestration Layer (Ruflo & LeanCTX)
+## Context Layer
 
-### Meta-Harness Operations
+### MCP Tool Routing Guardrails
 
-- Route active workflow loops, swarms, background daemon workers, and cross-session memory transactions through the registered Ruflo MCP server hooks.
-
-### MCP Tool Routing Guardrails (Conflict Prevention)
-
-- **File System & Context Reading:** ALWAYS prefer `lean-ctx` tools (`ctx_read`, `ctx_tree`, `ctx_search`, or the meta-tool `ctx_call`) over native file reads or Ruflo filesystem tools. Never pass raw, uncompressed files directly to the loop.
-- **Agent Coordination & Memory:** ALWAYS route task planning, sub-agent spawns, swarm coordination, and cross-session memory tracking through available Ruflo MCP tools such as `swarm_init`, `agent_spawn`, `agent_execute`, `hooks_worker_detect`, and `memory_retrieve`.
-- **Context Footprint Optimization:** Keep LeanCTX on its minimal tool profile (`lean-ctx tools minimal`) and use `ctx_call` for non-core LeanCTX capabilities so tool definitions do not crowd out Ruflo's swarm capabilities in Codex's system prompt.
+- **File System & Context Reading:** Prefer `lean-ctx` tools (`ctx_read`, `ctx_tree`, `ctx_search`, or the meta-tool `ctx_call`) over native file reads when those tools are available.
+- **Context Footprint Optimization:** Keep LeanCTX on its minimal tool profile (`lean-ctx tools minimal`) and use `ctx_call` for non-core LeanCTX capabilities when practical.
 
 ### Context7
 
@@ -55,18 +50,8 @@ debugging.
 
 ### Context & AST Isolation
 
-- Route all file reading, structural workspace analysis, and code sweeps through the LeanCTX MCP server infrastructure.
+- Route file reading, structural workspace analysis, and code sweeps through the LeanCTX MCP server infrastructure when available.
 - LeanCTX manages token-saving compression natively via local AST parsing.
-
-### Memory Synchronization
-
-- LeanCTX tracks local code symbols.
-- Ruflo updates its HNSW-indexed vector memory (AgentDB) with session trajectories and successful design patterns.
-
-### Hook Protection
-
-- Never execute LeanCTX onboard in the shell because Ruflo owns the terminal hook environment.
-- Restrict LeanCTX to its editor-level MCP context to avoid terminal loop collisions.
 
 ---
 
@@ -86,10 +71,6 @@ debugging.
 Invoke Superpowers manually when a task explicitly requests the workflow or
 when an already-active Superpowers workflow requires the next Superpowers skill.
 Do not auto-invoke Superpowers just because the task is software development.
-
-### Sandbox Boundary
-
-- All shell commands, testing scripts, and compilation routines initiated during a Superpowers task must execute within Ruflo's sandbox harness to preserve telemetry, audit trails, and cost tracking.
 
 ---
 
@@ -208,9 +189,9 @@ Define success criteria before implementation.
 
 Examples:
 
-- "Add validation" → Write failing tests first, then make them pass.
-- "Fix the bug" → Reproduce with a test, then fix it.
-- "Refactor X" → Verify behavior before and after.
+- "Add validation" -> Write failing tests first, then make them pass.
+- "Fix the bug" -> Reproduce with a test, then fix it.
+- "Refactor X" -> Verify behavior before and after.
 
 ### Multi-Step Plan Template
 
@@ -243,7 +224,6 @@ Ask:
 
 - Use the project-native formatter after editing files when one exists.
 - Use the project-native lint, typecheck, and test commands before declaring work complete.
-- Do not assume Ruflo provides formatter or linter commands. Use Ruflo only for supported harness, hook, memory, MCP, swarm, or orchestration commands confirmed by `npx --yes ruflo@latest --help`.
 
 ---
 
@@ -282,7 +262,7 @@ Guidelines:
 
 ---
 
-## 7. Demand Elegance (Gated)
+## 7. Demand Elegance
 
 For non-trivial work:
 
@@ -306,14 +286,14 @@ Skip this step for obvious or trivial fixes.
 
 Store information in its canonical location.
 
-### Agent Recall (Automatic)
+### Agent Recall
 
-- Local workspace state tracked by LeanCTX.
-- Long-term trajectories stored in Ruflo AgentDB.
+- Local workspace state is tracked by LeanCTX when available.
+- Use the active product's native memory tools when durable operational memory is needed.
 
-### Obsidian Knowledge (Primary Database)
+### Obsidian Knowledge
 
-Use Obsidian MCP commands:
+Use Obsidian MCP commands when available:
 
 - `obsidian_global_search`
 - `read_note`
@@ -325,19 +305,19 @@ Do not rely on manual filesystem scripts.
 ### Collision Prevention
 
 - Only the supervising agent may write to the Obsidian vault.
-- Subagents record memories only in AgentDB.
+- Subagents should return memory-worthy findings to the supervising agent.
 
 ### Session Journal
 
-- Managed automatically.
+- Managed automatically when the environment provides it.
 - Do not curate manually.
 
 ### Self-Improvement Loop
 
 After a user correction:
 
-- General behavioral improvements → write to Obsidian feedback directories.
-- Domain knowledge → update the appropriate Obsidian note.
+- General behavioral improvements -> write to Obsidian feedback directories.
+- Domain knowledge -> update the appropriate Obsidian note.
 
 Do not create separate lessons files.
 

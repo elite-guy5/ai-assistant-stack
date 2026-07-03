@@ -46,7 +46,6 @@ target_install_output_names_stack_actions() {
   assert_contains "$output" "Step: Preflight selected targets"
   assert_contains "$output" "Step: Install LeanCTX"
   assert_contains "$output" "Step: Configure Context7"
-  assert_contains "$output" "Step: Configure Ruflo"
   assert_contains "$output" "Step: Install Caveman"
   assert_contains "$output" "Step: Install Superpowers"
   assert_contains "$output" "Install complete"

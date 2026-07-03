@@ -24,8 +24,6 @@ seeder_target="$agents_home/scripts/seed-project-instructions.sh"
 # shellcheck source=/dev/null
 . "$ROOT/scripts/lib/preflight.sh"
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/ruflo-state.sh"
-# shellcheck source=/dev/null
 . "$ROOT/scripts/lib/stack-tools.sh"
 
 usage() {
@@ -420,7 +418,6 @@ log_kv "selected_tools" "$tools"
 
 if [ "$target_mode" = "1" ]; then
   preflight_targets
-  report_ruflo_state
   install_stack_tools
 fi
 

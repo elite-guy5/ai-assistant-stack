@@ -40,20 +40,6 @@ configure_context7() {
   fi
 }
 
-configure_ruflo() {
-  step "Configure Ruflo"
-  ensure_ruflo_home
-  run_logged sh -c "cd \"$HOME\" && RUFLO_HOME=\"$ruflo_home\" npx --yes ruflo@latest init"
-
-  if tool_enabled codex; then
-    run_logged codex mcp add ruflo -- npx -y ruflo@latest mcp start
-  fi
-
-  if tool_enabled claude; then
-    run_logged claude mcp add ruflo -- npx ruflo@latest mcp start
-  fi
-}
-
 install_caveman() {
   step "Install Caveman"
   if tool_enabled codex; then
@@ -83,7 +69,6 @@ install_superpowers() {
 install_stack_tools() {
   install_leanctx
   configure_context7
-  configure_ruflo
   install_caveman
   install_superpowers
 }

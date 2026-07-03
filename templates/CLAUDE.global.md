@@ -36,9 +36,7 @@ Claude Code reads `CLAUDE.md` as persistent instruction context. Use Claude Code
 
 # Claude Agent Execution Rules
 
-## Harness and Orchestration Layer
-
-### Claude Code Configuration Boundaries
+## Claude Code Configuration Boundaries
 
 - Use `~/.claude/CLAUDE.md` for global behavioral guidance.
 - Use `CLAUDE.md` or `.claude/CLAUDE.md` for project guidance.
@@ -48,19 +46,14 @@ Claude Code reads `CLAUDE.md` as persistent instruction context. Use Claude Code
 - Use `.claude/settings.local.json` for local permissions, machine-specific settings, and sensitive path boundaries.
 - Use `.mcp.json` for team-shared project MCP servers when appropriate.
 
-### Ruflo and LeanCTX Ownership
+## Context Layer
 
-- Route active workflow loops, swarms, background daemon workers, and cross-session memory transactions through registered Ruflo MCP tools when Ruflo is available.
 - Route file reading, structural workspace analysis, code search, tree scans, and compressed command output through LeanCTX MCP tools when LeanCTX is available.
 - Keep LeanCTX responsible for context and AST-aware workspace scoping.
-- Keep Ruflo responsible for orchestration, task state, swarm coordination, hooks, and AgentDB trajectory memory.
-- Do not use Ruflo for normal file reads, formatting, linting, or trivial status checks.
-- Do not use LeanCTX for agent orchestration or long-running swarm state.
 
 ### MCP Tool Routing Guardrails
 
 - Prefer LeanCTX tools such as `ctx_read`, `ctx_tree`, `ctx_search`, `ctx_shell`, or `ctx_call` over raw file reads and broad shell output when those tools are registered.
-- Use Ruflo MCP tools only when persistent orchestration, memory, hooks, or multi-agent coordination is materially useful.
 - Keep MCP server names distinct so Claude Code can namespace tool definitions cleanly.
 - Verify MCP availability from Claude Code before relying on a server. A binary on `PATH` does not prove the MCP server is active.
 
@@ -77,7 +70,6 @@ debugging.
 - Do not use hooks for vague guidance that belongs in `CLAUDE.md`.
 - Keep hook commands small, deterministic, idempotent, and easy to debug.
 - Confirm referenced helper files exist before enabling hooks that call them.
-- Do not let LeanCTX shell hooks and Ruflo shell hooks both claim the same lifecycle event unless the order is explicit.
 
 ---
 
@@ -108,12 +100,6 @@ Keep the following completely intact and uncompressed:
 Invoke Superpowers manually when a task explicitly requests the workflow or
 when an already-active Superpowers workflow requires the next Superpowers skill.
 Do not auto-invoke Superpowers just because the task is software development.
-
-### Sandbox Boundary
-
-- Run commands through Ruflo only when a Ruflo sandbox, hook, or orchestration path is actually configured and useful for the task.
-- Otherwise use the project-native verification commands listed in the project `CLAUDE.md`.
-- Do not invent Ruflo formatter or linter commands.
 
 ---
 
@@ -214,7 +200,6 @@ Never declare completion without explicit verification:
 
 - Use the project-native formatter after edits when one exists.
 - Use the project-native lint, typecheck, and test commands before declaring work complete.
-- Do not call `ruflo format <file>` or `ruflo lint` unless `npx --yes ruflo@latest --help` confirms those commands exist in the installed Ruflo version.
 - If the project has no formatter, linter, or tests, state that and run the best available verification command.
 
 ## 5. Plan Mode
@@ -264,10 +249,9 @@ If a fix feels hacky:
 - Use Claude Code auto memory for learned preferences and repeated corrections when enabled.
 - Use `CLAUDE.local.md` for private project preferences.
 - Track local workspace state via LeanCTX when available.
-- Store long-term trajectory and swarm memory in Ruflo AgentDB when Ruflo is available.
 - Write generalizable correction logs and domain knowledge to the personal Obsidian vault using the Obsidian MCP integration when available.
 - Restrict Obsidian writing to the supervising agent.
-- Subagents must record operational memories in AgentDB, not Obsidian.
+- Subagents should return memory-worthy findings to the supervising agent.
 
 ---
 

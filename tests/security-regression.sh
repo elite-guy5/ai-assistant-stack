@@ -32,11 +32,14 @@ assert_not_exists() {
 git_template_hooks_seed_future_repos() {
   local home="$tmp/home-template"
   local repo="$tmp/future-repo"
+  local template_dir
   mkdir -p "$home"
 
   HOME="$home" bash "$ROOT/scripts/install.sh" --non-interactive --tools codex >/dev/null
 
-  HOME="$home" git -c init.defaultBranch=main init "$repo" >/dev/null
+  template_dir="$(HOME="$home" git config --global --get init.templateDir)"
+  assert_contains "$template_dir" "$home/.agents/git-template"
+  HOME="$home" git -c init.defaultBranch=main init --template="$template_dir" "$repo" >/dev/null
   assert_exists "$repo/.git/hooks/post-checkout"
 
   HOME="$home" "$home/.agents/scripts/seed-project-instructions.sh" --tools codex "$repo"

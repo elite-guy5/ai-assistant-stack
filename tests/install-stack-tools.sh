@@ -15,24 +15,6 @@ assert_contains() {
   esac
 }
 
-ruflo_project_state_is_reported() {
-  local home="$tmp/home-ruflo"
-  local repo="$tmp/repo-ruflo"
-  local output
-  mkdir -p "$home/bin" "$repo/.ruflo"
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
-  chmod +x "$home/bin/codex"
-
-  output="$(
-    cd "$repo"
-    HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key \
-      bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --targets codex-desktop
-  )"
-
-  assert_contains "$output" "Warning: project-local Ruflo state path found: $repo/.ruflo"
-  assert_contains "$output" "Ruflo runtime state root: $home/.ruflo"
-}
-
 context7_credentials_required() {
   local home="$tmp/home-context7"
   mkdir -p "$home/bin"
@@ -63,16 +45,12 @@ dry_run_prints_stack_steps_for_codex() {
 
   assert_contains "$output" "Step: Install LeanCTX"
   assert_contains "$output" "Step: Configure Context7"
-  assert_contains "$output" "Step: Configure Ruflo"
   assert_contains "$output" "Step: Install Caveman"
   assert_contains "$output" "Step: Install Superpowers"
   assert_contains "$output" "codex mcp add context7"
-  assert_contains "$output" "codex mcp add ruflo"
-  assert_contains "$output" "RUFLO_HOME=\"$home/.ruflo\" npx --yes ruflo@latest init"
   assert_contains "$output" "--api-key <redacted>"
 }
 
-ruflo_project_state_is_reported
 context7_credentials_required
 dry_run_prints_stack_steps_for_codex
 
