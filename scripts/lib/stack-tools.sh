@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# Require Context7 credentials before any MCP configuration command can run.
 require_context7_credentials() {
   if [ -z "${CONTEXT7_API_KEY:-}" ]; then
     printf 'error: Context7 credentials are required before stack configuration.\n' >&2
@@ -13,6 +14,7 @@ require_context7_credentials() {
   log_line "context7_credentials=present"
 }
 
+# Install LeanCTX when missing and switch it to the minimal tool profile.
 install_leanctx() {
   step "Install LeanCTX"
   if command -v lean-ctx >/dev/null 2>&1; then
@@ -27,6 +29,7 @@ install_leanctx() {
   fi
 }
 
+# Register the Context7 MCP server for each selected AI client.
 configure_context7() {
   step "Configure Context7"
   require_context7_credentials
@@ -40,6 +43,7 @@ configure_context7() {
   fi
 }
 
+# Install Caveman support for each selected AI client.
 install_caveman() {
   step "Install Caveman"
   if tool_enabled codex; then
@@ -51,6 +55,8 @@ install_caveman() {
   fi
 }
 
+# Install Superpowers support by cloning its repository and linking its skills
+# into the selected client's skill directory.
 install_superpowers() {
   step "Install Superpowers"
   if tool_enabled codex; then
@@ -66,6 +72,7 @@ install_superpowers() {
   fi
 }
 
+# Run every stack-tool setup step in the required order.
 install_stack_tools() {
   install_leanctx
   configure_context7

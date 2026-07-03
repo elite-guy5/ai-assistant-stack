@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Locate the repository and create an isolated temporary workspace for this test
+# file.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+# Assert that command output includes an expected substring.
 assert_contains() {
   case "$1" in
     *"$2"*) ;;
@@ -15,6 +18,7 @@ assert_contains() {
   esac
 }
 
+# Verify Codex-only targets derive the legacy codex tool selector.
 target_mode_derives_codex_tools() {
   local home="$tmp/home-codex-targets"
   local output
@@ -32,6 +36,7 @@ target_mode_derives_codex_tools() {
   assert_contains "$output" "Selected tools: codex"
 }
 
+# Verify mixed Codex and Claude targets derive the legacy both tool selector.
 target_mode_derives_both_tools() {
   local home="$tmp/home-both-targets"
   local output
@@ -49,6 +54,7 @@ target_mode_derives_both_tools() {
   assert_contains "$output" "Selected tools: both"
 }
 
+# Verify unsupported target names are rejected during argument parsing.
 invalid_target_is_rejected() {
   local home="$tmp/home-invalid-target"
   mkdir -p "$home"
@@ -61,6 +67,7 @@ invalid_target_is_rejected() {
   assert_contains "$(cat "$tmp/invalid.err")" "invalid --targets value: codex-mobile"
 }
 
+# Verify non-interactive mode requires either --targets or --tools.
 non_interactive_requires_targets_or_tools() {
   local home="$tmp/home-requires-selection"
   mkdir -p "$home"
@@ -73,6 +80,7 @@ non_interactive_requires_targets_or_tools() {
   assert_contains "$(cat "$tmp/requires.err")" "--targets or --tools is required in non-interactive mode"
 }
 
+# Run target parsing and derivation scenarios.
 target_mode_derives_codex_tools
 target_mode_derives_both_tools
 invalid_target_is_rejected

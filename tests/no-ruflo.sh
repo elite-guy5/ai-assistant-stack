@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Run the repository scan from the project root so tracked and untracked file
+# paths are resolved consistently.
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
+# Assemble the forbidden-reference pattern from fragments so the test does not
+# match its own search terms.
 r1="ru"
 r2="flo"
 agent="agent"
@@ -15,6 +19,8 @@ dot="."
 
 pattern="${r1}${r2}|\\${dot}${r1}${r2}|${agent}${db}|${r1}${vector}|${claude}-${flow}|\\${dot}swarm|${r1}${r2}@"
 
+# Search all non-ignored repository files and fail if removed stack/runtime
+# references are still present.
 if git ls-files -z --cached --others --exclude-standard |
   while IFS= read -r -d '' file; do
     [ -e "$file" ] && printf '%s\0' "$file"

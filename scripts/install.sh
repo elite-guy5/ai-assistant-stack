@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Initialize global installer state before sourcing helper libraries that depend
+# on these variables.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 dry_run=0
 non_interactive=0
@@ -17,6 +19,8 @@ state_file="${TOKEN_SAVER_STATE:-$agents_home/install_state}"
 git_template_dir="$agents_home/git-template"
 seeder_target="$agents_home/scripts/seed-project-instructions.sh"
 
+# Load target parsing, logging, preflight, and stack-tool helpers from the
+# repository so install behavior stays centralized.
 # shellcheck source=/dev/null
 . "$ROOT/scripts/lib/targets.sh"
 # shellcheck source=/dev/null
@@ -26,6 +30,7 @@ seeder_target="$agents_home/scripts/seed-project-instructions.sh"
 # shellcheck source=/dev/null
 . "$ROOT/scripts/lib/stack-tools.sh"
 
+# Print command-line help for both target-mode and legacy tool-mode installs.
 usage() {
   cat <<'EOF'
 Usage: bash scripts/install.sh [options]
@@ -50,15 +55,19 @@ Options:
 EOF
 }
 
+# Print a normal status line to stdout.
 say() {
   printf '%s\n' "$*"
 }
 
+# Print an error and terminate the installer.
 die() {
   printf 'error: %s\n' "$*" >&2
   exit 1
 }
 
+# Execute a command unless --dry-run is active, in which case print the command
+# with any secrets redacted.
 run() {
   if [ "$dry_run" = "1" ]; then
     if command -v redact_text >/dev/null 2>&1; then
@@ -71,6 +80,7 @@ run() {
   "$@"
 }
 
+# Append a managed resource entry to the installer state file for uninstall.
 record_state() {
   local key="$1"
   local value="$2"
@@ -84,6 +94,7 @@ record_state() {
   printf '%s|%s\n' "$key" "$value" >> "$state_file"
 }
 
+# Store one current value for state keys where only the latest value matters.
 record_single_state() {
   local key="$1"
   local value="$2"
@@ -97,6 +108,7 @@ record_single_state() {
   printf '%s|%s\n' "$key" "$value" >> "$state_file"
 }
 
+# Normalize legacy --tools aliases to the canonical tool selector.
 normalize_tools() {
   local value="$1"
   value="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
@@ -108,6 +120,7 @@ normalize_tools() {
   esac
 }
 
+# Return success when the canonical tool selector includes the requested tool.
 tool_enabled() {
   case "$tools:$1" in
     both:*|codex:codex|claude:claude) return 0 ;;
@@ -115,6 +128,8 @@ tool_enabled() {
   esac
 }
 
+# Prompt for the legacy tool selector when the user does not pass --targets or
+# --tools in interactive mode.
 prompt_tools() {
   local choice
   cat <<'EOF'
@@ -133,6 +148,7 @@ EOF
   esac
 }
 
+# Read a yes/no answer with a default value for optional interactive actions.
 prompt_yes_no() {
   local prompt="$1"
   local default="$2"
@@ -153,11 +169,14 @@ prompt_yes_no() {
   esac
 }
 
+# Build a timestamped backup filename next to a file that may be replaced.
 backup_path() {
   local path="$1"
   printf '%s.token-saver-backup-%s' "$path" "$(date +%Y%m%d%H%M%S)"
 }
 
+# Install a managed template file, preserving user-owned files unless overwrite
+# was requested.
 install_file() {
   local source="$1"
   local target="$2"
@@ -186,6 +205,7 @@ install_file() {
   record_state "managed_component" "$label:$target"
 }
 
+# Install the project instruction seeding script into the shared agents home.
 install_seeder() {
   say "Installed $seeder_target"
   run mkdir -p "$(dirname "$seeder_target")"
@@ -194,20 +214,26 @@ install_seeder() {
   record_state "managed_file" "$seeder_target"
 }
 
+# Generate the managed Git hook body, wrapping any backed-up hook first and then
+# seeding project instructions for the configured tools.
 hook_body() {
   local existing="${1:-}"
   cat <<EOF
 #!/usr/bin/env bash
 # TOKEN_SAVER_MANAGED_HOOK_BEGIN
 set -e
+# Run the user's original hook first when this installer backed one up.
 if [ -n "$existing" ] && [ -x "$existing" ]; then
   "$existing" "\$@" || exit \$?
 fi
+# Seed project instruction files after checkout or merge without blocking Git.
 TOKEN_SAVER_TOOLS="$tools" "\$HOME/.agents/scripts/seed-project-instructions.sh" --tools "$tools" "\$(pwd)" >/dev/null 2>&1 || true
 # TOKEN_SAVER_MANAGED_HOOK_END
 EOF
 }
 
+# Install or update one managed Git hook while backing up pre-existing custom
+# hook content.
 install_hook_file() {
   local hook="$1"
   local label="$2"
@@ -234,6 +260,8 @@ install_hook_file() {
   record_state "managed_hook" "$hook"
 }
 
+# Install managed hooks into Git's template directory and remember any previous
+# global init.templateDir value for uninstall.
 install_git_template_hooks() {
   local previous
 
@@ -250,10 +278,13 @@ install_git_template_hooks() {
   fi
 }
 
+# Return the repository root for a path, or an empty value when outside Git.
 git_root_for() {
   git -C "$1" rev-parse --show-toplevel 2>/dev/null || true
 }
 
+# Seed an existing repository and install managed post-checkout/post-merge hooks
+# into that repository's .git directory.
 install_current_repo_hooks() {
   local repo="$1"
   local git_dir
@@ -277,6 +308,7 @@ install_current_repo_hooks() {
   install_hook_file "$git_dir/hooks/post-merge" "repo post-merge"
 }
 
+# Install global instruction files and project templates for selected tools.
 install_instruction_files() {
   local global_replace="$overwrite"
   local template_replace="$overwrite"
@@ -295,6 +327,7 @@ install_instruction_files() {
   fi
 }
 
+# Remove one managed hook when the uninstall flow sees it in state.
 remove_managed_hook() {
   local hook="$1"
   if [ -f "$hook" ] && grep -q 'TOKEN_SAVER_MANAGED_HOOK_BEGIN' "$hook"; then
@@ -303,6 +336,8 @@ remove_managed_hook() {
   fi
 }
 
+# Remove installer-managed files and hooks, restore saved hooks, and reset
+# init.templateDir when this installer set it.
 uninstall_all() {
   local line key value previous
   local hook backup
@@ -354,6 +389,7 @@ uninstall_all() {
   run rm -f "$state_file"
 }
 
+# Parse command-line options before any filesystem changes are attempted.
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --tools)
@@ -391,14 +427,18 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
+# Run uninstall as a separate early exit path so no install setup happens.
 if [ "$uninstall" = "1" ]; then
   uninstall_all
   exit 0
 fi
 
+# Start the audit log before target/tool selection and install steps.
 step "Initialize install log"
 log_kv "dry_run" "$dry_run"
 
+# Derive legacy tool selection from target surfaces, or prompt interactively
+# when no non-interactive selector was provided.
 if [ "$target_mode" = "1" ]; then
   tools="$(derive_tools_from_targets)"
 elif [ -z "$tools" ]; then
@@ -408,6 +448,7 @@ elif [ -z "$tools" ]; then
   prompt_targets
 fi
 
+# Report the normalized selection to stdout and to the install log.
 if [ "$target_mode" = "1" ]; then
   say "Selected targets: $targets"
   log_kv "selected_targets" "$targets"
@@ -416,11 +457,15 @@ say "Selected tools: $tools"
 log_kv "selected_tools" "$tools"
 [ -n "${CONTEXT7_API_KEY:-}" ] && log_line "CONTEXT7_API_KEY=$CONTEXT7_API_KEY"
 
+# For target-mode installs, validate prerequisites before making changes and
+# configure stack tools before writing instruction files.
 if [ "$target_mode" = "1" ]; then
   preflight_targets
   install_stack_tools
 fi
 
+# In interactive use from inside a repository, offer to seed and hook the current
+# checkout unless --repo already made the choice explicit.
 if [ "$non_interactive" = "0" ] && [ -z "$apply_current_repo" ]; then
   current_root="$(git_root_for "$PWD")"
   if [ -n "$current_root" ] && prompt_yes_no "Also install hooks and seed the current repo at $current_root?" "yes"; then
@@ -429,10 +474,13 @@ if [ "$non_interactive" = "0" ] && [ -z "$apply_current_repo" ]; then
   fi
 fi
 
+# Install the shared instruction files, seeder script, and future-repository Git
+# template hooks.
 install_instruction_files
 install_seeder
 install_git_template_hooks
 
+# Optionally apply the same seeding and hooks to an existing repository.
 if [ -n "$apply_current_repo" ]; then
   install_current_repo_hooks "${repo_path:-$PWD}"
 fi

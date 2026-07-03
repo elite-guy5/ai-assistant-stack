@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Locate the repository and create an isolated temporary workspace for this test
+# file.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+# Assert that command output includes an expected substring.
 assert_contains() {
   case "$1" in
     *"$2"*) ;;
@@ -15,6 +18,8 @@ assert_contains() {
   esac
 }
 
+# Verify target-mode stack setup fails before configuration when Context7
+# credentials are missing.
 context7_credentials_required() {
   local home="$tmp/home-context7"
   mkdir -p "$home/bin"
@@ -31,6 +36,8 @@ context7_credentials_required() {
   assert_contains "$(cat "$tmp/context7.err")" "export CONTEXT7_API_KEY=\"your-context7-api-key\""
 }
 
+# Verify Codex target dry-run output includes every stack setup step with
+# secrets redacted.
 dry_run_prints_stack_steps_for_codex() {
   local home="$tmp/home-stack-codex"
   local output
@@ -51,6 +58,7 @@ dry_run_prints_stack_steps_for_codex() {
   assert_contains "$output" "--api-key <redacted>"
 }
 
+# Run the stack-tool scenarios.
 context7_credentials_required
 dry_run_prints_stack_steps_for_codex
 

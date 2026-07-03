@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 
+# Store target-mode selection globally so install.sh can derive tool behavior
+# after parsing arguments or prompts.
 targets=""
 target_mode=0
 
+# Read one prompt response, using /dev/tty when bootstrap itself was piped into
+# bash and normal stdin has already been consumed.
 read_prompt_value() {
   local var_name="$1"
   local value=""
@@ -25,6 +29,8 @@ read_prompt_value() {
   printf -v "$var_name" '%s' "$value"
 }
 
+# Normalize a comma-separated target list, reject unknown targets, and remove
+# duplicates while preserving selection order.
 normalize_targets() {
   local raw="$1"
   local normalized=""
@@ -50,6 +56,7 @@ normalize_targets() {
   printf '%s\n' "$normalized"
 }
 
+# Return success when the normalized target list includes a specific surface.
 target_enabled() {
   case ",$targets," in
     *",$1,"*) return 0 ;;
@@ -57,6 +64,8 @@ target_enabled() {
   esac
 }
 
+# Collapse selected target surfaces into the legacy tool selector used by
+# instruction-file installation.
 derive_tools_from_targets() {
   local has_codex=0
   local has_claude=0
@@ -74,6 +83,7 @@ derive_tools_from_targets() {
   esac
 }
 
+# Prompt for target surfaces and map numeric menu selections to canonical names.
 prompt_targets() {
   local choice
 

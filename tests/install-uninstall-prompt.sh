@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Locate the repository and create an isolated temporary workspace for this test
+# file.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+# Assert that a path exists.
 assert_exists() {
   [ -e "$1" ] || {
     printf 'expected path to exist: %s\n' "$1" >&2
@@ -12,6 +15,7 @@ assert_exists() {
   }
 }
 
+# Assert that a path does not exist.
 assert_not_exists() {
   [ ! -e "$1" ] || {
     printf 'expected path not to exist: %s\n' "$1" >&2
@@ -19,6 +23,8 @@ assert_not_exists() {
   }
 }
 
+# Verify uninstall removes only installer-managed files and preserves a
+# pre-existing user-owned Codex instruction file.
 install_and_uninstall_managed_files_only() {
   local home="$tmp/home-uninstall"
   mkdir -p "$home/.codex"
@@ -40,6 +46,7 @@ install_and_uninstall_managed_files_only() {
   assert_exists "$home/.codex/AGENTS.md"
 }
 
+# Run the managed uninstall scenario.
 install_and_uninstall_managed_files_only
 
 printf 'install-uninstall-prompt.sh: OK\n'

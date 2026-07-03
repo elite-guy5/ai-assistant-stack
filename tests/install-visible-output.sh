@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Locate the repository and create an isolated temporary workspace for this test
+# file.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+# Assert that command output includes an expected substring.
 assert_contains() {
   case "$1" in
     *"$2"*) ;;
@@ -15,6 +18,7 @@ assert_contains() {
   esac
 }
 
+# Verify instruction-file installs print the user-visible actions they perform.
 install_output_names_instruction_file_actions() {
   local home="$tmp/home-output"
   local output
@@ -31,6 +35,8 @@ install_output_names_instruction_file_actions() {
   assert_contains "$output" "Configured git init.templateDir"
 }
 
+# Verify target-mode installs print stack setup progress before instruction-file
+# output.
 target_install_output_names_stack_actions() {
   local home="$tmp/home-target-output"
   local output
@@ -51,6 +57,7 @@ target_install_output_names_stack_actions() {
   assert_contains "$output" "Install complete"
 }
 
+# Run visible-output scenarios.
 install_output_names_instruction_file_actions
 target_install_output_names_stack_actions
 

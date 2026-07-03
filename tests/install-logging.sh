@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Locate the repository and create an isolated temporary workspace for this test
+# file.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+# Assert that command output includes an expected substring.
 assert_contains() {
   case "$1" in
     *"$2"*) ;;
@@ -15,6 +18,7 @@ assert_contains() {
   esac
 }
 
+# Assert that command output does not include an unwanted substring.
 assert_not_contains() {
   case "$1" in
     *"$2"*)
@@ -25,6 +29,7 @@ assert_not_contains() {
   esac
 }
 
+# Verify target-mode installs create a log and redact sensitive Context7 values.
 target_mode_writes_log() {
   local home="$tmp/home-log"
   local output log
@@ -50,6 +55,7 @@ target_mode_writes_log() {
   assert_contains "$(cat "$log")" "CONTEXT7_API_KEY=<redacted>"
 }
 
+# Run the logging scenario.
 target_mode_writes_log
 
 printf 'install-logging.sh: OK\n'

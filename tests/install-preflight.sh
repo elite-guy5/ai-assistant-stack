@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Locate the repository and create an isolated temporary workspace for this test
+# file.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+# Assert that command output includes an expected substring.
 assert_contains() {
   case "$1" in
     *"$2"*) ;;
@@ -15,6 +18,7 @@ assert_contains() {
   esac
 }
 
+# Assert that a path was not created.
 assert_not_exists() {
   [ ! -e "$1" ] || {
     printf 'expected path not to exist: %s\n' "$1" >&2
@@ -22,6 +26,7 @@ assert_not_exists() {
   }
 }
 
+# Verify missing Codex stops the install before managed files are written.
 missing_codex_stops_before_changes() {
   local home="$tmp/home-missing-codex"
   mkdir -p "$home"
@@ -38,6 +43,7 @@ missing_codex_stops_before_changes() {
   assert_not_exists "$home/.agents/scripts/seed-project-instructions.sh"
 }
 
+# Verify Codex VS Code targets require the VS Code command in addition to Codex.
 missing_vscode_stops_before_changes() {
   local home="$tmp/home-missing-code"
   mkdir -p "$home/bin"
@@ -55,6 +61,7 @@ missing_vscode_stops_before_changes() {
   assert_not_exists "$home/.codex/AGENTS.md"
 }
 
+# Verify missing Claude Code stops the install before Claude files are written.
 missing_claude_stops_before_changes() {
   local home="$tmp/home-missing-claude"
   mkdir -p "$home"
@@ -69,6 +76,7 @@ missing_claude_stops_before_changes() {
   assert_not_exists "$home/.claude/CLAUDE.md"
 }
 
+# Run the preflight failure scenarios.
 missing_codex_stops_before_changes
 missing_vscode_stops_before_changes
 missing_claude_stops_before_changes

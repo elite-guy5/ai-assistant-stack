@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Locate the repository and create an isolated temporary workspace for this test
+# file.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+# Assert that command output includes an expected substring.
 assert_contains() {
   case "$1" in
     *"$2"*) ;;
@@ -15,6 +18,7 @@ assert_contains() {
   esac
 }
 
+# Assert that a path exists.
 assert_exists() {
   [ -e "$1" ] || {
     printf 'expected path to exist: %s\n' "$1" >&2
@@ -22,6 +26,7 @@ assert_exists() {
   }
 }
 
+# Assert that a path does not exist.
 assert_not_exists() {
   [ ! -e "$1" ] || {
     printf 'expected path not to exist: %s\n' "$1" >&2
@@ -29,6 +34,8 @@ assert_not_exists() {
   }
 }
 
+# Verify Git template hooks seed Codex instructions into repositories created
+# after installation.
 git_template_hooks_seed_future_repos() {
   local home="$tmp/home-template"
   local repo="$tmp/future-repo"
@@ -47,6 +54,8 @@ git_template_hooks_seed_future_repos() {
   assert_not_exists "$repo/CLAUDE.md"
 }
 
+# Verify current-repo hook installation wraps a custom hook and seeds only the
+# selected tool's instruction file.
 current_repo_hook_wraps_existing_hook_and_seeds_selected_files() {
   local home="$tmp/home-current"
   local repo="$tmp/current-repo"
@@ -68,6 +77,7 @@ current_repo_hook_wraps_existing_hook_and_seeds_selected_files() {
   assert_contains "$(cat "$hook")" "custom-hook"
 }
 
+# Verify seeding skips user-owned files and overwrite mode creates a backup.
 seeder_skips_existing_files_and_overwrite_creates_backup() {
   local home="$tmp/home-overwrite"
   local repo="$tmp/overwrite-repo"
@@ -84,6 +94,8 @@ seeder_skips_existing_files_and_overwrite_creates_backup() {
   ls "$repo"/AGENTS.md.token-saver-backup-* >/dev/null
 }
 
+# Verify mixed-tool seeding does not create a second instruction file when
+# either supported project instruction file already exists.
 seeder_skips_project_when_any_instruction_file_exists() {
   local home="$tmp/home-cross-skip"
   local repo_with_agents="$tmp/cross-skip-agents"
@@ -104,6 +116,7 @@ seeder_skips_project_when_any_instruction_file_exists() {
   assert_not_exists "$repo_with_claude/AGENTS.md"
 }
 
+# Verify checksum mismatch handling rejects tampered bootstrap archives.
 bootstrap_rejects_tampered_archive() {
   local archive="$tmp/archive.tar.gz"
   printf 'tampered' > "$archive"
@@ -115,6 +128,8 @@ bootstrap_rejects_tampered_archive() {
   assert_contains "$(cat "$tmp/bootstrap.err")" "setup archive checksum mismatch"
 }
 
+# Verify bootstrap can run from a local archive without requiring a checked-out
+# repository.
 bootstrap_runs_local_archive_without_required_checkout() {
   local archive="$tmp/bootstrap-local.tar.gz"
   local home="$tmp/home-bootstrap"
@@ -136,6 +151,8 @@ bootstrap_runs_local_archive_without_required_checkout() {
   assert_contains "$(cat "$tmp/bootstrap-local.out")" "Install complete"
 }
 
+# Verify bootstrap still prompts correctly when the script itself is piped into
+# bash and stdin would otherwise be exhausted.
 bootstrap_runs_when_script_is_piped_to_bash() {
   local archive="$tmp/bootstrap-piped.tar.gz"
   local home="$tmp/home-bootstrap-piped"
@@ -158,6 +175,7 @@ bootstrap_runs_when_script_is_piped_to_bash() {
   assert_contains "$(cat "$tmp/bootstrap-piped.out")" "Install complete"
 }
 
+# Run hook, seeding, and bootstrap security regression scenarios.
 git_template_hooks_seed_future_repos
 current_repo_hook_wraps_existing_hook_and_seeds_selected_files
 seeder_skips_existing_files_and_overwrite_creates_backup

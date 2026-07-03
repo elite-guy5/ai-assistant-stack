@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Locate the repository and create an isolated temporary workspace for this test
+# file.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+# Assert that command output includes an expected substring.
 assert_contains() {
   case "$1" in
     *"$2"*) ;;
@@ -15,6 +18,7 @@ assert_contains() {
   esac
 }
 
+# Assert that command output does not include an unwanted substring.
 assert_not_contains() {
   case "$1" in
     *"$2"*)
@@ -25,6 +29,8 @@ assert_not_contains() {
   esac
 }
 
+# Verify non-interactive installs fail before doing work when no selection is
+# provided.
 requires_tools_in_non_interactive_mode() {
   local home="$tmp/home-requires-tools"
   mkdir -p "$home"
@@ -37,6 +43,8 @@ requires_tools_in_non_interactive_mode() {
   assert_contains "$(cat "$tmp/requires.err")" "--targets or --tools is required in non-interactive mode"
 }
 
+# Verify legacy codex-only dry-run output stays limited to instruction-file and
+# hook actions.
 dry_run_codex_only_has_no_third_party_actions() {
   local home="$tmp/home-codex"
   local output
@@ -56,6 +64,7 @@ dry_run_codex_only_has_no_third_party_actions() {
   assert_not_contains "$output" "third-party setup"
 }
 
+# Verify removed installer flags fail loudly instead of being accepted silently.
 removed_flags_are_rejected() {
   local home="$tmp/home-removed-flags"
   mkdir -p "$home"
@@ -68,6 +77,8 @@ removed_flags_are_rejected() {
   assert_contains "$(cat "$tmp/removed.err")" "unknown option: --ai-apps"
 }
 
+# Verify interactive target selection can choose a single Codex desktop target
+# and decline current-repo hook installation.
 interactive_selection_can_choose_codex_desktop() {
   local home="$tmp/home-interactive"
   local output
@@ -86,6 +97,7 @@ interactive_selection_can_choose_codex_desktop() {
   assert_not_contains "$output" "$home/.claude/CLAUDE.md"
 }
 
+# Run the dry-run behavior scenarios.
 requires_tools_in_non_interactive_mode
 dry_run_codex_only_has_no_third_party_actions
 removed_flags_are_rejected

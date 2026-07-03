@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Default to seeding both instruction-file types unless the hook or caller
+# restricts the tool scope.
 tools="${TOKEN_SAVER_TOOLS:-both}"
 overwrite=0
 cwd="$PWD"
 
+# Print an error and stop the seeder.
 die() {
   printf 'error: %s\n' "$*" >&2
   exit 1
 }
 
+# Normalize tool aliases to the canonical seeding selector.
 normalize_tools() {
   local value="$1"
   value="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
@@ -21,6 +25,7 @@ normalize_tools() {
   esac
 }
 
+# Return success when the canonical selector includes the requested tool.
 tool_enabled() {
   case "$tools:$1" in
     both:*|codex:codex|claude:claude) return 0 ;;
@@ -28,11 +33,14 @@ tool_enabled() {
   esac
 }
 
+# Build a timestamped backup filename for overwrite mode.
 backup_path() {
   local path="$1"
   printf '%s.token-saver-backup-%s' "$path" "$(date +%Y%m%d%H%M%S)"
 }
 
+# Copy one project instruction template when available, preserving existing files
+# unless overwrite mode is active.
 copy_instruction_file() {
   local template="$1"
   local target="$2"
@@ -53,10 +61,13 @@ copy_instruction_file() {
   cp "$template" "$target"
 }
 
+# Detect either supported project instruction file so mixed-tool installs avoid
+# writing around user-owned configuration.
 project_instruction_file_exists() {
   [ -e "$repo_root/AGENTS.md" ] || [ -e "$repo_root/CLAUDE.md" ]
 }
 
+# Parse the seeder's small option set before resolving the repository root.
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --tools)
@@ -76,15 +87,19 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
+# Resolve the target Git repository and skip non-repositories or symlink roots.
 tools="$(normalize_tools "$tools")"
 repo_root="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || true)"
 [ -n "$repo_root" ] || exit 0
 [ ! -L "$repo_root" ] || exit 0
 
+# Preserve existing project instruction files unless the caller explicitly
+# requested overwrite.
 if [ "$overwrite" = "0" ] && project_instruction_file_exists; then
   exit 0
 fi
 
+# Seed the Codex and Claude project files selected by the tool scope.
 if tool_enabled codex; then
   copy_instruction_file "$HOME/.codex/AGENTS.project-template.md" "$repo_root/AGENTS.md"
 fi

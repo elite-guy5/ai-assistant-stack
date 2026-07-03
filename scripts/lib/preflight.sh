@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# Report a missing prerequisite and stop before the installer changes files.
 preflight_die() {
   local target="$1"
   local prerequisite="$2"
@@ -13,6 +14,7 @@ preflight_die() {
   exit 1
 }
 
+# Verify one command required by one target surface is available on PATH.
 require_command_for_target() {
   local target="$1"
   local command_name="$2"
@@ -25,6 +27,7 @@ require_command_for_target() {
   log_line "preflight_ok target=$target command=$command_name"
 }
 
+# Check only the prerequisites needed by the selected target surfaces.
 preflight_targets() {
   step "Preflight selected targets"
 
