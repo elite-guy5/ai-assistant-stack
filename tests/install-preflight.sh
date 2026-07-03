@@ -73,6 +73,8 @@ missing_claude_stops_before_changes() {
   fi
 
   assert_contains "$(cat "$tmp/claude.err")" "missing prerequisite for claude-desktop: claude"
+  assert_contains "$(cat "$tmp/claude.err")" "Install the Claude Code CLI so the claude command is on PATH."
+  assert_contains "$(cat "$tmp/claude.err")" "The Claude desktop app alone does not provide the required CLI."
   assert_not_exists "$home/.claude/CLAUDE.md"
 }
 

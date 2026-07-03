@@ -29,8 +29,8 @@ Instead of configuring multiple tools by hand, AI Assistant Stack installs and c
 |--------|------------------------|
 | `codex-desktop` | Codex client or `codex` CLI |
 | `codex-vscode` | Codex client or `codex` CLI, VS Code `code` CLI |
-| `claude-desktop` | Claude client or `claude` CLI |
-| `claude-vscode` | Claude client or `claude` CLI, VS Code `code` CLI |
+| `claude-desktop` | Claude Code CLI (`claude`) |
+| `claude-vscode` | Claude Code CLI (`claude`), VS Code `code` CLI |
 
 If a selected prerequisite is missing, the installer stops before making
 changes and prints the missing prerequisite list.

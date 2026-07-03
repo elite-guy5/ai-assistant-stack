@@ -39,7 +39,8 @@ target_mode_derives_codex_tools() {
   assert_contains "$output" "OK codex"
 }
 
-# Verify mixed Codex and Claude targets derive the legacy both tool selector.
+# Verify mixed Codex and Claude targets derive the legacy both tool selector
+# while naming the Claude requirement as Claude Code, not the standalone app.
 target_mode_derives_both_tools() {
   local home="$tmp/home-both-targets"
   local output
@@ -55,7 +56,7 @@ target_mode_derives_both_tools() {
 
   assert_contains "$output" "Selected targets"
   assert_contains "$output" "OK Codex Desktop"
-  assert_contains "$output" "OK Claude Desktop"
+  assert_contains "$output" "OK Claude Code CLI"
   assert_contains "$output" "Selected tools"
   assert_contains "$output" "OK both"
 }
@@ -107,10 +108,11 @@ interactive_selector_uses_space_toggles() {
   )"
 
   assert_contains "$output" "> ○ Codex Desktop"
+  assert_contains "$output" "  ○ Claude Code CLI"
   assert_contains "$output" "> ● Codex Desktop"
   assert_contains "$output" "Space toggles"
   case "$output" in
-    *"All"*|*"Selection [5]"*)
+    *"Claude Desktop"*|*"All"*|*"Selection [5]"*)
       printf 'legacy target menu appeared in output:\n%s\n' "$output" >&2
       exit 1
       ;;

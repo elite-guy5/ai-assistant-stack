@@ -5,7 +5,7 @@
 targets=""
 target_mode=0
 target_values=(codex-desktop codex-vscode claude-desktop claude-vscode)
-target_labels=("Codex Desktop" "Codex VS Code" "Claude Desktop" "Claude VS Code")
+target_labels=("Codex Desktop" "Codex VS Code" "Claude Code CLI" "Claude Code VS Code")
 target_count=4
 selector_test_keys="${TOKEN_SAVER_TEST_KEYS-}"
 

@@ -42,11 +42,13 @@ preflight_targets() {
   fi
 
   if target_enabled claude-desktop; then
-    require_command_for_target "claude-desktop" "claude" "Install Claude Code before running this installer."
+    require_command_for_target "claude-desktop" "claude" "Install the Claude Code CLI so the claude command is on PATH.
+The Claude desktop app alone does not provide the required CLI."
   fi
 
   if target_enabled claude-vscode; then
-    require_command_for_target "claude-vscode" "claude" "Install Claude Code before running this installer."
+    require_command_for_target "claude-vscode" "claude" "Install the Claude Code CLI so the claude command is on PATH.
+The Claude desktop app alone does not provide the required CLI."
     require_command_for_target "claude-vscode" "code" "Install VS Code and enable the code shell command."
   fi
 }

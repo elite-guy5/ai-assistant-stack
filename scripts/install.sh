@@ -455,8 +455,8 @@ if [ "$target_mode" = "1" ]; then
   log_kv "selected_targets" "$targets"
   target_enabled codex-desktop && status_ok "Codex Desktop"
   target_enabled codex-vscode && status_ok "Codex VS Code"
-  target_enabled claude-desktop && status_ok "Claude Desktop"
-  target_enabled claude-vscode && status_ok "Claude VS Code"
+  target_enabled claude-desktop && status_ok "Claude Code CLI"
+  target_enabled claude-vscode && status_ok "Claude Code VS Code"
 fi
 phase "Selected tools"
 status_ok "$tools"
