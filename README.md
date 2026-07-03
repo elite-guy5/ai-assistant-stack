@@ -120,6 +120,126 @@ The installer follows these guides when configuring stack tools:
   equivalent Claude Code setup for `CLAUDE.md`, Claude settings, MCP servers,
   hooks, and skills.
 
+## Windows Stack Commands
+
+The automated installer remains macOS-focused. On Windows, install Node.js 18
+or newer, Git, VS Code, and the selected AI clients first, then run the
+upstream commands below from PowerShell or from the target AI client. Commands
+come from [LeanCTX](https://github.com/yvgude/lean-ctx),
+[Context7](https://github.com/upstash/context7),
+[Ruflo](https://github.com/ruvnet/ruflo),
+[Caveman](https://github.com/JuliusBrussee/caveman), and
+[Superpowers](https://github.com/obra/superpowers).
+
+Install LeanCTX:
+
+```powershell
+npm install -g lean-ctx-bin
+lean-ctx onboard
+lean-ctx doctor
+```
+
+Alternative LeanCTX package-manager install:
+
+```powershell
+cargo install lean-ctx
+```
+
+Install Context7 for Codex and Claude Code:
+
+```powershell
+$env:CONTEXT7_API_KEY = "your-context7-api-key"
+npx ctx7 setup --codex --api-key $env:CONTEXT7_API_KEY
+npx ctx7 setup --claude --api-key $env:CONTEXT7_API_KEY
+```
+
+Install Ruflo and register its MCP server:
+
+```powershell
+npx ruflo@latest init wizard
+codex mcp add ruflo -- npx -y ruflo@latest mcp start
+claude mcp add ruflo -- npx ruflo@latest mcp start
+```
+
+Install Caveman:
+
+```powershell
+irm https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.ps1 | iex
+npx skills add JuliusBrussee/caveman -a codex
+claude plugin marketplace add JuliusBrussee/caveman
+claude plugin install caveman@caveman
+```
+
+Install Superpowers from the target client.
+
+For Codex CLI, open the plugin search interface, search for `superpowers`, and
+select `Install Plugin`:
+
+```text
+/plugins
+superpowers
+```
+
+For Claude Code:
+
+```text
+/plugin install superpowers@claude-plugins-official
+```
+
+Uninstall LeanCTX:
+
+```powershell
+lean-ctx uninstall
+lean-ctx uninstall --dry-run
+lean-ctx uninstall --keep-config
+npm uninstall -g lean-ctx-bin
+cargo uninstall lean-ctx
+```
+
+Uninstall Context7:
+
+```powershell
+npx ctx7 remove
+npm uninstall -g ctx7
+```
+
+Uninstall Caveman:
+
+```powershell
+npx -y github:JuliusBrussee/caveman -- --uninstall
+npx skills remove caveman
+```
+
+The Superpowers repository does not document a general uninstall command for
+Codex or Claude Code installs. For this repository's git-clone and symlink
+layout on Windows, remove the cloned repositories and linked skill folders:
+
+```powershell
+Remove-Item -Recurse -Force "$env:USERPROFILE\.codex\superpowers", "$env:USERPROFILE\.agents\skills\superpowers" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force "$env:USERPROFILE\.claude\superpowers", "$env:USERPROFILE\.claude\skills\superpowers" -ErrorAction SilentlyContinue
+```
+
+The Ruflo repository documents Claude plugin removal but does not document a
+general uninstall command for the `npx ruflo@latest` runtime path. Run this in
+Claude Code when the Claude plugin path was used:
+
+```text
+/plugin remove claude-flow
+```
+
+After stopping active Ruflo processes, remove this repository's preferred
+Windows runtime-state location:
+
+```powershell
+Remove-Item -Recurse -Force "$env:USERPROFILE\.ruflo" -ErrorAction SilentlyContinue
+```
+
+If you chose the Ruflo global npm install path, remove the package:
+
+```powershell
+npm uninstall -g ruflo
+```
+
 ## Legacy Instruction-File Install
 
 The `--tools` flow remains available for compatibility when you only want
