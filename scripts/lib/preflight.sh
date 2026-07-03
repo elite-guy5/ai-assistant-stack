@@ -5,9 +5,11 @@ preflight_die() {
   local prerequisite="$2"
   shift 2
 
-  printf 'error: missing prerequisite for %s: %s\n' "$target" "$prerequisite" >&2
+  printf 'error: missing prerequisite for %s: %s\n
+    ' "$target" "$prerequisite" >&2
   printf '%s\n' "$*" >&2
-  printf 'No files or configuration were changed.\n' >&2
+  printf 'No files or configuration were changed.\n
+    ' >&2
   printf 'Log: %s\n' "$install_log" >&2
   log_line "preflight_failure target=$target prerequisite=$prerequisite"
   exit 1
