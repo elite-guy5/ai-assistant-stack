@@ -170,9 +170,8 @@ whenever possible.
 
 ## Memory Management
 
-### Durable Knowledge
-
-- Generalizable learnings and correction logs should be written directly to the
-  personal Obsidian vault using the Obsidian integration when available.
-- Only the primary supervising agent is authorized to write or append to the
-  Obsidian vault to prevent parallel write-collision locks.
+### Context & Active Knowledge
+- State tracking, temporal facts, and session discoveries are managed natively by LeanCTX via `ctx_knowledge`.
+- Do not attempt to automatically write correction logs, session journals, or lessons learned to an external Obsidian vault or personal notes.
+- If high-leverage architectural changes or unique domain patterns are established, focus entirely on the engineering execution loop. 
+- Provide a clean, markdown-formatted technical summary of the session *only* if explicitly requested by the human for manual curation.

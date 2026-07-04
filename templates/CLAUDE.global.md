@@ -231,7 +231,7 @@ Guidelines:
 
 - Limit each subagent to one task.
 - Use parallel subagents only when tasks are independent.
-- Subagents must not write to shared Obsidian notes.
+- Subagents must return all memory-worthy findings directly to the supervising agent.
 
 ## 7. Demand Elegance
 
@@ -245,13 +245,10 @@ If a fix feels hacky:
 
 ## 8. Memory and Knowledge Management
 
-- Store durable instructions in the narrowest appropriate `CLAUDE.md` file.
-- Use Claude Code auto memory for learned preferences and repeated corrections when enabled.
-- Use `CLAUDE.local.md` for private project preferences.
-- Track local workspace state via LeanCTX when available.
-- Write generalizable correction logs and domain knowledge to the personal Obsidian vault using the Obsidian MCP integration when available.
-- Restrict Obsidian writing to the supervising agent.
-- Subagents should return memory-worthy findings to the supervising agent.
+- **Instruction Canonicalization:** Store durable instructions in the narrowest appropriate `CLAUDE.md` file. Use `CLAUDE.local.md` for private project preferences.
+- **Automated Active Context:** Rely entirely on LeanCTX (`ctx_knowledge`, `ctx_search`) to natively track local workspace states, temporal session facts, and real-time corrections.
+- **Domain Knowledge:** Keep core codebase domain knowledge and system design logic in the project's native documentation or markdown files for LeanCTX to index.
+- **Human Curation (Obsidian Boundary):** Do not attempt to automatically write correction logs, lessons learned, or session journals to external personal notes or Obsidian MCP vaults. Focus completely on the engineering task. Only output a clean, markdown-formatted session post-mortem if the user explicitly asks for a summary to manually archive.
 
 ---
 

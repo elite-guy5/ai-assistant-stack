@@ -291,35 +291,22 @@ Store information in its canonical location.
 - Local workspace state is tracked by LeanCTX when available.
 - Use the active product's native memory tools when durable operational memory is needed.
 
-### Obsidian Knowledge
+## 8. Memory & Knowledge
 
-Use Obsidian MCP commands when available:
+Store information in its canonical location.
 
-- `obsidian_global_search`
-- `read_note`
-- `Notes`
-- `append_to_file`
+### Systemic Context & Agent Recall
+- Local workspace state, temporal facts, and session findings are tracked natively by LeanCTX via `ctx_knowledge`.
+- Rely on LeanCTX utilities (`ctx_search`, `ctx_read`) to maintain codebase awareness without polluting external files.
 
-Do not rely on manual filesystem scripts.
+### Domain Knowledge
+- Keep core domain knowledge, business logic constraints, and local architectural rules in the project's native `/docs` or markdown files. 
+- Let LeanCTX index and fetch these files dynamically during the session.
 
-### Collision Prevention
-
-- Only the supervising agent may write to the Obsidian vault.
-- Subagents should return memory-worthy findings to the supervising agent.
-
-### Session Journal
-
-- Managed automatically when the environment provides it.
-- Do not curate manually.
-
-### Self-Improvement Loop
-
-After a user correction:
-
-- General behavioral improvements -> write to Obsidian feedback directories.
-- Domain knowledge -> update the appropriate Obsidian note.
-
-Do not create separate lessons files.
+### Human Knowledge Curation (Obsidian Hand-off)
+- Do not attempt to automatically write logs, lessons learned, or behavioral updates to external personal notes or Obsidian vaults.
+- If a major structural decision, complex bug resolution, or high-leverage architectural paradigm is established, focus entirely on solving the task first. 
+- Only generate a structured, clean Markdown summary of these findings if the user explicitly requests a session post-mortem for their personal human curation.
 
 ---
 

@@ -205,21 +205,13 @@ possible.
 
 ## Memory Management
 
-### Durable Knowledge
-
-- Generalizable learnings and correction logs should be written directly to the
-  personal Obsidian vault using the Obsidian integration when available.
-- Project-specific durable notes should go to the repository's documented
-  Obsidian destination when one exists.
-- Only the primary supervising agent is authorized to write or append to the
-  Obsidian vault to prevent parallel write-collision locks.
+### Context & Active Knowledge (LeanCTX)
+- **Active Workspace Memory:** State tracking, temporal facts, and session discoveries are handled natively by LeanCTX via `ctx_knowledge`.
+- **Systemic Guardrail:** Do not attempt to automatically write correction logs, session journals, or lessons learned to an external Obsidian vault or personal note directory. Focus entirely on the engineering execution loop.
+- **Human Curation Hand-off:** Only provide a clean, markdown-formatted technical summary of structural decisions if explicitly requested by the human for manual archiving.
 
 ### Claude Code Memory
-
-- Use `CLAUDE.md` for durable project instructions that every session should
-  read.
-- Use `CLAUDE.local.md` for private local preferences.
-- Use Claude Code auto memory for learned preferences and repeated corrections
-  when enabled.
-- Use `.claude/rules/` or skills for scoped procedures that would bloat this
-  file.
+- Use `CLAUDE.md` for durable project instructions that every session should read.
+- Use `CLAUDE.local.md` for private local preferences kept out of source control.
+- Use Claude Code native auto-memory solely for learned preferences and repeated interaction corrections when enabled.
+- Use `.claude/rules/` for localized, feature-specific procedure files to avoid bloating this file.
