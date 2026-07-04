@@ -415,6 +415,47 @@ invalid_codex_skill_json_stops_caveman_install() {
   assert_not_contains "$commands" "skills add"
 }
 
+# Verify malformed successful Codex plugin-list output stops Superpowers install
+# instead of falling through to plugin add.
+malformed_codex_plugin_list_stops_superpowers_install() {
+  local home="$tmp/home-malformed-codex-plugin-list"
+  local log="$home/.agents/install.log"
+  local output commands
+  mkdir -p "$home/bin" "$home/.agents"
+
+  printf '#!/usr/bin/env bash\nprintf "codex %%s\\n" "$*" >> "$HOME/commands.log"\nif [ "$1 $2" = "plugin list" ]; then printf "unrecognized output\\n"; exit 0; fi\nprintf "unexpected install: %%s\\n" "$*" >> "$HOME/commands.log"; exit 8\n' > "$home/bin/codex"
+  chmod +x "$home/bin/codex"
+
+  if output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" agents_home="$home/.agents" dry_run=0 bash -c '
+      ROOT="$1"
+      install_log="$2"
+      tools=codex
+      tool_enabled() {
+        case "$tools:$1" in
+          both:*|codex:codex|claude:claude) return 0 ;;
+          *) return 1 ;;
+        esac
+      }
+      say() { printf "%s\n" "$*"; }
+      die() { printf "error: %s\n" "$*" >&2; exit 1; }
+      run() { "$@"; }
+      . "$ROOT/scripts/lib/targets.sh"
+      . "$ROOT/scripts/lib/logging.sh"
+      . "$ROOT/scripts/lib/stack-tools.sh"
+      install_superpowers
+    ' sh "$ROOT" "$log" 2>&1
+  )"; then
+    printf 'malformed Codex plugin list unexpectedly succeeded\n' >&2
+    exit 1
+  fi
+
+  assert_contains "$output" "invalid output from codex plugin list"
+  commands="$(cat "$home/commands.log")"
+  assert_contains "$commands" "codex plugin list"
+  assert_not_contains "$commands" "plugin add superpowers@openai-curated"
+}
+
 # Verify missing Superpowers installs through native Codex and Claude plugin
 # commands rather than git clone and symlink setup.
 missing_superpowers_uses_plugin_installers() {
@@ -576,6 +617,7 @@ installed_state_helpers_reject_invalid_json
 installed_stack_tools_are_skipped
 invalid_claude_plugin_json_stops_caveman_install
 invalid_codex_skill_json_stops_caveman_install
+malformed_codex_plugin_list_stops_superpowers_install
 missing_superpowers_uses_plugin_installers
 installed_state_helpers_reject_empty_json_output
 dry_run_prints_stack_steps_for_claude_desktop

@@ -141,6 +141,7 @@ codex_skill_installed() {
 codex_plugin_installed() {
   local plugin="$1"
   local output
+  local status
 
   if [ "$dry_run" = "1" ]; then
     status_dry_run "Check Codex plugin $plugin"
@@ -148,10 +149,25 @@ codex_plugin_installed() {
   fi
 
   output="$(codex plugin list 2>&1)" || die "failed to list Codex plugins: $output"
-  printf '%s\n' "$output" | awk -v plugin="$plugin" '
-    $1 == plugin && $0 ~ /installed/ && $0 !~ /not installed/ { found = 1 }
-    END { exit found ? 0 : 1 }
-  '
+  if printf '%s\n' "$output" | awk -v plugin="$plugin" '
+    NR == 1 && $1 == "PLUGIN" && $2 == "STATUS" { valid_header = 1; next }
+    NF == 0 { next }
+    $1 == plugin && $0 ~ /not installed/ { missing = 1; next }
+    $1 == plugin && $0 ~ /installed/ { found = 1; next }
+    $1 == plugin { invalid = 1 }
+    END {
+      if (!valid_header || invalid) exit 2
+      if (found) exit 0
+      exit 1
+    }
+  '; then
+    return 0
+  else
+    status=$?
+  fi
+
+  [ "$status" -lt 2 ] && return "$status"
+  die "invalid output from codex plugin list"
 }
 
 claude_plugin_installed() {
