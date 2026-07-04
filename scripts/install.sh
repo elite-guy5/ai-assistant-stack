@@ -185,6 +185,12 @@ install_file() {
   [ -f "$source" ] || die "missing source template: $source"
 
   if [ -e "$target" ]; then
+    if [ "$replace" != "1" ] && [ "$non_interactive" = "0" ]; then
+      if prompt_yes_no "Replace existing $target?" "no"; then
+        replace=1
+      fi
+    fi
+
     if [ "$replace" = "1" ]; then
       backup="$(backup_path "$target")"
       status_ok "Backing up $target to $backup"
