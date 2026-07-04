@@ -72,8 +72,11 @@ dry_run_prints_stack_steps_for_codex() {
   assert_contains "$output" "Dry run Disable LeanCTX proxy"
   assert_contains "$output" "Configure Context7"
   assert_contains "$output" "Install Caveman"
+  assert_contains "$output" "Dry run Check Codex skill caveman"
   assert_contains "$output" "Dry run Install all Caveman skills for Codex"
   assert_contains "$output" "Install Superpowers"
+  assert_contains "$output" "Dry run Check Codex plugin superpowers@openai-curated"
+  assert_contains "$output" "Dry run Install Superpowers for Codex"
   assert_contains "$output" "Dry run Configure Context7 for Codex"
   assert_not_contains "$output" "Configure LeanCTX tools"
   assert_contains "$(cat "$log")" "lean-ctx setup"
@@ -83,6 +86,7 @@ dry_run_prints_stack_steps_for_codex() {
   assert_not_contains "$(cat "$log")" "LEAN_CTX_PROJECT_ROOT"
   assert_contains "$(cat "$log")" "lean-ctx proxy disable"
   assert_contains "$(cat "$log")" "npx skills add JuliusBrussee/caveman --yes --global"
+  assert_contains "$(cat "$log")" "codex plugin add superpowers@openai-curated"
   assert_contains "$(cat "$log")" "codex mcp add context7"
   assert_contains "$(cat "$log")" "--api-key <redacted>"
   assert_not_contains "$(cat "$log")" "lean-ctx tools minimal"
@@ -257,6 +261,109 @@ installed_state_helpers_reject_invalid_json() {
   assert_contains "$output" "invalid JSON from claude plugin list"
 }
 
+# Verify Caveman and Superpowers installers skip selected clients where the tool
+# is already installed.
+installed_stack_tools_are_skipped() {
+  local home="$tmp/home-stack-tools-skipped"
+  local log="$home/.agents/install.log"
+  local output commands
+  local node_path
+  node_path="$(command -v node || true)"
+  [ -n "$node_path" ] || {
+    printf 'node is required for this test\n' >&2
+    exit 1
+  }
+
+  mkdir -p "$home/bin" "$home/.agents"
+  ln -s "$node_path" "$home/bin/node"
+  printf '#!/usr/bin/env bash\ncase "$*" in\n  "skills list --json --global --agent codex") printf "[{\\"name\\":\\"caveman\\"}]\\n" ;;\n  "skills add"*) printf "unexpected install: %%s\\n" "$*" >> "$HOME/commands.log"; exit 8 ;;\n  *) printf "unexpected npx args: %%s\\n" "$*" >&2; exit 9 ;;\nesac\n' > "$home/bin/npx"
+  printf '#!/usr/bin/env bash\nprintf "codex %%s\\n" "$*" >> "$HOME/commands.log"\nif [ "$1 $2" = "plugin list" ]; then printf "PLUGIN STATUS VERSION PATH\\nsuperpowers@openai-curated installed, enabled 1 /tmp/superpowers\\n"; exit 0; fi\nexit 8\n' > "$home/bin/codex"
+  printf '#!/usr/bin/env bash\nprintf "claude %%s\\n" "$*" >> "$HOME/commands.log"\nif [ "$1 $2 $3" = "plugin list --json" ]; then printf "[{\\"id\\":\\"caveman@caveman\\"},{\\"id\\":\\"superpowers@claude-plugins-official\\"}]\\n"; exit 0; fi\nexit 8\n' > "$home/bin/claude"
+  chmod +x "$home/bin/npx" "$home/bin/codex" "$home/bin/claude"
+
+  output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" agents_home="$home/.agents" dry_run=0 bash -c '
+      ROOT="$1"
+      install_log="$2"
+      tools=both
+      tool_enabled() {
+        case "$tools:$1" in
+          both:*|codex:codex|claude:claude) return 0 ;;
+          *) return 1 ;;
+        esac
+      }
+      say() { printf "%s\n" "$*"; }
+      die() { printf "error: %s\n" "$*" >&2; exit 1; }
+      run() { "$@"; }
+      . "$ROOT/scripts/lib/targets.sh"
+      . "$ROOT/scripts/lib/logging.sh"
+      . "$ROOT/scripts/lib/stack-tools.sh"
+      install_caveman
+      install_superpowers
+    ' sh "$ROOT" "$log"
+  )"
+
+  assert_contains "$output" "Skipped Caveman already installed for Codex"
+  assert_contains "$output" "Skipped Caveman already installed for Claude Code"
+  assert_contains "$output" "Skipped Superpowers already installed for Codex"
+  assert_contains "$output" "Skipped Superpowers already installed for Claude Code"
+  commands="$(cat "$home/commands.log")"
+  assert_contains "$commands" "codex plugin list"
+  assert_contains "$commands" "claude plugin list --json"
+  assert_not_contains "$commands" "plugin add superpowers"
+  assert_not_contains "$commands" "plugin install superpowers"
+}
+
+# Verify missing Superpowers installs through native Codex and Claude plugin
+# commands rather than git clone and symlink setup.
+missing_superpowers_uses_plugin_installers() {
+  local home="$tmp/home-superpowers-install"
+  local log="$home/.agents/install.log"
+  local output commands
+  local node_path
+  node_path="$(command -v node || true)"
+  [ -n "$node_path" ] || {
+    printf 'node is required for this test\n' >&2
+    exit 1
+  }
+
+  mkdir -p "$home/bin" "$home/.agents"
+  ln -s "$node_path" "$home/bin/node"
+
+  printf '#!/usr/bin/env bash\nprintf "codex %%s\\n" "$*" >> "$HOME/commands.log"\nif [ "$1 $2" = "plugin list" ]; then printf "PLUGIN STATUS VERSION PATH\\nsuperpowers@openai-curated not installed  /tmp/superpowers\\n"; exit 0; fi\nif [ "$1 $2 $3" = "plugin add superpowers@openai-curated" ]; then exit 0; fi\nexit 8\n' > "$home/bin/codex"
+  printf '#!/usr/bin/env bash\nprintf "claude %%s\\n" "$*" >> "$HOME/commands.log"\nif [ "$1 $2 $3" = "plugin list --json" ]; then printf "[]\\n"; exit 0; fi\nif [ "$1 $2 $3 $4 $5" = "plugin install superpowers@claude-plugins-official --scope user" ]; then exit 0; fi\nexit 8\n' > "$home/bin/claude"
+  chmod +x "$home/bin/codex" "$home/bin/claude"
+
+  output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" agents_home="$home/.agents" dry_run=0 bash -c '
+      ROOT="$1"
+      install_log="$2"
+      tools=both
+      tool_enabled() {
+        case "$tools:$1" in
+          both:*|codex:codex|claude:claude) return 0 ;;
+          *) return 1 ;;
+        esac
+      }
+      say() { printf "%s\n" "$*"; }
+      die() { printf "error: %s\n" "$*" >&2; exit 1; }
+      run() { "$@"; }
+      . "$ROOT/scripts/lib/targets.sh"
+      . "$ROOT/scripts/lib/logging.sh"
+      . "$ROOT/scripts/lib/stack-tools.sh"
+      install_superpowers
+    ' sh "$ROOT" "$log"
+  )"
+
+  assert_contains "$output" "OK Install Superpowers for Codex"
+  assert_contains "$output" "OK Install Superpowers for Claude Code"
+  commands="$(cat "$home/commands.log")"
+  assert_contains "$commands" "codex plugin add superpowers@openai-curated"
+  assert_contains "$commands" "claude plugin install superpowers@claude-plugins-official --scope user"
+  assert_not_contains "$commands" "git clone"
+  assert_not_contains "$commands" "ln -sfn"
+}
+
 # Verify empty JSON helper output fails explicitly instead of looking like a
 # missing install.
 installed_state_helpers_reject_empty_json_output() {
@@ -365,6 +472,8 @@ stack_command_already_exists_continues
 stack_command_real_failure_still_fails
 installed_state_helpers_detect_existing_tools
 installed_state_helpers_reject_invalid_json
+installed_stack_tools_are_skipped
+missing_superpowers_uses_plugin_installers
 installed_state_helpers_reject_empty_json_output
 dry_run_prints_stack_steps_for_claude_desktop
 claude_desktop_config_is_merged

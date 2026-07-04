@@ -409,30 +409,42 @@ configure_context7() {
 install_caveman() {
   step "Install Caveman"
   if tool_enabled codex; then
-    run_stack_command "Install all Caveman skills for Codex" npx skills add JuliusBrussee/caveman --yes --global
+    if codex_skill_installed caveman; then
+      status_skipped "Caveman already installed for Codex"
+    else
+      run_stack_command "Install all Caveman skills for Codex" npx skills add JuliusBrussee/caveman --yes --global
+    fi
   fi
 
   if tool_enabled claude && claude_cli_available; then
-    run_stack_command "Install Caveman for Claude Code" sh -c "claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman"
+    if claude_plugin_installed caveman@caveman; then
+      status_skipped "Caveman already installed for Claude Code"
+    else
+      run_stack_command "Install Caveman marketplace for Claude Code" claude plugin marketplace add JuliusBrussee/caveman
+      run_stack_command "Install Caveman for Claude Code" claude plugin install caveman@caveman --scope user
+    fi
   elif tool_enabled claude; then
     status_skipped "Claude Code CLI not found; skipped Caveman for Claude Code"
   fi
 }
 
-# Install Superpowers support by cloning its repository and linking its skills
-# into the selected client's skill directory.
+# Install Superpowers through each client's native plugin system.
 install_superpowers() {
   step "Install Superpowers"
   if tool_enabled codex; then
-    run_stack_command "Install Superpowers for Codex" sh -c "if [ -d \"$HOME/.codex/superpowers/.git\" ]; then git -C \"$HOME/.codex/superpowers\" pull; else git clone https://github.com/obra/superpowers.git \"$HOME/.codex/superpowers\"; fi"
-    run_stack_command "Prepare Superpowers skills directory for Codex" mkdir -p "$HOME/.agents/skills"
-    run_stack_command "Link Superpowers skills for Codex" ln -sfn "$HOME/.codex/superpowers/skills" "$HOME/.agents/skills/superpowers"
+    if codex_plugin_installed superpowers@openai-curated; then
+      status_skipped "Superpowers already installed for Codex"
+    else
+      run_stack_command "Install Superpowers for Codex" codex plugin add superpowers@openai-curated
+    fi
   fi
 
   if tool_enabled claude && claude_cli_available; then
-    run_stack_command "Install Superpowers for Claude Code" sh -c "if [ -d \"$HOME/.claude/superpowers/.git\" ]; then git -C \"$HOME/.claude/superpowers\" pull; else git clone https://github.com/obra/superpowers.git \"$HOME/.claude/superpowers\"; fi"
-    run_stack_command "Prepare Superpowers skills directory for Claude Code" mkdir -p "$HOME/.claude/skills"
-    run_stack_command "Link Superpowers skills for Claude Code" ln -sfn "$HOME/.claude/superpowers/skills" "$HOME/.claude/skills/superpowers"
+    if claude_plugin_installed superpowers@claude-plugins-official; then
+      status_skipped "Superpowers already installed for Claude Code"
+    else
+      run_stack_command "Install Superpowers for Claude Code" claude plugin install superpowers@claude-plugins-official --scope user
+    fi
   elif tool_enabled claude; then
     status_skipped "Claude Code CLI not found; skipped Superpowers for Claude Code"
   fi
