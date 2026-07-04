@@ -139,7 +139,31 @@ NODE
 }
 
 # Return the Git project directory LeanCTX setup should run from.
+leanctx_find_git_project_under() {
+  local base="$1"
+  local candidate
+  local root
+
+  [ -d "$base" ] || return 0
+
+  root="$(git_root_for "$base")"
+  if [ -n "$root" ]; then
+    printf '%s\n' "$root"
+    return 0
+  fi
+
+  for candidate in "$base"/* "$base"/*/*; do
+    [ -d "$candidate" ] || continue
+    root="$(git_root_for "$candidate")"
+    if [ -n "$root" ]; then
+      printf '%s\n' "$root"
+      return 0
+    fi
+  done
+}
+
 leanctx_setup_project_dir() {
+  local candidate
   local root=""
 
   if [ -n "${TOKEN_SAVER_LEANCTX_SETUP_DIR:-}" ]; then
@@ -168,6 +192,21 @@ leanctx_setup_project_dir() {
     printf '%s\n' "$root"
     return 0
   fi
+
+  for candidate in \
+    "$HOME/Documents/git/ai-assistant-stack" \
+    "$HOME/Documents/git/token-saver-setup" \
+    "$HOME/Documents/git" \
+    "$HOME/git" \
+    "$HOME/src" \
+    "$HOME/Projects" \
+    "$HOME/Documents"; do
+    root="$(leanctx_find_git_project_under "$candidate")"
+    if [ -n "$root" ]; then
+      printf '%s\n' "$root"
+      return 0
+    fi
+  done
 
   die "LeanCTX setup requires an active Git project directory; run from inside a Git project or pass --repo"
 }

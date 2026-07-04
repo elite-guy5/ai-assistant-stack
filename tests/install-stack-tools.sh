@@ -89,6 +89,36 @@ dry_run_prints_stack_steps_for_codex() {
   assert_not_contains "$(cat "$log")" "lean-ctx proxy enable"
 }
 
+# Verify a bootstrap-style install from the user's home directory can find an
+# active project checkout under the normal Documents/git project folder.
+dry_run_finds_git_project_from_home() {
+  local home="$tmp/home-stack-from-home"
+  local bundle="$tmp/bootstrap-payload"
+  local project
+  local output log
+
+  mkdir -p "$home/bin" "$home/Documents/git/example-project" "$bundle"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
+  chmod +x "$home/bin/codex"
+  git -C "$home/Documents/git/example-project" init >/dev/null 2>&1
+  project="$(git -C "$home/Documents/git/example-project" rev-parse --show-toplevel)"
+  cp -R "$ROOT/scripts" "$bundle/scripts"
+  cp -R "$ROOT/templates" "$bundle/templates"
+
+  output="$(
+    cd "$home"
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" CONTEXT7_API_KEY="test-key" \
+      bash "$bundle/scripts/install.sh" --dry-run --non-interactive --targets codex
+  )"
+  log="$home/.agents/install.log"
+
+  assert_contains "$output" "Dry run Configure LeanCTX setup"
+  assert_contains "$(cat "$log")" "leanctx_setup_project=$project"
+  assert_contains "$(cat "$log")" 'cd "$1"'
+  assert_contains "$(cat "$log")" 'cd "$HOME"'
+  assert_not_contains "$(cat "$log")" "LEAN_CTX_PROJECT_ROOT"
+}
+
 # Verify Claude Desktop targets configure Context7 through the Desktop MCP config
 # path without requiring the Claude Code CLI.
 dry_run_prints_stack_steps_for_claude_desktop() {
@@ -155,6 +185,7 @@ if (config.mcpServers.context7.env.CONTEXT7_API_KEY !== "test-key") process.exit
 # Run the stack-tool scenarios.
 context7_credentials_required
 dry_run_prints_stack_steps_for_codex
+dry_run_finds_git_project_from_home
 dry_run_prints_stack_steps_for_claude_desktop
 claude_desktop_config_is_merged
 
