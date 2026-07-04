@@ -63,6 +63,19 @@ verify with the best available command.
 
 > `<Project-specific Claude Code settings, hook files, permission boundaries, MCP servers, and local-only setup notes>`
 
+### 🤖 Model Routing & Token Enforcement (Claude Optimized)
+
+- **Spec Writers & Architecture Reviewers:**
+  - **Model:** `claude-3-7-sonnet` (or `claude-3-5-sonnet`)
+  - **Thinking Budget:** `Enabled` (High/Extended for architecture)
+  - *Use Case:* High-level context synthesis, structural planning, and final code quality reviews.
+- **Implementers & TDD Repair Loops:**
+  - **Model:** `claude-3-5-haiku` (or switch to the global `Speed` profile)
+  - **Thinking Budget:** `Disabled` (or set to standard fast response)
+  - *Use Case:* Writing basic unit tests, running terminal commands, and localized file modifications. This stops the repetitive execution loops from burning your primary usage limits.
+- **Max Iteration Loop Limit:** Subagents are capped at a maximum of **3 regression/repair loops** per task. If a test fails 3 times sequentially, the agent **MUST halt**, save an error state, and hand execution back to the human.
+- **Tool-Call Hard Cap:** Hard-cap tool calls at a maximum of **12,000 input tokens** to prevent context blowout from massive files.
+
 ---
 
 ## Token-Saver File Boundaries

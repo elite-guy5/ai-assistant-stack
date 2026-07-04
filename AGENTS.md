@@ -91,6 +91,19 @@ verify with the best available command.
 - Keep the repository package-free unless a requested change truly requires a dependency manager.
 - Treat docs and templates as part of the product surface; changes to `README.md`, `docs/*.md`, and `templates/*.md` should stay consistent with actual installer flags and behavior.
 
+### 🤖 Model Routing & Token Enforcement
+
+- **Spec Writers & Architecture Reviewers:**
+  - **Model:** `GPT-5.5`
+  - **Reasoning Tier:** `High` (or `Medium`)
+  - *Use Case:* High-level context synthesis and architectural guardrails.
+- **Implementers & TDD Repair Loops:**
+  - **Model:** `GPT-5.4-Mini` OR route strictly to the `Speed` profile.
+  - **Reasoning Tier:** `Light`
+  - *Use Case:* Writing basic unit tests and localized file modifications. This stops execution loops from burning premium limits.
+- **Max Iteration Loop Limit:** Subagents are capped at a maximum of **3 regression/repair loops** per task. If a test fails 3 times sequentially, the agent **MUST halt**, save an error state, and hand execution back to the human.
+- **Tool-Call Hard Cap:** Hard-cap tool calls at a maximum of **12,000 input tokens** to prevent context blowout from massive files.
+
 ---
 
 ## Token-Saver File Boundaries
