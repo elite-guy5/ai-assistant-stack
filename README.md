@@ -1,10 +1,16 @@
+<div align="center">
+
 # AI Assistant Stack
 
-**AI Assistant Stack** is an AI assistant stack that helps reduce token usage while improving the quality and consistency of AI-assisted development.
+### Your AI Assistant Stack for Smarter Development
 
-Instead of configuring multiple tools by hand, AI Assistant Stack installs and configures a curated development stack that works together to provide better project context, access to up-to-date documentation, and reusable AI workflows.
+Install and configure LeanCTX, Context7, Caveman, Superpowers, optimized `AGENTS.md`/`CLAUDE.md` templates, and automatic Git project seeding.
 
-## What Gets Installed
+[Features](#features) • [Installation](#installation) • [Documentation](#documentation)
+
+</div>
+
+## Features
 
 - **LeanCTX** for efficient project context management.
 - **Context7** for live documentation and API reference retrieval.
@@ -106,7 +112,7 @@ install managed hooks in the current repository when it is run from inside one.
   commands, tests, coding standards, project-specific rules, and context
   boundaries.
 
-## Agent Stack Setup Guides
+## Documentation
 
 The installer follows these guides when configuring stack tools:
 
