@@ -127,7 +127,10 @@ Install LeanCTX:
 
 ```powershell
 npm install -g lean-ctx-bin
+Set-Location (git rev-parse --show-toplevel)
 lean-ctx setup
+Set-Location $HOME
+lean-ctx proxy disable
 lean-ctx doctor
 ```
 
@@ -149,7 +152,7 @@ Install Caveman:
 
 ```powershell
 irm https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.ps1 | iex
-npx skills add JuliusBrussee/caveman -a codex
+npx skills add JuliusBrussee/caveman --yes --global
 claude plugin marketplace add JuliusBrussee/caveman
 claude plugin install caveman@caveman
 ```
@@ -532,7 +535,7 @@ configuration parses correctly.
 Install runtime skills manually:
 
 ```bash
-npx skills add JuliusBrussee/caveman -a codex
+npx skills add JuliusBrussee/caveman --yes --global
 npx skills add superpowers -a codex
 ```
 

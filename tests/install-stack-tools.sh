@@ -69,15 +69,24 @@ dry_run_prints_stack_steps_for_codex() {
 
   assert_contains "$output" "Install LeanCTX"
   assert_contains "$output" "Dry run Configure LeanCTX setup"
+  assert_contains "$output" "Dry run Disable LeanCTX proxy"
   assert_contains "$output" "Configure Context7"
   assert_contains "$output" "Install Caveman"
+  assert_contains "$output" "Dry run Install all Caveman skills for Codex"
   assert_contains "$output" "Install Superpowers"
   assert_contains "$output" "Dry run Configure Context7 for Codex"
   assert_not_contains "$output" "Configure LeanCTX tools"
   assert_contains "$(cat "$log")" "lean-ctx setup"
+  assert_contains "$(cat "$log")" "leanctx_setup_project=$ROOT"
+  assert_contains "$(cat "$log")" 'cd "$1"'
+  assert_contains "$(cat "$log")" 'cd "$HOME"'
+  assert_not_contains "$(cat "$log")" "LEAN_CTX_PROJECT_ROOT"
+  assert_contains "$(cat "$log")" "lean-ctx proxy disable"
+  assert_contains "$(cat "$log")" "npx skills add JuliusBrussee/caveman --yes --global"
   assert_contains "$(cat "$log")" "codex mcp add context7"
   assert_contains "$(cat "$log")" "--api-key <redacted>"
   assert_not_contains "$(cat "$log")" "lean-ctx tools minimal"
+  assert_not_contains "$(cat "$log")" "lean-ctx proxy enable"
 }
 
 # Verify Claude Desktop targets configure Context7 through the Desktop MCP config

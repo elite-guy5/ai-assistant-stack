@@ -101,7 +101,10 @@ Use LeanCTX for:
 Use LeanCTX's interactive setup command with this stack's unattended answers:
 
 ```bash
-printf "y\nn\ny\nmax\ny\n$HOME/Documents\n" | lean-ctx setup
+cd "$(git rev-parse --show-toplevel)"
+printf "y\nn\ny\nmax\ny\n" | lean-ctx setup
+cd "$HOME"
+lean-ctx proxy disable
 ```
 
 Do not force a custom tool profile or document invalid config keys:
@@ -112,8 +115,10 @@ lean-ctx config set mode lazy
 ```
 
 The answers enable IDE config access, decline anonymous telemetry, enable
-auto-updates, select `max` compression, enable result archiving, and set the
-default project root to `~/Documents`.
+auto-updates, select `max` compression, and enable result archiving. Run setup
+from an active Git project so LeanCTX can use its default project-root
+detection. Do not set `LEAN_CTX_PROJECT_ROOT` manually. Return to the user's
+home directory before continuing, and disable the proxy after setup.
 
 Verify:
 

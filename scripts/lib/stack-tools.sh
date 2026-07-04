@@ -138,11 +138,49 @@ NODE
   log_line "update_vscode_mcp_config=$config server=context7"
 }
 
-# Run LeanCTX setup with this stack's unattended configuration choices.
-configure_leanctx_setup() {
-  local project_root="${LEAN_CTX_PROJECT_ROOT:-$HOME/Documents}"
+# Return the Git project directory LeanCTX setup should run from.
+leanctx_setup_project_dir() {
+  local root=""
 
-  run_stack_command "Configure LeanCTX setup" sh -c 'printf "y\nn\ny\nmax\ny\n%s\n" "$1" | lean-ctx setup' sh "$project_root"
+  if [ -n "${TOKEN_SAVER_LEANCTX_SETUP_DIR:-}" ]; then
+    root="$(git_root_for "$TOKEN_SAVER_LEANCTX_SETUP_DIR")"
+    [ -n "$root" ] || die "LeanCTX setup directory is not inside a Git repository: $TOKEN_SAVER_LEANCTX_SETUP_DIR"
+    printf '%s\n' "$root"
+    return 0
+  fi
+
+  if [ -n "${repo_path:-}" ]; then
+    root="$(git_root_for "$repo_path")"
+    if [ -n "$root" ]; then
+      printf '%s\n' "$root"
+      return 0
+    fi
+  fi
+
+  root="$(git_root_for "$PWD")"
+  if [ -n "$root" ]; then
+    printf '%s\n' "$root"
+    return 0
+  fi
+
+  root="$(git_root_for "$ROOT")"
+  if [ -n "$root" ]; then
+    printf '%s\n' "$root"
+    return 0
+  fi
+
+  die "LeanCTX setup requires an active Git project directory; run from inside a Git project or pass --repo"
+}
+
+# Run LeanCTX setup from an active Git project with this stack's unattended
+# configuration choices, then return to the user's home directory.
+configure_leanctx_setup() {
+  local project_root
+
+  project_root="$(leanctx_setup_project_dir)"
+  log_line "leanctx_setup_project=$project_root"
+  run_stack_command "Configure LeanCTX setup" sh -c 'set -e; cd "$1"; printf "y\nn\ny\nmax\ny\n" | lean-ctx setup; cd "$HOME"' sh "$project_root"
+  run_stack_command "Disable LeanCTX proxy" lean-ctx proxy disable
 }
 
 # Install LeanCTX when missing, then run upstream setup with the stack defaults.
@@ -191,7 +229,7 @@ configure_context7() {
 install_caveman() {
   step "Install Caveman"
   if tool_enabled codex; then
-    run_stack_command "Install Caveman for Codex" npx skills add JuliusBrussee/caveman -a codex
+    run_stack_command "Install all Caveman skills for Codex" npx skills add JuliusBrussee/caveman --yes --global
   fi
 
   if tool_enabled claude && claude_cli_available; then
