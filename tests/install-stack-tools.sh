@@ -194,7 +194,7 @@ installed_state_helpers_detect_existing_tools() {
   mkdir -p "$home/bin" "$home/.agents"
   ln -s "$node_path" "$home/bin/node"
 
-  printf '#!/usr/bin/env bash\ncase "$*" in\n  "skills list --json --global --agent codex") printf "[{\\"name\\":\\"caveman\\"}]\\n" ;;\n  *) printf "unexpected npx args: %s\\n" "$*" >&2; exit 9 ;;\nesac\n' > "$home/bin/npx"
+  printf '#!/usr/bin/env bash\ncase "$*" in\n  "skills list --json --global --agent codex") printf "warning: cache stale\\n" >&2; printf "[{\\"name\\":\\"caveman\\"}]\\n" ;;\n  *) printf "unexpected npx args: %s\\n" "$*" >&2; exit 9 ;;\nesac\n' > "$home/bin/npx"
   printf '#!/usr/bin/env bash\nif [ "$1 $2" = "plugin list" ]; then printf "PLUGIN STATUS VERSION PATH\\nsuperpowers@openai-curated installed, enabled 1 /tmp/superpowers\\n"; else exit 9; fi\n' > "$home/bin/codex"
   printf '#!/usr/bin/env bash\nif [ "$1 $2" = "plugin list" ]; then printf "[{\\"id\\":\\"caveman@caveman\\"},{\\"id\\":\\"superpowers@claude-plugins-official\\"}]\\n"; else exit 9; fi\n' > "$home/bin/claude"
   chmod +x "$home/bin/npx" "$home/bin/codex" "$home/bin/claude"
@@ -255,6 +255,43 @@ installed_state_helpers_reject_invalid_json() {
   fi
 
   assert_contains "$output" "invalid JSON from claude plugin list"
+}
+
+# Verify empty JSON helper output fails explicitly instead of looking like a
+# missing install.
+installed_state_helpers_reject_empty_json_output() {
+  local home="$tmp/home-installed-state-empty-json"
+  local log="$home/.agents/install.log"
+  local output
+  local node_path
+  node_path="$(command -v node || true)"
+  [ -n "$node_path" ] || {
+    printf 'node is required for this test\n' >&2
+    exit 1
+  }
+
+  mkdir -p "$home/bin" "$home/.agents"
+  ln -s "$node_path" "$home/bin/node"
+  printf '#!/usr/bin/env bash\nprintf "   \\n"\n' > "$home/bin/claude"
+  chmod +x "$home/bin/claude"
+
+  if output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" agents_home="$home/.agents" dry_run=0 bash -c '
+      ROOT="$1"
+      install_log="$2"
+      say() { printf "%s\n" "$*"; }
+      die() { printf "error: %s\n" "$*" >&2; exit 1; }
+      . "$ROOT/scripts/lib/targets.sh"
+      . "$ROOT/scripts/lib/logging.sh"
+      . "$ROOT/scripts/lib/stack-tools.sh"
+      claude_plugin_installed caveman@caveman
+    ' sh "$ROOT" "$log" 2>&1
+  )"; then
+    printf 'empty JSON unexpectedly succeeded\n' >&2
+    exit 1
+  fi
+
+  assert_contains "$output" "invalid JSON from claude plugin list: empty output"
 }
 
 # Verify Claude Desktop targets configure Context7 through the Desktop MCP config
@@ -328,6 +365,7 @@ stack_command_already_exists_continues
 stack_command_real_failure_still_fails
 installed_state_helpers_detect_existing_tools
 installed_state_helpers_reject_invalid_json
+installed_state_helpers_reject_empty_json_output
 dry_run_prints_stack_steps_for_claude_desktop
 claude_desktop_config_is_merged
 

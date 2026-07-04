@@ -81,8 +81,13 @@ process.stdin.on("data", chunk => {
 
 process.stdin.on("end", () => {
   let parsed;
+  if (input.trim() === "") {
+    console.error(`invalid JSON from ${label}: empty output`);
+    process.exit(2);
+  }
+
   try {
-    parsed = JSON.parse(input || "[]");
+    parsed = JSON.parse(input);
   } catch (error) {
     console.error(`invalid JSON from ${label}: ${error.message}`);
     process.exit(2);
@@ -101,13 +106,26 @@ process.stdin.on("end", () => {
 codex_skill_installed() {
   local skill="$1"
   local output
+  local stderr_file
+  local stderr
 
   if [ "$dry_run" = "1" ]; then
     status_dry_run "Check Codex skill $skill"
     return 1
   fi
 
-  output="$(npx skills list --json --global --agent codex 2>&1)" || die "failed to list Codex skills: $output"
+  stderr_file="$(mktemp)"
+  if output="$(npx skills list --json --global --agent codex 2>"$stderr_file")"; then
+    rm -f "$stderr_file"
+  else
+    stderr="$(cat "$stderr_file")"
+    rm -f "$stderr_file"
+    if [ -n "$stderr" ]; then
+      die "failed to list Codex skills: $stderr"
+    fi
+    die "failed to list Codex skills: $output"
+  fi
+
   printf '%s\n' "$output" | json_array_contains_field_value "npx skills list" "name" "$skill"
 }
 
@@ -130,13 +148,26 @@ codex_plugin_installed() {
 claude_plugin_installed() {
   local plugin="$1"
   local output
+  local stderr_file
+  local stderr
 
   if [ "$dry_run" = "1" ]; then
     status_dry_run "Check Claude Code plugin $plugin"
     return 1
   fi
 
-  output="$(claude plugin list --json 2>&1)" || die "failed to list Claude Code plugins: $output"
+  stderr_file="$(mktemp)"
+  if output="$(claude plugin list --json 2>"$stderr_file")"; then
+    rm -f "$stderr_file"
+  else
+    stderr="$(cat "$stderr_file")"
+    rm -f "$stderr_file"
+    if [ -n "$stderr" ]; then
+      die "failed to list Claude Code plugins: $stderr"
+    fi
+    die "failed to list Claude Code plugins: $output"
+  fi
+
   printf '%s\n' "$output" | json_array_contains_field_value "claude plugin list" "id" "$plugin"
 }
 
