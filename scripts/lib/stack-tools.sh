@@ -106,6 +106,8 @@ process.stdin.on("end", () => {
 codex_skill_installed() {
   local skill="$1"
   local output
+  local parse_error
+  local status
   local stderr_file
   local stderr
 
@@ -126,7 +128,14 @@ codex_skill_installed() {
     die "failed to list Codex skills: $output"
   fi
 
-  printf '%s\n' "$output" | json_array_contains_field_value "npx skills list" "name" "$skill"
+  if parse_error="$(printf '%s\n' "$output" | json_array_contains_field_value "npx skills list" "name" "$skill" 2>&1)"; then
+    return 0
+  else
+    status=$?
+  fi
+
+  [ "$status" -eq 1 ] && return 1
+  die "$parse_error"
 }
 
 codex_plugin_installed() {
@@ -148,6 +157,8 @@ codex_plugin_installed() {
 claude_plugin_installed() {
   local plugin="$1"
   local output
+  local parse_error
+  local status
   local stderr_file
   local stderr
 
@@ -168,7 +179,14 @@ claude_plugin_installed() {
     die "failed to list Claude Code plugins: $output"
   fi
 
-  printf '%s\n' "$output" | json_array_contains_field_value "claude plugin list" "id" "$plugin"
+  if parse_error="$(printf '%s\n' "$output" | json_array_contains_field_value "claude plugin list" "id" "$plugin" 2>&1)"; then
+    return 0
+  else
+    status=$?
+  fi
+
+  [ "$status" -eq 1 ] && return 1
+  die "$parse_error"
 }
 
 # Merge the local Context7 MCP server into Claude Desktop's config without

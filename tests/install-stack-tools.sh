@@ -314,6 +314,107 @@ installed_stack_tools_are_skipped() {
   assert_not_contains "$commands" "plugin install superpowers"
 }
 
+# Verify invalid Claude plugin JSON stops Caveman install instead of falling
+# through to install commands.
+invalid_claude_plugin_json_stops_caveman_install() {
+  local home="$tmp/home-invalid-claude-json-caveman"
+  local log="$home/.agents/install.log"
+  local output commands
+  local node_path
+  node_path="$(command -v node || true)"
+  [ -n "$node_path" ] || {
+    printf 'node is required for this test\n' >&2
+    exit 1
+  }
+
+  mkdir -p "$home/bin" "$home/.agents"
+  ln -s "$node_path" "$home/bin/node"
+  printf '#!/usr/bin/env bash\ncase "$*" in\n  "skills list --json --global --agent codex") printf "[{\\"name\\":\\"caveman\\"}]\\n" ;;\n  *) printf "unexpected npx args: %%s\\n" "$*" >&2; exit 9 ;;\nesac\n' > "$home/bin/npx"
+  printf '#!/usr/bin/env bash\nprintf "claude %%s\\n" "$*" >> "$HOME/commands.log"\nif [ "$1 $2 $3" = "plugin list --json" ]; then printf "not-json\\n"; exit 0; fi\nprintf "unexpected install: %%s\\n" "$*" >> "$HOME/commands.log"; exit 8\n' > "$home/bin/claude"
+  chmod +x "$home/bin/npx" "$home/bin/claude"
+
+  if output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" agents_home="$home/.agents" dry_run=0 bash -c '
+      ROOT="$1"
+      install_log="$2"
+      tools=both
+      tool_enabled() {
+        case "$tools:$1" in
+          both:*|codex:codex|claude:claude) return 0 ;;
+          *) return 1 ;;
+        esac
+      }
+      say() { printf "%s\n" "$*"; }
+      die() { printf "error: %s\n" "$*" >&2; exit 1; }
+      run() { "$@"; }
+      . "$ROOT/scripts/lib/targets.sh"
+      . "$ROOT/scripts/lib/logging.sh"
+      . "$ROOT/scripts/lib/stack-tools.sh"
+      install_caveman
+    ' sh "$ROOT" "$log" 2>&1
+  )"; then
+    printf 'invalid Claude plugin JSON unexpectedly succeeded\n' >&2
+    exit 1
+  fi
+
+  assert_contains "$output" "invalid JSON from claude plugin list"
+  commands="$(cat "$home/commands.log")"
+  assert_contains "$commands" "claude plugin list --json"
+  assert_not_contains "$commands" "plugin marketplace add"
+  assert_not_contains "$commands" "plugin install caveman"
+}
+
+# Verify invalid Codex skill JSON stops Caveman install instead of falling
+# through to install commands.
+invalid_codex_skill_json_stops_caveman_install() {
+  local home="$tmp/home-invalid-codex-json-caveman"
+  local log="$home/.agents/install.log"
+  local output commands
+  local node_path
+  node_path="$(command -v node || true)"
+  [ -n "$node_path" ] || {
+    printf 'node is required for this test\n' >&2
+    exit 1
+  }
+
+  mkdir -p "$home/bin" "$home/.agents"
+  ln -s "$node_path" "$home/bin/node"
+  printf '#!/usr/bin/env bash\ncase "$*" in\n  "skills list --json --global --agent codex") printf "not-json\\n" ;;\n  "skills add"*) printf "unexpected install: %%s\\n" "$*" >> "$HOME/commands.log"; exit 8 ;;\n  *) printf "unexpected npx args: %%s\\n" "$*" >&2; exit 9 ;;\nesac\n' > "$home/bin/npx"
+  chmod +x "$home/bin/npx"
+
+  if output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" agents_home="$home/.agents" dry_run=0 bash -c '
+      ROOT="$1"
+      install_log="$2"
+      tools=codex
+      tool_enabled() {
+        case "$tools:$1" in
+          both:*|codex:codex|claude:claude) return 0 ;;
+          *) return 1 ;;
+        esac
+      }
+      say() { printf "%s\n" "$*"; }
+      die() { printf "error: %s\n" "$*" >&2; exit 1; }
+      run() { "$@"; }
+      . "$ROOT/scripts/lib/targets.sh"
+      . "$ROOT/scripts/lib/logging.sh"
+      . "$ROOT/scripts/lib/stack-tools.sh"
+      install_caveman
+    ' sh "$ROOT" "$log" 2>&1
+  )"; then
+    printf 'invalid Codex skill JSON unexpectedly succeeded\n' >&2
+    exit 1
+  fi
+
+  assert_contains "$output" "invalid JSON from npx skills list"
+  if [ -f "$home/commands.log" ]; then
+    commands="$(cat "$home/commands.log")"
+  else
+    commands=""
+  fi
+  assert_not_contains "$commands" "skills add"
+}
+
 # Verify missing Superpowers installs through native Codex and Claude plugin
 # commands rather than git clone and symlink setup.
 missing_superpowers_uses_plugin_installers() {
@@ -473,6 +574,8 @@ stack_command_real_failure_still_fails
 installed_state_helpers_detect_existing_tools
 installed_state_helpers_reject_invalid_json
 installed_stack_tools_are_skipped
+invalid_claude_plugin_json_stops_caveman_install
+invalid_codex_skill_json_stops_caveman_install
 missing_superpowers_uses_plugin_installers
 installed_state_helpers_reject_empty_json_output
 dry_run_prints_stack_steps_for_claude_desktop
