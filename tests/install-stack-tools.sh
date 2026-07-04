@@ -69,6 +69,7 @@ dry_run_prints_stack_steps_for_codex() {
 
   assert_contains "$output" "Install LeanCTX"
   assert_contains "$output" "Dry run Configure LeanCTX setup"
+  assert_contains "$output" "Dry run Disable LeanCTX path jail"
   assert_contains "$output" "Dry run Disable LeanCTX proxy"
   assert_contains "$output" "Configure Context7"
   assert_contains "$output" "Install Caveman"
@@ -84,6 +85,7 @@ dry_run_prints_stack_steps_for_codex() {
   assert_contains "$(cat "$log")" 'cd "$1"'
   assert_contains "$(cat "$log")" 'cd "$HOME"'
   assert_not_contains "$(cat "$log")" "LEAN_CTX_PROJECT_ROOT"
+  assert_contains "$(cat "$log")" "lean-ctx config set path_jail false --yes"
   assert_contains "$(cat "$log")" "lean-ctx proxy disable"
   assert_contains "$(cat "$log")" "npx skills add JuliusBrussee/caveman --yes --global"
   assert_contains "$(cat "$log")" "codex plugin add superpowers@openai-curated"
