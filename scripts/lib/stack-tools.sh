@@ -150,11 +150,15 @@ codex_plugin_installed() {
 
   output="$(codex plugin list 2>&1)" || die "failed to list Codex plugins: $output"
   if printf '%s\n' "$output" | awk -v plugin="$plugin" '
-    NR == 1 && $1 == "PLUGIN" && $2 == "STATUS" { valid_header = 1; next }
     NF == 0 { next }
+    $1 == "Marketplace" { next }
+    $0 ~ /^\// { next }
+    $1 == "PLUGIN" && $2 == "STATUS" { valid_header = 1; next }
     $1 == plugin && $0 ~ /not installed/ { missing = 1; next }
     $1 == plugin && $0 ~ /installed/ { found = 1; next }
     $1 == plugin { invalid = 1 }
+    $0 ~ /not installed/ || $0 ~ /installed/ { next }
+    { invalid = 1 }
     END {
       if (!valid_header || invalid) exit 2
       if (found) exit 0

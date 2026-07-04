@@ -225,6 +225,36 @@ installed_state_helpers_detect_existing_tools() {
   assert_contains "$output" "claude-superpowers=yes"
 }
 
+# Verify Codex plugin detection accepts current multi-marketplace output with
+# banner, path, and blank lines before plugin tables.
+codex_plugin_installed_accepts_marketplace_sections() {
+  local home="$tmp/home-codex-marketplace-sections"
+  local log="$home/.agents/install.log"
+  local output
+  mkdir -p "$home/bin" "$home/.agents"
+
+  printf '#!/usr/bin/env bash\nif [ "$1 $2" = "plugin list" ]; then\n  printf "Marketplace \`openai-primary-runtime\`\\n"\n  printf "%s/.codex/plugins/marketplaces/openai-primary-runtime/marketplace.json\\n\\n" "$HOME"\n  printf "PLUGIN STATUS VERSION PATH\\n"\n  printf "runtime@openai-primary-runtime installed, enabled 1 %s/.codex/plugins/runtime\\n\\n" "$HOME"\n  printf "Marketplace \`openai-curated\`\\n"\n  printf "%s/.codex/plugins/marketplaces/openai-curated/marketplace.json\\n\\n" "$HOME"\n  printf "PLUGIN STATUS VERSION PATH\\n"\n  printf "superpowers@openai-curated installed, enabled 1 %s/.codex/plugins/superpowers\\n"\nelse\n  exit 9\nfi\n' > "$home/bin/codex"
+  chmod +x "$home/bin/codex"
+
+  if ! output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" agents_home="$home/.agents" dry_run=0 bash -c '
+      ROOT="$1"
+      install_log="$2"
+      say() { printf "%s\n" "$*"; }
+      die() { printf "error: %s\n" "$*" >&2; exit 1; }
+      . "$ROOT/scripts/lib/targets.sh"
+      . "$ROOT/scripts/lib/logging.sh"
+      . "$ROOT/scripts/lib/stack-tools.sh"
+      codex_plugin_installed superpowers@openai-curated && printf "codex-superpowers=yes\n"
+    ' sh "$ROOT" "$log" 2>&1
+  )"; then
+    printf 'multi-marketplace Codex plugin output unexpectedly failed\n%s\n' "$output" >&2
+    exit 1
+  fi
+
+  assert_contains "$output" "codex-superpowers=yes"
+}
+
 # Verify JSON helper failures are explicit.
 installed_state_helpers_reject_invalid_json() {
   local home="$tmp/home-installed-state-invalid-json"
@@ -613,6 +643,7 @@ dry_run_finds_git_project_from_home
 stack_command_already_exists_continues
 stack_command_real_failure_still_fails
 installed_state_helpers_detect_existing_tools
+codex_plugin_installed_accepts_marketplace_sections
 installed_state_helpers_reject_invalid_json
 installed_stack_tools_are_skipped
 invalid_claude_plugin_json_stops_caveman_install
