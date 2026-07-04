@@ -53,19 +53,22 @@ Do not use a shared wrapper that hides which server owns which tools.
 
 ## LeanCTX Setup
 
-Use LeanCTX's real tool profile command:
+Use LeanCTX's interactive setup command with this stack's unattended answers:
+
+```bash
+printf "y\nn\ny\nmax\ny\n$HOME/Documents\n" | lean-ctx setup
+```
+
+Do not force a custom tool profile or document invalid config keys:
 
 ```bash
 lean-ctx tools minimal
-```
-
-Do not document or run:
-
-```bash
 lean-ctx config set mode lazy
 ```
 
-That key is not valid for the installed LeanCTX version in this environment.
+The answers enable IDE config access, decline anonymous telemetry, enable
+auto-updates, select `max` compression, enable result archiving, and set the
+default project root to `~/Documents`.
 
 Verify LeanCTX:
 
@@ -79,7 +82,6 @@ Expected outcome:
 
 - LeanCTX is on `PATH`.
 - Codex MCP config includes `lean-ctx`.
-- Tool profile is `minimal`.
 - Fixed overhead is under the configured token budget.
 
 ## Context7 Setup

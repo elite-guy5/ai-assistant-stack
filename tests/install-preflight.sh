@@ -83,9 +83,34 @@ claude_desktop_without_cli_passes_preflight() {
   assert_contains "$output" "Dry run Configure Context7 for Claude Desktop"
 }
 
+# Verify interactive target-mode installs can collect the Context7 API key
+# during preflight before stack setup begins.
+interactive_claude_prompts_for_context7_key() {
+  local home="$tmp/home-claude-context7-prompt"
+  local output log
+  mkdir -p "$home/bin" "$home/Applications/Claude.app"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/node"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/npx"
+  chmod +x "$home/bin/node" "$home/bin/npx"
+
+  output="$(
+    printf 'prompted-context7-key\nn\n' | HOME="$home" PATH="$home/bin:/usr/bin:/bin" \
+      CLAUDE_DESKTOP_APP_PATH="$home/Applications/Claude.app" \
+      bash "$ROOT/scripts/install.sh" --dry-run --targets claude
+  )"
+  log="$home/.agents/install.log"
+
+  assert_contains "$output" "Context7 API key:"
+  assert_contains "$output" "OK Context7 API key provided"
+  assert_contains "$output" "Dry run Configure Context7 for Claude Desktop"
+  assert_contains "$(cat "$log")" "context7_credentials=present"
+  assert_contains "$(cat "$log")" "CONTEXT7_API_KEY=<redacted>"
+}
+
 # Run the preflight scenarios.
 missing_codex_stops_before_changes
 missing_claude_surfaces_stop_before_changes
 claude_desktop_without_cli_passes_preflight
+interactive_claude_prompts_for_context7_key
 
 printf 'install-preflight.sh: OK\n'

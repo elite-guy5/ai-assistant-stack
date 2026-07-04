@@ -84,7 +84,68 @@ NODE
   log_line "update_claude_desktop_config=$config server=context7"
 }
 
-# Install LeanCTX when missing and switch it to the minimal tool profile.
+# Merge the local Context7 MCP server into VS Code's user MCP config without
+# logging the raw API key.
+configure_vscode_context7() {
+  local config
+  local backup
+
+  config="$(vscode_mcp_config_path)"
+  if [ "$dry_run" = "1" ]; then
+    status_dry_run "Configure Context7 for VS Code $config"
+    log_line "update_vscode_mcp_config=$config server=context7"
+    return 0
+  fi
+
+  if [ -e "$config" ]; then
+    backup="$(backup_path "$config")"
+    status_ok "Backing up $config to $backup"
+    mkdir -p "$(dirname "$config")"
+    cp "$config" "$backup"
+  fi
+
+  mkdir -p "$(dirname "$config")"
+  CONTEXT7_API_KEY="$CONTEXT7_API_KEY" node - "$config" <<'NODE'
+const fs = require("fs");
+
+const configPath = process.argv[2];
+const apiKey = process.env.CONTEXT7_API_KEY;
+let config = {};
+
+if (fs.existsSync(configPath) && fs.readFileSync(configPath, "utf8").trim()) {
+  config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+}
+
+if (!config || Array.isArray(config) || typeof config !== "object") {
+  throw new Error("VS Code MCP config must be a JSON object");
+}
+
+if (!config.servers || Array.isArray(config.servers) || typeof config.servers !== "object") {
+  config.servers = {};
+}
+
+config.servers.context7 = {
+  command: "npx",
+  args: ["-y", "@upstash/context7-mcp"],
+  env: {
+    CONTEXT7_API_KEY: apiKey
+  }
+};
+
+fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+NODE
+  status_ok "Configure Context7 for VS Code $config"
+  log_line "update_vscode_mcp_config=$config server=context7"
+}
+
+# Run LeanCTX setup with this stack's unattended configuration choices.
+configure_leanctx_setup() {
+  local project_root="${LEAN_CTX_PROJECT_ROOT:-$HOME/Documents}"
+
+  run_stack_command "Configure LeanCTX setup" sh -c 'printf "y\nn\ny\nmax\ny\n%s\n" "$1" | lean-ctx setup' sh "$project_root"
+}
+
+# Install LeanCTX when missing, then run upstream setup with the stack defaults.
 install_leanctx() {
   step "Install LeanCTX"
   if command -v lean-ctx >/dev/null 2>&1; then
@@ -95,7 +156,7 @@ install_leanctx() {
   fi
 
   if command -v lean-ctx >/dev/null 2>&1 || [ "$dry_run" = "1" ]; then
-    run_stack_command "Configure LeanCTX tools" lean-ctx tools minimal
+    configure_leanctx_setup
   fi
 }
 
@@ -119,6 +180,10 @@ configure_context7() {
     configure_claude_desktop_context7
   elif tool_enabled claude; then
     status_skipped "Claude Desktop app not found; skipped Desktop Context7"
+  fi
+
+  if target_enabled vscode; then
+    configure_vscode_context7
   fi
 }
 

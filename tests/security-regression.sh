@@ -167,14 +167,16 @@ bootstrap_runs_when_script_is_piped_to_bash() {
   printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/code"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/claude"
-  chmod +x "$home/bin/codex" "$home/bin/code" "$home/bin/claude"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/node"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/npx"
+  chmod +x "$home/bin/codex" "$home/bin/code" "$home/bin/claude" "$home/bin/node" "$home/bin/npx"
 
   HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key TOKEN_SAVER_BOOTSTRAP_ARCHIVE="$archive" TOKEN_SAVER_TEST_KEYS=$' \033[B \n' \
     bash -s -- --overwrite --dry-run < "$ROOT/scripts/bootstrap.sh" >"$tmp/bootstrap-piped.out"
 
-  assert_contains "$(cat "$tmp/bootstrap-piped.out")" "Select targets to configure"
   assert_contains "$(cat "$tmp/bootstrap-piped.out")" "OK Codex"
   assert_contains "$(cat "$tmp/bootstrap-piped.out")" "OK Claude"
+  assert_contains "$(cat "$tmp/bootstrap-piped.out")" "OK VS Code"
   assert_contains "$(cat "$tmp/bootstrap-piped.out")" "Selected tools"
   assert_contains "$(cat "$tmp/bootstrap-piped.out")" "OK both"
   assert_contains "$(cat "$tmp/bootstrap-piped.out")" "Install complete"

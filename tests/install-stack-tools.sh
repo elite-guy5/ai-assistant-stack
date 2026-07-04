@@ -29,10 +29,11 @@ assert_not_contains() {
   esac
 }
 
-# Verify target-mode stack setup fails before configuration when Context7
-# credentials are missing.
+# Verify target-mode setup fails during preflight when Context7 credentials are
+# missing, before any stack setup begins.
 context7_credentials_required() {
   local home="$tmp/home-context7"
+  local output
   mkdir -p "$home/bin"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
   chmod +x "$home/bin/codex"
@@ -43,8 +44,12 @@ context7_credentials_required() {
     exit 1
   fi
 
-  assert_contains "$(cat "$tmp/context7.err")" "Context7 credentials are required before stack configuration."
+  output="$(cat "$tmp/context7.out")$(cat "$tmp/context7.err")"
+  assert_contains "$output" "Preflight selected targets"
+  assert_contains "$output" "missing prerequisite for selected targets: Context7 API key"
   assert_contains "$(cat "$tmp/context7.err")" "export CONTEXT7_API_KEY=\"your-context7-api-key\""
+  assert_not_contains "$output" "Install LeanCTX"
+  assert_not_contains "$output" "Configure Context7"
 }
 
 # Verify Codex target dry-run output includes every stack setup step with
@@ -63,12 +68,16 @@ dry_run_prints_stack_steps_for_codex() {
   log="$home/.agents/install.log"
 
   assert_contains "$output" "Install LeanCTX"
+  assert_contains "$output" "Dry run Configure LeanCTX setup"
   assert_contains "$output" "Configure Context7"
   assert_contains "$output" "Install Caveman"
   assert_contains "$output" "Install Superpowers"
   assert_contains "$output" "Dry run Configure Context7 for Codex"
+  assert_not_contains "$output" "Configure LeanCTX tools"
+  assert_contains "$(cat "$log")" "lean-ctx setup"
   assert_contains "$(cat "$log")" "codex mcp add context7"
   assert_contains "$(cat "$log")" "--api-key <redacted>"
+  assert_not_contains "$(cat "$log")" "lean-ctx tools minimal"
 }
 
 # Verify Claude Desktop targets configure Context7 through the Desktop MCP config

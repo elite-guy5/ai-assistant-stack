@@ -98,17 +98,22 @@ Use LeanCTX for:
 - tree scans
 - compressed command output
 
-Use the real installed command for footprint control:
+Use LeanCTX's interactive setup command with this stack's unattended answers:
+
+```bash
+printf "y\nn\ny\nmax\ny\n$HOME/Documents\n" | lean-ctx setup
+```
+
+Do not force a custom tool profile or document invalid config keys:
 
 ```bash
 lean-ctx tools minimal
-```
-
-Do not document:
-
-```bash
 lean-ctx config set mode lazy
 ```
+
+The answers enable IDE config access, decline anonymous telemetry, enable
+auto-updates, select `max` compression, enable result archiving, and set the
+default project root to `~/Documents`.
 
 Verify:
 

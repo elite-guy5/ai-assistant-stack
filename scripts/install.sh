@@ -30,17 +30,18 @@ seeder_target="$agents_home/scripts/seed-project-instructions.sh"
 # shellcheck source=/dev/null
 . "$ROOT/scripts/lib/stack-tools.sh"
 
-# Print command-line help for both target-mode and legacy tool-mode installs.
+# Print command-line help for auto-detected stack installs and legacy
+# instruction-file installs.
 usage() {
   cat <<'EOF'
 Usage: bash scripts/install.sh [options]
 
 Options:
-  --targets <list>         Comma-separated product targets: codex,claude.
-                           Derives --tools automatically.
+  --targets <list>         Optional comma-separated product targets:
+                           codex,claude,vscode. Auto-detected when omitted.
   --tools <codex|claude|both>
                            Legacy instruction-file tools to configure.
-                           Required with --non-interactive when --targets is absent.
+                           Skips third-party stack setup.
   --repo <path>            Also seed and install managed hooks in this Git repo.
   --non-interactive        Do not prompt.
   --dry-run                Print actions without changing files.
@@ -437,15 +438,14 @@ fi
 step "Initialize install log"
 log_kv "dry_run" "$dry_run"
 
-# Derive legacy tool selection from target surfaces, or prompt interactively
-# when no non-interactive selector was provided.
+# Derive legacy tool selection from explicit or auto-detected targets. The
+# legacy --tools path remains instruction-file-only for compatibility.
 if [ "$target_mode" = "1" ]; then
   tools="$(derive_tools_from_targets)"
 elif [ -z "$tools" ]; then
-  if [ "$non_interactive" = "1" ]; then
-    die "--targets or --tools is required in non-interactive mode"
-  fi
-  prompt_targets
+  targets="$(auto_detect_targets)"
+  target_mode=1
+  tools="$(derive_tools_from_targets)"
 fi
 
 # Report the normalized selection to stdout and to the install log.
@@ -454,10 +454,17 @@ if [ "$target_mode" = "1" ]; then
   log_kv "selected_targets" "$targets"
   target_enabled codex && status_ok "Codex"
   target_enabled claude && status_ok "Claude"
+  target_enabled vscode && status_ok "VS Code"
 fi
-phase "Selected tools"
-status_ok "$tools"
-log_kv "selected_tools" "$tools"
+if [ -n "$tools" ]; then
+  phase "Selected tools"
+  status_ok "$tools"
+  log_kv "selected_tools" "$tools"
+else
+  phase "Selected tools"
+  status_ok "none"
+  log_kv "selected_tools" "none"
+fi
 [ -n "${CONTEXT7_API_KEY:-}" ] && log_line "CONTEXT7_API_KEY=$CONTEXT7_API_KEY"
 
 # For target-mode installs, validate prerequisites before making changes and
@@ -479,12 +486,14 @@ fi
 
 # Install the shared instruction files, seeder script, and future-repository Git
 # template hooks.
-install_instruction_files
-install_seeder
-install_git_template_hooks
+if [ -n "$tools" ]; then
+  install_instruction_files
+  install_seeder
+  install_git_template_hooks
+fi
 
 # Optionally apply the same seeding and hooks to an existing repository.
-if [ -n "$apply_current_repo" ]; then
+if [ -n "$apply_current_repo" ] && [ -n "$tools" ]; then
   install_current_repo_hooks "${repo_path:-$PWD}"
 fi
 

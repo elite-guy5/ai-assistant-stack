@@ -29,11 +29,14 @@ Instead of configuring multiple tools by hand, AI Assistant Stack installs and c
 |--------|------------------------|
 | `codex` | Codex CLI (`codex`) |
 | `claude` | Claude Desktop, Claude Code CLI (`claude`), or both |
+| `vscode` | VS Code app or CLI, plus `npx` for Context7 MCP |
 
 If a selected prerequisite is missing, the installer stops before making
 changes and prints the missing prerequisite list.
 
-When `claude` is selected, the installer detects installed Claude surfaces. It
+The default installer auto-detects installed supported AI tools and configures
+all of them. Codex, Claude, and VS Code are detected as first-class targets.
+When `claude` is detected, the installer detects installed Claude surfaces. It
 updates Claude Desktop MCP configuration when the Desktop app is present, and it
 uses `claude mcp` plus Claude plugin commands when the Claude Code CLI is
 present. If only one Claude surface is installed, the missing surface is skipped
@@ -124,7 +127,7 @@ Install LeanCTX:
 
 ```powershell
 npm install -g lean-ctx-bin
-lean-ctx onboard
+lean-ctx setup
 lean-ctx doctor
 ```
 
@@ -282,8 +285,9 @@ Interactive install with prompts:
 bash scripts/install.sh
 ```
 
-Non-interactive mode requires `--tools codex`, `--tools claude`, or
-`--tools both` so automation cannot silently choose a target.
+Interactive and non-interactive stack installs auto-detect installed supported
+AI tools. Use `--tools codex`, `--tools claude`, or `--tools both` only when you
+want the legacy instruction-file path without third-party stack setup.
 
 ## Git Hook Behavior
 
@@ -329,15 +333,16 @@ repository when the installer is run from inside a Git worktree.
 
 | Option | Purpose |
 |--------|---------|
-| `--targets codex` | Configure the Codex product stack. |
-| `--targets claude` | Configure the Claude product stack for detected Desktop and CLI surfaces. |
-| `--targets codex,claude` | Configure both product stacks. |
+| `--targets codex` | Optional override to configure only the Codex product stack. |
+| `--targets claude` | Optional override to configure only the Claude product stack for detected Desktop and CLI surfaces. |
+| `--targets vscode` | Optional override to configure only the VS Code product stack. |
+| `--targets codex,claude,vscode` | Optional override to configure all listed product stacks. |
 | `--tools codex` | Install only Codex instruction files and hooks. |
 | `--tools claude` | Install only Claude Code instruction files and hooks. |
 | `--tools both` | Install both instruction-file sets. |
 | `--repo <path>` | Also seed and install managed hooks in an existing repo. |
 | `--dry-run` | Print actions without changing files. |
-| `--non-interactive` | Disable prompts; requires `--targets` or `--tools`. |
+| `--non-interactive` | Disable prompts; installed stack targets are auto-detected unless `--targets` or `--tools` is passed. |
 | `--overwrite` | Back up and replace existing target files. |
 | `--overwrite-global-instructions` | Back up and replace global instruction files. |
 | `--overwrite-project-templates` | Back up and replace project templates. |

@@ -39,7 +39,7 @@
 ### MCP Tool Routing Guardrails
 
 - **File System & Context Reading:** Prefer `lean-ctx` tools (`ctx_read`, `ctx_tree`, `ctx_search`, or the meta-tool `ctx_call`) over native file reads when those tools are available.
-- **Context Footprint Optimization:** Keep LeanCTX on its minimal tool profile (`lean-ctx tools minimal`) and use `ctx_call` for non-core LeanCTX capabilities when practical.
+- **Context Footprint Optimization:** Use LeanCTX's stack setup path (`lean-ctx setup` with IDE access enabled, telemetry off, auto-updates on, compression `max`, archive on, and `~/Documents` as the default project root) unless the user explicitly asks to tune LeanCTX separately, and use `ctx_call` for non-core LeanCTX capabilities when practical.
 
 ### Context7
 
@@ -332,4 +332,3 @@ These guidelines are successful when they produce:
 - simpler implementations
 - clarifying questions before implementation
 - verified solutions rather than assumed ones
-

@@ -93,17 +93,44 @@ invalid_target_is_rejected() {
   assert_contains "$(cat "$tmp/invalid.err")" "invalid --targets value: codex-mobile"
 }
 
-# Verify non-interactive mode requires either --targets or --tools.
-non_interactive_requires_targets_or_tools() {
-  local home="$tmp/home-requires-selection"
+# Verify non-interactive mode auto-detects all installed supported targets.
+non_interactive_auto_detects_installed_targets() {
+  local home="$tmp/home-auto-detect"
+  local output
+  mkdir -p "$home/bin" "$home/Applications/Claude.app" "$home/Applications/Visual Studio Code.app"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/node"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/npx"
+  chmod +x "$home/bin/codex" "$home/bin/node" "$home/bin/npx"
+
+  output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" CONTEXT7_API_KEY=test-key \
+      CLAUDE_DESKTOP_APP_PATH="$home/Applications/Claude.app" \
+      VSCODE_APP_PATH="$home/Applications/Visual Studio Code.app" \
+      bash "$ROOT/scripts/install.sh" --dry-run --non-interactive
+  )"
+
+  assert_contains "$output" "Selected targets"
+  assert_contains "$output" "OK Codex"
+  assert_contains "$output" "OK Claude"
+  assert_contains "$output" "OK VS Code"
+  assert_contains "$output" "OK both"
+  assert_contains "$output" "Dry run Configure Context7 for VS Code"
+}
+
+# Verify installs without detectable AI tools fail before stack setup.
+no_detected_targets_fails() {
+  local home="$tmp/home-no-targets"
   mkdir -p "$home"
 
-  if HOME="$home" bash "$ROOT/scripts/install.sh" --dry-run --non-interactive >"$tmp/requires.out" 2>"$tmp/requires.err"; then
-    printf 'non-interactive install without selection unexpectedly succeeded\n' >&2
+  if HOME="$home" PATH="/usr/bin:/bin" CLAUDE_DESKTOP_APP_PATH="$home/missing/Claude.app" \
+    VSCODE_APP_PATH="$home/missing/Visual Studio Code.app" \
+    bash "$ROOT/scripts/install.sh" --dry-run --non-interactive >"$tmp/no-targets.out" 2>"$tmp/no-targets.err"; then
+    printf 'install without detected targets unexpectedly succeeded\n' >&2
     exit 1
   fi
 
-  assert_contains "$(cat "$tmp/requires.err")" "--targets or --tools is required in non-interactive mode"
+  assert_contains "$(cat "$tmp/no-targets.err")" "no supported AI tools were detected"
 }
 
 # Run target parsing and derivation scenarios.
@@ -111,64 +138,35 @@ target_mode_derives_codex_tools
 target_mode_derives_both_tools
 legacy_surface_targets_normalize_to_products
 invalid_target_is_rejected
-non_interactive_requires_targets_or_tools
+non_interactive_auto_detects_installed_targets
+no_detected_targets_fails
 
-# Verify the interactive checklist starts empty, uses Space to toggle, and has
-# only product-level Codex and Claude options.
-interactive_selector_uses_space_toggles() {
-  local home="$tmp/home-selector"
+# Verify interactive installs auto-detect targets instead of rendering a
+# selection checklist.
+interactive_auto_detects_without_selector() {
+  local home="$tmp/home-interactive-auto"
   local output
   mkdir -p "$home/bin"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
   chmod +x "$home/bin/codex"
 
   output="$(
-    printf 'n\n' | HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key TOKEN_SAVER_TEST_KEYS=$' \n' \
+    printf 'n\n' | HOME="$home" PATH="$home/bin:/usr/bin:/bin" CONTEXT7_API_KEY=test-key \
+      CLAUDE_DESKTOP_APP_PATH="$home/missing/Claude.app" \
+      VSCODE_APP_PATH="$home/missing/Visual Studio Code.app" \
       bash "$ROOT/scripts/install.sh" --dry-run
   )"
 
-  assert_contains "$output" "> ○ Codex"
-  assert_contains "$output" "  ○ Claude"
-  assert_contains "$output" "> ● Codex"
-  assert_contains "$output" "Space toggles"
+  assert_contains "$output" "Selected targets"
+  assert_contains "$output" "OK Codex"
   case "$output" in
-    *"Codex Desktop"*|*"Codex VS Code"*|*"Claude Desktop"*|*"Claude Code"*|*"All"*|*"Selection [5]"*)
-      printf 'legacy target menu appeared in output:\n%s\n' "$output" >&2
+    *"Select targets to configure"*|*"Space toggles"*)
+      printf 'target selector appeared in output:\n%s\n' "$output" >&2
       exit 1
       ;;
   esac
 }
 
-interactive_selector_uses_space_toggles
-
-# Verify terminal arrow escape sequences move focus to Claude before Space
-# toggles the selected row. Some terminals use ESC [ B and others use ESC O B.
-interactive_selector_supports_arrow_keys() {
-  local home="$tmp/home-arrows"
-  local output
-  mkdir -p "$home/bin"
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/claude"
-  chmod +x "$home/bin/claude"
-
-  output="$(
-    printf 'n\n' | HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key TOKEN_SAVER_TEST_KEYS=$'\033[B \n' \
-      bash "$ROOT/scripts/install.sh" --dry-run
-  )"
-
-  assert_contains "$output" "> ○ Claude"
-  assert_contains "$output" "> ● Claude"
-  assert_contains "$output" "OK Claude"
-
-  output="$(
-    printf 'n\n' | HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key TOKEN_SAVER_TEST_KEYS=$'\033OB \n' \
-      bash "$ROOT/scripts/install.sh" --dry-run
-  )"
-
-  assert_contains "$output" "> ○ Claude"
-  assert_contains "$output" "> ● Claude"
-  assert_contains "$output" "OK Claude"
-}
-
-interactive_selector_supports_arrow_keys
+interactive_auto_detects_without_selector
 
 printf 'install-targets.sh: OK\n'

@@ -29,18 +29,25 @@ assert_not_contains() {
   esac
 }
 
-# Verify non-interactive installs fail before doing work when no selection is
-# provided.
-requires_tools_in_non_interactive_mode() {
-  local home="$tmp/home-requires-tools"
-  mkdir -p "$home"
+# Verify non-interactive installs auto-detect installed stack targets when no
+# legacy --tools selector is provided.
+auto_detects_tools_in_non_interactive_mode() {
+  local home="$tmp/home-auto-detect"
+  local output
+  mkdir -p "$home/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
+  chmod +x "$home/bin/codex"
 
-  if HOME="$home" bash "$ROOT/scripts/install.sh" --dry-run --non-interactive >"$tmp/requires.out" 2>"$tmp/requires.err"; then
-    printf 'non-interactive install without --tools unexpectedly succeeded\n' >&2
-    exit 1
-  fi
+  output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" CONTEXT7_API_KEY=test-key \
+      CLAUDE_DESKTOP_APP_PATH="$home/missing/Claude.app" \
+      VSCODE_APP_PATH="$home/missing/Visual Studio Code.app" \
+      bash "$ROOT/scripts/install.sh" --dry-run --non-interactive
+  )"
 
-  assert_contains "$(cat "$tmp/requires.err")" "--targets or --tools is required in non-interactive mode"
+  assert_contains "$output" "Selected targets"
+  assert_contains "$output" "OK Codex"
+  assert_contains "$output" "Install LeanCTX"
 }
 
 # Verify legacy codex-only dry-run output stays limited to instruction-file and
@@ -78,9 +85,9 @@ removed_flags_are_rejected() {
   assert_contains "$(cat "$tmp/removed.err")" "unknown option: --ai-apps"
 }
 
-# Verify interactive target selection can choose the Codex product target
-# with Space/Enter and decline current-repo hook installation through stdin.
-interactive_selection_can_choose_codex() {
+# Verify interactive installs auto-detect Codex without rendering the old
+# target checklist and can still decline current-repo hook installation.
+interactive_auto_detection_can_choose_codex() {
   local home="$tmp/home-interactive"
   local output
   mkdir -p "$home/bin"
@@ -88,25 +95,25 @@ interactive_selection_can_choose_codex() {
   chmod +x "$home/bin/codex"
 
   output="$(
-    printf 'n\n' | HOME="$home" PATH="$home/bin:$PATH" CONTEXT7_API_KEY=test-key TOKEN_SAVER_TEST_KEYS=$' \n' \
+    printf 'n\n' | HOME="$home" PATH="$home/bin:/usr/bin:/bin" CONTEXT7_API_KEY=test-key \
+      CLAUDE_DESKTOP_APP_PATH="$home/missing/Claude.app" \
+      VSCODE_APP_PATH="$home/missing/Visual Studio Code.app" \
       bash "$ROOT/scripts/install.sh" --dry-run
   )"
 
-  assert_contains "$output" "Select targets to configure"
-  assert_contains "$output" "> ○ Codex"
-  assert_contains "$output" "> ● Codex"
   assert_contains "$output" "Selected targets"
   assert_contains "$output" "OK Codex"
   assert_contains "$output" "Selected tools"
   assert_contains "$output" "OK codex"
   assert_contains "$output" "$home/.codex/AGENTS.md"
   assert_not_contains "$output" "$home/.claude/CLAUDE.md"
+  assert_not_contains "$output" "Select targets to configure"
 }
 
 # Run the dry-run behavior scenarios.
-requires_tools_in_non_interactive_mode
+auto_detects_tools_in_non_interactive_mode
 dry_run_codex_only_has_no_third_party_actions
 removed_flags_are_rejected
-interactive_selection_can_choose_codex
+interactive_auto_detection_can_choose_codex
 
 printf 'install-dry-run.sh: OK\n'
