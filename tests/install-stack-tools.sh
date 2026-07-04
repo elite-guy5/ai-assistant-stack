@@ -178,6 +178,85 @@ stack_command_real_failure_still_fails() {
   assert_not_contains "$output" "OK Failing step"
 }
 
+# Verify installed-state helpers can detect existing tools and fail on invalid
+# JSON instead of guessing.
+installed_state_helpers_detect_existing_tools() {
+  local home="$tmp/home-installed-state"
+  local log="$home/.agents/install.log"
+  local output
+  local node_path
+  node_path="$(command -v node || true)"
+  [ -n "$node_path" ] || {
+    printf 'node is required for this test\n' >&2
+    exit 1
+  }
+
+  mkdir -p "$home/bin" "$home/.agents"
+  ln -s "$node_path" "$home/bin/node"
+
+  printf '#!/usr/bin/env bash\ncase "$*" in\n  "skills list --json --global --agent codex") printf "[{\\"name\\":\\"caveman\\"}]\\n" ;;\n  *) printf "unexpected npx args: %s\\n" "$*" >&2; exit 9 ;;\nesac\n' > "$home/bin/npx"
+  printf '#!/usr/bin/env bash\nif [ "$1 $2" = "plugin list" ]; then printf "PLUGIN STATUS VERSION PATH\\nsuperpowers@openai-curated installed, enabled 1 /tmp/superpowers\\n"; else exit 9; fi\n' > "$home/bin/codex"
+  printf '#!/usr/bin/env bash\nif [ "$1 $2" = "plugin list" ]; then printf "[{\\"id\\":\\"caveman@caveman\\"},{\\"id\\":\\"superpowers@claude-plugins-official\\"}]\\n"; else exit 9; fi\n' > "$home/bin/claude"
+  chmod +x "$home/bin/npx" "$home/bin/codex" "$home/bin/claude"
+
+  output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" agents_home="$home/.agents" dry_run=0 bash -c '
+      ROOT="$1"
+      install_log="$2"
+      say() { printf "%s\n" "$*"; }
+      die() { printf "error: %s\n" "$*" >&2; exit 1; }
+      . "$ROOT/scripts/lib/targets.sh"
+      . "$ROOT/scripts/lib/logging.sh"
+      . "$ROOT/scripts/lib/stack-tools.sh"
+      codex_skill_installed caveman && printf "codex-caveman=yes\n"
+      codex_plugin_installed superpowers@openai-curated && printf "codex-superpowers=yes\n"
+      claude_plugin_installed caveman@caveman && printf "claude-caveman=yes\n"
+      claude_plugin_installed superpowers@claude-plugins-official && printf "claude-superpowers=yes\n"
+    ' sh "$ROOT" "$log"
+  )"
+
+  assert_contains "$output" "codex-caveman=yes"
+  assert_contains "$output" "codex-superpowers=yes"
+  assert_contains "$output" "claude-caveman=yes"
+  assert_contains "$output" "claude-superpowers=yes"
+}
+
+# Verify JSON helper failures are explicit.
+installed_state_helpers_reject_invalid_json() {
+  local home="$tmp/home-installed-state-invalid-json"
+  local log="$home/.agents/install.log"
+  local output
+  local node_path
+  node_path="$(command -v node || true)"
+  [ -n "$node_path" ] || {
+    printf 'node is required for this test\n' >&2
+    exit 1
+  }
+
+  mkdir -p "$home/bin" "$home/.agents"
+  ln -s "$node_path" "$home/bin/node"
+  printf '#!/usr/bin/env bash\nprintf "not-json\\n"\n' > "$home/bin/claude"
+  chmod +x "$home/bin/claude"
+
+  if output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" agents_home="$home/.agents" dry_run=0 bash -c '
+      ROOT="$1"
+      install_log="$2"
+      say() { printf "%s\n" "$*"; }
+      die() { printf "error: %s\n" "$*" >&2; exit 1; }
+      . "$ROOT/scripts/lib/targets.sh"
+      . "$ROOT/scripts/lib/logging.sh"
+      . "$ROOT/scripts/lib/stack-tools.sh"
+      claude_plugin_installed caveman@caveman
+    ' sh "$ROOT" "$log" 2>&1
+  )"; then
+    printf 'invalid JSON unexpectedly succeeded\n' >&2
+    exit 1
+  fi
+
+  assert_contains "$output" "invalid JSON from claude plugin list"
+}
+
 # Verify Claude Desktop targets configure Context7 through the Desktop MCP config
 # path without requiring the Claude Code CLI.
 dry_run_prints_stack_steps_for_claude_desktop() {
@@ -247,6 +326,8 @@ dry_run_prints_stack_steps_for_codex
 dry_run_finds_git_project_from_home
 stack_command_already_exists_continues
 stack_command_real_failure_still_fails
+installed_state_helpers_detect_existing_tools
+installed_state_helpers_reject_invalid_json
 dry_run_prints_stack_steps_for_claude_desktop
 claude_desktop_config_is_merged
 

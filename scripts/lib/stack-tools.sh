@@ -62,6 +62,84 @@ run_stack_command() {
   return "$status"
 }
 
+json_array_contains_field_value() {
+  local label="$1"
+  local field="$2"
+  local expected="$3"
+
+  command -v node >/dev/null 2>&1 || die "node is required to parse $label JSON output"
+
+  node -e '
+const label = process.argv[1];
+const field = process.argv[2];
+const expected = process.argv[3];
+let input = "";
+
+process.stdin.on("data", chunk => {
+  input += chunk;
+});
+
+process.stdin.on("end", () => {
+  let parsed;
+  try {
+    parsed = JSON.parse(input || "[]");
+  } catch (error) {
+    console.error(`invalid JSON from ${label}: ${error.message}`);
+    process.exit(2);
+  }
+
+  if (!Array.isArray(parsed)) {
+    console.error(`invalid JSON from ${label}: expected array`);
+    process.exit(2);
+  }
+
+  process.exit(parsed.some(item => item && item[field] === expected) ? 0 : 1);
+});
+' "$label" "$field" "$expected"
+}
+
+codex_skill_installed() {
+  local skill="$1"
+  local output
+
+  if [ "$dry_run" = "1" ]; then
+    status_dry_run "Check Codex skill $skill"
+    return 1
+  fi
+
+  output="$(npx skills list --json --global --agent codex 2>&1)" || die "failed to list Codex skills: $output"
+  printf '%s\n' "$output" | json_array_contains_field_value "npx skills list" "name" "$skill"
+}
+
+codex_plugin_installed() {
+  local plugin="$1"
+  local output
+
+  if [ "$dry_run" = "1" ]; then
+    status_dry_run "Check Codex plugin $plugin"
+    return 1
+  fi
+
+  output="$(codex plugin list 2>&1)" || die "failed to list Codex plugins: $output"
+  printf '%s\n' "$output" | awk -v plugin="$plugin" '
+    $1 == plugin && $0 ~ /installed/ && $0 !~ /not installed/ { found = 1 }
+    END { exit found ? 0 : 1 }
+  '
+}
+
+claude_plugin_installed() {
+  local plugin="$1"
+  local output
+
+  if [ "$dry_run" = "1" ]; then
+    status_dry_run "Check Claude Code plugin $plugin"
+    return 1
+  fi
+
+  output="$(claude plugin list --json 2>&1)" || die "failed to list Claude Code plugins: $output"
+  printf '%s\n' "$output" | json_array_contains_field_value "claude plugin list" "id" "$plugin"
+}
+
 # Merge the local Context7 MCP server into Claude Desktop's config without
 # logging the raw API key.
 configure_claude_desktop_context7() {
