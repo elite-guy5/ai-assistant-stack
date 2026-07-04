@@ -15,19 +15,51 @@ require_context7_credentials() {
   log_line "context7_credentials=present"
 }
 
+stack_command_output_is_idempotent() {
+  case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+    *"already exists"*|*"already installed"*|*"already configured"*|*"already present"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # Run one stack command with a short stdout label while preserving the exact
-# redacted command in the install log for troubleshooting.
+# redacted command in the install log for troubleshooting. Upstream tools often
+# return nonzero for idempotent setup attempts; treat their explicit "already"
+# responses as success so the stack install can continue.
 run_stack_command() {
   local dry_run_label="$1"
+  local output
+  local status
   shift
 
   if [ "$dry_run" = "1" ]; then
     status_dry_run "$dry_run_label"
+    run_logged "$@"
+    return 0
   fi
-  run_logged "$@"
-  if [ "$dry_run" = "0" ]; then
+
+  output="$(mktemp)"
+  log_line "command=$*"
+  if "$@" >"$output" 2>&1; then
+    redact_text < "$output"
+    rm -f "$output"
     status_ok "$dry_run_label"
+    return 0
+  else
+    status=$?
   fi
+
+  if stack_command_output_is_idempotent "$(cat "$output")"; then
+    redact_text < "$output"
+    rm -f "$output"
+    log_line "idempotent_command=$* exit_status=$status"
+    status_ok "$dry_run_label already configured"
+    return 0
+  fi
+
+  redact_text < "$output" >&2
+  rm -f "$output"
+  return "$status"
 }
 
 # Merge the local Context7 MCP server into Claude Desktop's config without

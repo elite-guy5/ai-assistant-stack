@@ -119,6 +119,65 @@ dry_run_finds_git_project_from_home() {
   assert_not_contains "$(cat "$log")" "LEAN_CTX_PROJECT_ROOT"
 }
 
+# Verify stack commands continue when an upstream installer reports an existing
+# config with a nonzero exit code.
+stack_command_already_exists_continues() {
+  local home="$tmp/home-stack-idempotent"
+  local output log
+  mkdir -p "$home/bin" "$home/.agents"
+  printf '#!/usr/bin/env bash\nprintf "MCP server context7 already exists in user config\\n" >&2\nexit 1\n' > "$home/bin/already"
+  printf '#!/usr/bin/env bash\nprintf "next command ran\\n"\n' > "$home/bin/next"
+  chmod +x "$home/bin/already" "$home/bin/next"
+  log="$home/.agents/install.log"
+
+  output="$(
+    HOME="$home" agents_home="$home/.agents" dry_run=0 bash -c '
+      ROOT="$1"
+      install_log="$2"
+      say() { printf "%s\n" "$*"; }
+      run() { "$@"; }
+      . "$ROOT/scripts/lib/logging.sh"
+      . "$ROOT/scripts/lib/stack-tools.sh"
+      run_stack_command "Configure Context7 for Claude Code" "$HOME/bin/already"
+      run_stack_command "Next step" "$HOME/bin/next"
+    ' sh "$ROOT" "$log"
+  )"
+
+  assert_contains "$output" "MCP server context7 already exists in user config"
+  assert_contains "$output" "OK Configure Context7 for Claude Code already configured"
+  assert_contains "$output" "next command ran"
+  assert_contains "$output" "OK Next step"
+  assert_contains "$(cat "$log")" "idempotent_command=$home/bin/already exit_status=1"
+}
+
+# Verify non-idempotent command failures still stop the stack install.
+stack_command_real_failure_still_fails() {
+  local home="$tmp/home-stack-real-failure"
+  local output log
+  mkdir -p "$home/bin" "$home/.agents"
+  printf '#!/usr/bin/env bash\nprintf "permission denied\\n" >&2\nexit 7\n' > "$home/bin/fail"
+  chmod +x "$home/bin/fail"
+  log="$home/.agents/install.log"
+
+  if output="$(
+    HOME="$home" agents_home="$home/.agents" dry_run=0 bash -c '
+      ROOT="$1"
+      install_log="$2"
+      say() { printf "%s\n" "$*"; }
+      run() { "$@"; }
+      . "$ROOT/scripts/lib/logging.sh"
+      . "$ROOT/scripts/lib/stack-tools.sh"
+      run_stack_command "Failing step" "$HOME/bin/fail"
+    ' sh "$ROOT" "$log" 2>&1
+  )"; then
+    printf 'non-idempotent failure unexpectedly succeeded\n' >&2
+    exit 1
+  fi
+
+  assert_contains "$output" "permission denied"
+  assert_not_contains "$output" "OK Failing step"
+}
+
 # Verify Claude Desktop targets configure Context7 through the Desktop MCP config
 # path without requiring the Claude Code CLI.
 dry_run_prints_stack_steps_for_claude_desktop() {
@@ -186,6 +245,8 @@ if (config.mcpServers.context7.env.CONTEXT7_API_KEY !== "test-key") process.exit
 context7_credentials_required
 dry_run_prints_stack_steps_for_codex
 dry_run_finds_git_project_from_home
+stack_command_already_exists_continues
+stack_command_real_failure_still_fails
 dry_run_prints_stack_steps_for_claude_desktop
 claude_desktop_config_is_merged
 
