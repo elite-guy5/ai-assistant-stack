@@ -1,22 +1,22 @@
 <div align="center">
 
-```
+<pre>
 ╔══════════════════════════════╗
 ║      AI ASSISTANT STACK      ║
 ╚══════════════════════════════╝
+</pre>
 
-```
-</div>
-
-<div align="center">
+# AI Assistant Stack
 
 ### Your AI Assistant Stack for Smarter Development
 
-**AI Assistant Stack** is an AI assistant stack that helps reduce token usage while improving the quality and consistency of AI-assisted development.
+AI Assistant Stack installs and configures a curated AI development environment that reduces token usage while improving context, consistency, and developer productivity.
 
-Instead of configuring multiple tools by hand, AI Assistant Stack installs and configures a curated development stack that works together to provide better project context, access to up-to-date documentation, and reusable AI workflows.
-
-[Features](#features) • [Installation](#installation) • [Documentation](#documentation)
+<p>
+  <a href="#features">Features</a> •
+  <a href="#installation">Installation</a> •
+  <a href="#documentation">Documentation</a>
+</p>
 
 </div>
 
