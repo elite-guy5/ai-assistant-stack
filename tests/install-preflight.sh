@@ -26,6 +26,96 @@ assert_not_exists() {
   }
 }
 
+# Verify non-interactive installs stop when rtk is present because it conflicts
+# with LeanCTX.
+rtk_conflict_stops_non_interactive_install() {
+  local home="$tmp/home-rtk-conflict-noninteractive"
+  mkdir -p "$home/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
+  printf '#!/usr/bin/env bash\nprintf "rtk should not run\\n" >> "$HOME/commands.log"\nexit 0\n' > "$home/bin/rtk"
+  chmod +x "$home/bin/codex" "$home/bin/rtk"
+
+  if HOME="$home" PATH="$home/bin:/usr/bin:/bin" CONTEXT7_API_KEY=test-key \
+    bash "$ROOT/scripts/install.sh" --non-interactive --targets codex >"$tmp/rtk-noninteractive.out" 2>"$tmp/rtk-noninteractive.err"; then
+    printf 'rtk conflict unexpectedly succeeded\n' >&2
+    exit 1
+  fi
+
+  assert_contains "$(cat "$tmp/rtk-noninteractive.out")" "Warning rtk found; rtk conflicts with lean-ctx."
+  assert_contains "$(cat "$tmp/rtk-noninteractive.err")" "conflicting tool for lean-ctx: rtk"
+  assert_contains "$(cat "$tmp/rtk-noninteractive.err")" "Run rtk init -g --uninstall, then rerun this installer."
+  assert_not_exists "$home/commands.log"
+  assert_not_exists "$home/.codex/AGENTS.md"
+}
+
+# Verify dry runs report the rtk uninstall command without executing it.
+rtk_conflict_dry_run_reports_uninstall_command() {
+  local home="$tmp/home-rtk-conflict-dry-run"
+  local output
+  mkdir -p "$home/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/codex"
+  printf '#!/usr/bin/env bash\nprintf "rtk should not run\\n" >> "$HOME/commands.log"\nexit 0\n' > "$home/bin/rtk"
+  chmod +x "$home/bin/codex" "$home/bin/rtk"
+
+  output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" CONTEXT7_API_KEY=test-key \
+      bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --targets codex
+  )"
+
+  assert_contains "$output" "Warning rtk found; rtk conflicts with lean-ctx."
+  assert_contains "$output" "Dry run Run rtk init -g --uninstall"
+  assert_not_exists "$home/commands.log"
+}
+
+# Verify interactive preflight executes the rtk uninstall command after a yes
+# answer.
+interactive_rtk_conflict_runs_uninstall_command() {
+  local home="$tmp/home-rtk-conflict-interactive"
+  local output
+  mkdir -p "$home/bin"
+  printf '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$HOME/commands.log"\nexit 0\n' > "$home/bin/rtk"
+  chmod +x "$home/bin/rtk"
+
+  output="$(
+    printf 'y\n' | HOME="$home" PATH="$home/bin:/usr/bin:/bin" bash -c '
+      ROOT="$1"
+      agents_home="$HOME/.agents"
+      dry_run=0
+      non_interactive=0
+      say() { printf "%s\n" "$*"; }
+      die() { printf "error: %s\n" "$*" >&2; exit 1; }
+      run() { "$@"; }
+      . "$ROOT/scripts/lib/targets.sh"
+      . "$ROOT/scripts/lib/logging.sh"
+      . "$ROOT/scripts/lib/preflight.sh"
+      prompt_yes_no() {
+        local prompt="$1"
+        local default="$2"
+        local answer suffix
+        if [ "$default" = "yes" ]; then
+          suffix="[Y/n]"
+        else
+          suffix="[y/N]"
+        fi
+        printf "%s %s " "$prompt" "$suffix"
+        read_prompt_value answer
+        answer="${answer:-$default}"
+        case "$answer" in
+          y|Y|yes|YES) return 0 ;;
+          *) return 1 ;;
+        esac
+      }
+      preflight_rtk_conflict
+    ' sh "$ROOT"
+  )"
+
+  assert_contains "$output" "Warning rtk found; rtk conflicts with lean-ctx."
+  assert_contains "$output" "Uninstall rtk before installing LeanCTX? [Y/n]"
+  assert_contains "$output" "OK rtk uninstall command completed"
+  assert_contains "$(cat "$home/.agents/install.log")" "command=rtk init -g --uninstall"
+  assert_contains "$(cat "$home/.agents/install.log")" "rtk_uninstall=completed"
+}
+
 # Verify missing Codex stops the install before managed files are written.
 missing_codex_stops_before_changes() {
   local home="$tmp/home-missing-codex"
@@ -119,7 +209,7 @@ interactive_claude_prompts_for_context7_key() {
   )"
   log="$home/.agents/install.log"
 
-  assert_contains "$output" "Context7 API key:"
+  assert_contains "$output" "Enter Context7 API key"
   assert_contains "$output" "OK Context7 API key provided"
   assert_contains "$output" "Dry run Configure Context7 for Claude Desktop"
   assert_contains "$(cat "$log")" "context7_credentials=present"
@@ -127,6 +217,9 @@ interactive_claude_prompts_for_context7_key() {
 }
 
 # Run the preflight scenarios.
+rtk_conflict_stops_non_interactive_install
+rtk_conflict_dry_run_reports_uninstall_command
+interactive_rtk_conflict_runs_uninstall_command
 missing_codex_stops_before_changes
 missing_claude_surfaces_stop_before_changes
 claude_desktop_without_cli_passes_preflight

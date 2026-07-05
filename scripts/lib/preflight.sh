@@ -16,6 +16,22 @@ preflight_die() {
   exit 1
 }
 
+# Report a conflicting tool and stop before the installer changes files.
+preflight_conflict_die() {
+  local target="$1"
+  local tool="$2"
+  shift 2
+
+  printf 'error: conflicting tool for %s: %s\n' "$target" "$tool" >&2
+  for instruction in "$@"; do
+    printf '%s\n' "$instruction" >&2
+  done
+  printf 'No files or configuration were changed.\n' >&2
+  printf 'Log: %s\n' "$install_log" >&2
+  log_line "preflight_conflict target=$target tool=$tool"
+  exit 1
+}
+
 # Verify one command required by one target surface is available on PATH.
 require_command_for_target() {
   local target="$1"
@@ -82,6 +98,37 @@ preflight_context7_credentials() {
   preflight_die "selected targets" "Context7 API key" "Create a Context7 API key, then rerun with:" "export CONTEXT7_API_KEY=\"your-context7-api-key\""
 }
 
+# RTK rewrites and compresses shell commands before agents see output, which
+# conflicts with LeanCTX's own shell/context layer.
+preflight_rtk_conflict() {
+  if ! command -v rtk >/dev/null 2>&1; then
+    return 0
+  fi
+
+  log_line "preflight_conflict target=lean-ctx tool=rtk"
+  status_warning "rtk found; rtk conflicts with lean-ctx."
+
+  if [ "$dry_run" = "1" ]; then
+    status_dry_run "Run rtk init -g --uninstall"
+    return 0
+  fi
+
+  if [ "$non_interactive" = "0" ] && prompt_yes_no "Uninstall rtk before installing LeanCTX?" "yes"; then
+    if run_logged rtk init -g --uninstall; then
+      status_ok "rtk uninstall command completed"
+      log_line "rtk_uninstall=completed"
+      return 0
+    fi
+    preflight_conflict_die "lean-ctx" "rtk" \
+      "rtk conflicts with lean-ctx." \
+      "The rtk uninstall command failed. Run rtk init -g --uninstall, then rerun this installer."
+  fi
+
+  preflight_conflict_die "lean-ctx" "rtk" \
+    "rtk conflicts with lean-ctx." \
+    "Run rtk init -g --uninstall, then rerun this installer."
+}
+
 # Check that at least one Claude product surface is available, then verify the
 # runtime commands needed by each detected surface.
 preflight_claude() {
@@ -133,5 +180,6 @@ preflight_targets() {
     require_command_for_target "vscode" "npx" "Install Node.js/npm so VS Code can launch the Context7 MCP server."
   fi
 
+  preflight_rtk_conflict
   preflight_context7_credentials
 }

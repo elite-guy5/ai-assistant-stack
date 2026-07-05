@@ -18,8 +18,8 @@ AI Assistant Stack installs and configures a curated AI development environment 
 
 - **LeanCTX** for efficient project context management.
 - **Context7** for live documentation and API reference retrieval.
-- **Caveman** for reusable AI development skills and workflows.
-- **Superpowers** for additional AI productivity enhancements.
+- **Caveman** a plugin that cuts agent output tokens by 65% via ultra-compressed communication.
+- **Superpowers** an agentic skills framework and software development methodology that enforces structured coding workflows like TDD.
 - **Optimized AI Instruction Files** at both the global and project levels, giving AI coding assistants consistent instructions across every repository.
 - **AI Instruction Project Bootstrap** installs a Git hook that automatically seeds new Git repositories with the appropriate **AGENTS.md** and/or **CLAUDE.md** project files, ensuring every project starts with an optimized AI configuration.
 
