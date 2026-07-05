@@ -18,6 +18,20 @@ assert_contains() {
   esac
 }
 
+# Assert that one substring appears before another in command output.
+assert_before() {
+  local output="$1"
+  local first="$2"
+  local second="$3"
+  case "$output" in
+    *"$first"*"$second"*) ;;
+    *)
+      printf 'expected output to show "%s" before "%s"\\noutput was:\\n%s\\n' "$first" "$second" "$output" >&2
+      exit 1
+      ;;
+  esac
+}
+
 # Verify instruction-file installs print the user-visible actions they perform.
 install_output_names_instruction_file_actions() {
   local home="$tmp/home-output"
@@ -36,8 +50,7 @@ install_output_names_instruction_file_actions() {
   assert_contains "$output" "Configured git init.templateDir"
 }
 
-# Verify target-mode installs print stack setup progress before instruction-file
-# output.
+# Verify target-mode installs write instruction files before stack setup output.
 target_install_output_names_stack_actions() {
   local home="$tmp/home-target-output"
   local output
@@ -51,11 +64,14 @@ target_install_output_names_stack_actions() {
   )"
 
   assert_contains "$output" "Preflight selected targets"
+  assert_contains "$output" "Instruction files"
+  assert_contains "$output" "Installed $home/.codex/AGENTS.md"
   assert_contains "$output" "Install LeanCTX"
   assert_contains "$output" "Configure Context7"
   assert_contains "$output" "Install Caveman"
   assert_contains "$output" "Install Superpowers"
   assert_contains "$output" "Install complete"
+  assert_before "$output" "Instruction files" "Install LeanCTX"
 }
 
 # Run visible-output scenarios.

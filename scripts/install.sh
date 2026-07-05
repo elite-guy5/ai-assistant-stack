@@ -479,10 +479,13 @@ fi
 
 [ -n "${ANTHROPIC_API_KEY:-}" ] && log_line "ANTHROPIC_API_KEY=[REDACTED:API key param]"
 
-# For target-mode installs, validate prerequisites before making changes and
-# configure stack tools before writing instruction files.
+# For target-mode installs, validate prerequisites before making changes, then
+# install instruction files before configuring the rest of the stack.
 if [ "$target_mode" = "1" ]; then
   preflight_targets
+  if [ -n "$tools" ]; then
+    install_instruction_files
+  fi
   install_stack_tools
 fi
 
@@ -499,7 +502,9 @@ fi
 # Install the shared instruction files, seeder script, and future-repository Git
 # template hooks.
 if [ -n "$tools" ]; then
-  install_instruction_files
+  if [ "$target_mode" != "1" ]; then
+    install_instruction_files
+  fi
   install_seeder
   install_git_template_hooks
 fi
