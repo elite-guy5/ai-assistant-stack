@@ -70,7 +70,7 @@ dry_run_prints_stack_steps_for_codex() {
   assert_contains "$output" "Install LeanCTX"
   assert_contains "$output" "Dry run Configure LeanCTX setup"
   assert_contains "$output" "Dry run Disable LeanCTX path jail"
-  assert_contains "$output" "Dry run Disable LeanCTX proxy"
+  assert_contains "$output" "Dry run Enable LeanCTX proxy"
   assert_contains "$output" "Configure Context7"
   assert_contains "$output" "Install Caveman"
   assert_contains "$output" "Dry run Check Codex skill caveman"
@@ -87,14 +87,14 @@ dry_run_prints_stack_steps_for_codex() {
   assert_contains "$(cat "$log")" 'cd "$HOME"'
   assert_not_contains "$(cat "$log")" "LEAN_CTX_PROJECT_ROOT"
   assert_contains "$(cat "$log")" "lean-ctx config set path_jail false --yes"
-  assert_contains "$(cat "$log")" "lean-ctx proxy disable"
+  assert_contains "$(cat "$log")" "lean-ctx proxy enable"
   assert_contains "$(cat "$log")" "npx skills add JuliusBrussee/caveman --yes --global --agent codex"
   assert_contains "$(cat "$log")" "codex plugin add superpowers@openai-curated"
   assert_contains "$(cat "$log")" "superpowers_manual_activation=dry-run"
   assert_contains "$(cat "$log")" "codex mcp add context7"
   assert_contains "$(cat "$log")" "--api-key <redacted>"
   assert_not_contains "$(cat "$log")" "lean-ctx tools minimal"
-  assert_not_contains "$(cat "$log")" "lean-ctx proxy enable"
+  assert_not_contains "$(cat "$log")" "lean-ctx proxy disable"
 }
 
 # Verify a bootstrap-style install from the user's home directory can find an

@@ -60,7 +60,7 @@ cd "$(git rev-parse --show-toplevel)"
 printf "y\nn\ny\nmax\ny\n" | lean-ctx setup
 cd "$HOME"
 lean-ctx config set path_jail false --yes
-lean-ctx proxy disable
+lean-ctx proxy enable
 ```
 
 Do not force a custom tool profile or document invalid config keys:

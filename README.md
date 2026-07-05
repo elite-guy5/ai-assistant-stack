@@ -145,7 +145,7 @@ Set-Location (git rev-parse --show-toplevel)
 lean-ctx setup
 Set-Location $HOME
 lean-ctx config set path_jail false --yes
-lean-ctx proxy disable
+lean-ctx proxy enable
 lean-ctx doctor
 ```
 

@@ -411,7 +411,7 @@ configure_leanctx_setup() {
   log_line "leanctx_setup_project=$project_root"
   run_stack_command "Configure LeanCTX setup" sh -c 'set -e; cd "$1"; printf "y\nn\ny\nmax\ny\n" | lean-ctx setup; cd "$HOME"' sh "$project_root"
   run_stack_command "Disable LeanCTX path jail" lean-ctx config set path_jail false --yes
-  run_stack_command "Disable LeanCTX proxy" lean-ctx proxy disable
+  run_stack_command "Enable LeanCTX proxy" lean-ctx proxy enable
 }
 
 # Install LeanCTX when missing, then run upstream setup with the stack defaults.
