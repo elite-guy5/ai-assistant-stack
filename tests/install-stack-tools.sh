@@ -70,6 +70,7 @@ dry_run_prints_stack_steps_for_codex() {
   assert_contains "$output" "Install LeanCTX"
   assert_contains "$output" "Dry run Configure LeanCTX setup"
   assert_contains "$output" "Dry run Disable LeanCTX path jail"
+  assert_contains "$output" "Dry run Run LeanCTX doctor --fix"
   assert_contains "$output" "Dry run Enable LeanCTX proxy"
   assert_contains "$output" "Dry run Enable LeanCTX Codex ChatGPT proxy"
   assert_contains "$output" "Configure Context7"
@@ -88,6 +89,7 @@ dry_run_prints_stack_steps_for_codex() {
   assert_contains "$(cat "$log")" 'cd "$HOME"'
   assert_not_contains "$(cat "$log")" "LEAN_CTX_PROJECT_ROOT"
   assert_contains "$(cat "$log")" "lean-ctx config set path_jail false --yes"
+  assert_contains "$(cat "$log")" "lean-ctx doctor --fix"
   assert_contains "$(cat "$log")" "lean-ctx proxy enable"
   assert_contains "$(cat "$log")" "lean-ctx proxy codex-chatgpt on"
   assert_contains "$(cat "$log")" "npx skills add JuliusBrussee/caveman --yes --global --agent codex"
@@ -663,11 +665,15 @@ dry_run_prints_stack_steps_for_claude_desktop() {
   log="$home/.agents/install.log"
 
   assert_contains "$output" "Dry run Configure Context7 for Claude Desktop"
+  assert_contains "$output" "Dry run Configure LeanCTX for Claude Desktop"
+  assert_contains "$output" "Dry run Run LeanCTX doctor --fix"
   assert_contains "$output" "Skipped LeanCTX proxy for Claude disabled"
   assert_contains "$output" "$config"
   assert_contains "$output" "Skipped Claude Code CLI not found"
   assert_contains "$(cat "$log")" "claude_proxy=disabled"
   assert_not_contains "$(cat "$log")" "lean-ctx proxy enable"
+  assert_contains "$(cat "$log")" "lean-ctx doctor --fix"
+  assert_contains "$(cat "$log")" "update_claude_desktop_config=$config server=lean-ctx"
   assert_contains "$(cat "$log")" "update_claude_desktop_config=$config server=context7"
 }
 
@@ -702,7 +708,7 @@ dry_run_can_enable_claude_proxy() {
 # merges the managed Context7 entry.
 claude_desktop_config_is_merged() {
   local home="$tmp/home-claude-desktop-merge"
-  local output config node_path
+  local output config node_path leanctx_path
   node_path="$(command -v node || true)"
   [ -n "$node_path" ] || {
     printf 'node is required for this test\n' >&2
@@ -714,6 +720,7 @@ claude_desktop_config_is_merged() {
   printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/npx"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/lean-ctx"
   chmod +x "$home/bin/npx" "$home/bin/lean-ctx"
+  leanctx_path="$home/bin/lean-ctx"
   config="$home/Library/Application Support/Claude/claude_desktop_config.json"
   printf '{"theme":"dark","mcpServers":{"existing":{"command":"true"}}}\n' > "$config"
 
@@ -724,16 +731,19 @@ claude_desktop_config_is_merged() {
       bash "$ROOT/scripts/install.sh" --non-interactive --targets claude
   )"
 
+  assert_contains "$output" "OK Configure LeanCTX for Claude Desktop $config"
   assert_contains "$output" "OK Configure Context7 for Claude Desktop $config"
   assert_not_contains "$output" "Configure Context7 for Claude Code"
   "$node_path" -e '
 const fs = require("fs");
 const config = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+const leanctxPath = process.argv[2];
 if (config.theme !== "dark") process.exit(1);
 if (!config.mcpServers.existing) process.exit(2);
-if (config.mcpServers.context7.command !== "npx") process.exit(3);
-if (config.mcpServers.context7.env.CONTEXT7_API_KEY !== "test-key") process.exit(4);
-' "$config"
+if (config.mcpServers["lean-ctx"].command !== leanctxPath) process.exit(3);
+if (config.mcpServers.context7.command !== "npx") process.exit(4);
+if (config.mcpServers.context7.env.CONTEXT7_API_KEY !== "test-key") process.exit(5);
+' "$config" "$leanctx_path"
 }
 
 # Run the stack-tool scenarios.

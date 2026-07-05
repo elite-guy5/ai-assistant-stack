@@ -221,6 +221,63 @@ claude_plugin_installed() {
   die "$parse_error"
 }
 
+# Return the LeanCTX command Claude Desktop should launch. Prefer an absolute
+# path because macOS GUI apps do not reliably inherit the user's shell PATH.
+leanctx_command_for_desktop() {
+  command -v lean-ctx 2>/dev/null || printf 'lean-ctx\n'
+}
+
+# Merge the local LeanCTX MCP server into Claude Desktop's config.
+configure_claude_desktop_leanctx() {
+  local config
+  local backup
+  local leanctx_command
+
+  config="$(claude_desktop_config_path)"
+  leanctx_command="$(leanctx_command_for_desktop)"
+  if [ "$dry_run" = "1" ]; then
+    status_dry_run "Configure LeanCTX for Claude Desktop $config"
+    log_line "update_claude_desktop_config=$config server=lean-ctx command=$leanctx_command"
+    return 0
+  fi
+
+  if [ -e "$config" ]; then
+    backup="$(backup_path "$config")"
+    status_ok "Backing up $config to $backup"
+    mkdir -p "$(dirname "$config")"
+    cp "$config" "$backup"
+  fi
+
+  mkdir -p "$(dirname "$config")"
+  node - "$config" "$leanctx_command" <<'NODE'
+const fs = require("fs");
+
+const configPath = process.argv[2];
+const leanctxCommand = process.argv[3];
+let config = {};
+
+if (fs.existsSync(configPath) && fs.readFileSync(configPath, "utf8").trim()) {
+  config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+}
+
+if (!config || Array.isArray(config) || typeof config !== "object") {
+  throw new Error("Claude Desktop config must be a JSON object");
+}
+
+if (!config.mcpServers || Array.isArray(config.mcpServers) || typeof config.mcpServers !== "object") {
+  config.mcpServers = {};
+}
+
+config.mcpServers["lean-ctx"] = {
+  command: leanctxCommand
+};
+
+fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+NODE
+  status_ok "Configure LeanCTX for Claude Desktop $config"
+  log_line "update_claude_desktop_config=$config server=lean-ctx command=$leanctx_command"
+}
+
 # Merge the local Context7 MCP server into Claude Desktop's config without
 # logging the raw API key.
 configure_claude_desktop_context7() {
@@ -411,6 +468,13 @@ configure_leanctx_setup() {
   log_line "leanctx_setup_project=$project_root"
   run_stack_command "Configure LeanCTX setup" sh -c 'set -e; cd "$1"; printf "y\nn\ny\nmax\ny\n" | lean-ctx setup; cd "$HOME"' sh "$project_root"
   run_stack_command "Disable LeanCTX path jail" lean-ctx config set path_jail false --yes
+  run_stack_command "Run LeanCTX doctor --fix" lean-ctx doctor --fix
+
+  if tool_enabled claude && claude_desktop_available; then
+    configure_claude_desktop_leanctx
+  elif tool_enabled claude; then
+    status_skipped "Claude Desktop app not found; skipped Desktop LeanCTX MCP config"
+  fi
 
   if [ "$claude_proxy_enabled" = "1" ]; then
     run_stack_command "Enable LeanCTX proxy" env ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" lean-ctx proxy enable

@@ -105,6 +105,7 @@ cd "$(git rev-parse --show-toplevel)"
 printf "y\nn\ny\nmax\ny\n" | lean-ctx setup
 cd "$HOME"
 lean-ctx config set path_jail false --yes
+lean-ctx doctor --fix
 # Optional: enable Claude/Anthropic proxy routing.
 ANTHROPIC_API_KEY="your-anthropic-api-key" lean-ctx proxy enable
 ```
