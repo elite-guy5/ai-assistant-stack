@@ -1,12 +1,6 @@
 <div align="center">
 
-<pre>
-╔══════════════════════════════╗
-║      AI ASSISTANT STACK      ║
-╚══════════════════════════════╝
-</pre>
-
-# AI Assistant Stack
+<img src="docs/ai-assistant-stack-logo.png" alt="AI Assistant Stack" width="500">
 
 ### Your AI Assistant Stack for Smarter Development
 
