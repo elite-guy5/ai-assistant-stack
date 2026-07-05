@@ -112,6 +112,10 @@ install managed hooks in the current repository when it is run from inside one.
   APIs, and error output exactly.
 - The global files keep Superpowers manual-only unless the user explicitly
   requests that workflow in a session.
+- Target-aware stack setup installs Superpowers, then limits its cached skill
+  trigger metadata to manual invocation so it is available without activating
+  at every session start. It also replaces the cached `using-superpowers` body
+  so manual invocation does not reintroduce upstream automatic routing rules.
 - Project templates give each repository a local place for purpose, language,
   commands, tests, coding standards, project-specific rules, and context
   boundaries.

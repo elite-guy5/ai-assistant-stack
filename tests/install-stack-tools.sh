@@ -78,6 +78,7 @@ dry_run_prints_stack_steps_for_codex() {
   assert_contains "$output" "Install Superpowers"
   assert_contains "$output" "Dry run Check Codex plugin superpowers@openai-curated"
   assert_contains "$output" "Dry run Install Superpowers for Codex"
+  assert_contains "$output" "Dry run Limit Superpowers skills to manual invocation"
   assert_contains "$output" "Dry run Configure Context7 for Codex"
   assert_not_contains "$output" "Configure LeanCTX tools"
   assert_contains "$(cat "$log")" "lean-ctx setup"
@@ -89,6 +90,7 @@ dry_run_prints_stack_steps_for_codex() {
   assert_contains "$(cat "$log")" "lean-ctx proxy disable"
   assert_contains "$(cat "$log")" "npx skills add JuliusBrussee/caveman --yes --global --agent codex"
   assert_contains "$(cat "$log")" "codex plugin add superpowers@openai-curated"
+  assert_contains "$(cat "$log")" "superpowers_manual_activation=dry-run"
   assert_contains "$(cat "$log")" "codex mcp add context7"
   assert_contains "$(cat "$log")" "--api-key <redacted>"
   assert_not_contains "$(cat "$log")" "lean-ctx tools minimal"
@@ -495,6 +497,7 @@ missing_superpowers_uses_plugin_installers() {
   local home="$tmp/home-superpowers-install"
   local log="$home/.agents/install.log"
   local output commands
+  local codex_skill claude_skill
   local node_path
   node_path="$(command -v node || true)"
   [ -n "$node_path" ] || {
@@ -504,6 +507,11 @@ missing_superpowers_uses_plugin_installers() {
 
   mkdir -p "$home/bin" "$home/.agents"
   ln -s "$node_path" "$home/bin/node"
+  codex_skill="$home/.codex/plugins/cache/openai-curated/superpowers/test/skills/using-superpowers/SKILL.md"
+  claude_skill="$home/.claude/plugins/cache/claude-plugins-official/superpowers/test/skills/brainstorming/SKILL.md"
+  mkdir -p "$(dirname "$codex_skill")" "$(dirname "$claude_skill")"
+  printf '%s\n' '---' 'name: using-superpowers' 'description: Use when starting any conversation - establishes how to find and use skills' '---' '' '<EXTREMELY-IMPORTANT>' 'If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.' '</EXTREMELY-IMPORTANT>' > "$codex_skill"
+  printf '%s\n' '---' 'name: brainstorming' 'description: "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior."' '---' '' 'body' > "$claude_skill"
 
   printf '#!/usr/bin/env bash\nprintf "codex %%s\\n" "$*" >> "$HOME/commands.log"\nif [ "$1 $2" = "plugin list" ]; then printf "PLUGIN STATUS VERSION PATH\\nsuperpowers@openai-curated not installed  /tmp/superpowers\\n"; exit 0; fi\nif [ "$1 $2 $3" = "plugin add superpowers@openai-curated" ]; then exit 0; fi\nexit 8\n' > "$home/bin/codex"
   printf '#!/usr/bin/env bash\nprintf "claude %%s\\n" "$*" >> "$HOME/commands.log"\nif [ "$1 $2 $3" = "plugin list --json" ]; then printf "[]\\n"; exit 0; fi\nif [ "$1 $2 $3 $4 $5" = "plugin install superpowers@claude-plugins-official --scope user" ]; then exit 0; fi\nexit 8\n' > "$home/bin/claude"
@@ -532,11 +540,19 @@ missing_superpowers_uses_plugin_installers() {
 
   assert_contains "$output" "OK Install Superpowers for Codex"
   assert_contains "$output" "OK Install Superpowers for Claude Code"
+  assert_contains "$output" "OK Limit Superpowers skills to manual invocation"
   commands="$(cat "$home/commands.log")"
   assert_contains "$commands" "codex plugin add superpowers@openai-curated"
   assert_contains "$commands" "claude plugin install superpowers@claude-plugins-official --scope user"
   assert_not_contains "$commands" "git clone"
   assert_not_contains "$commands" "ln -sfn"
+  assert_contains "$(cat "$codex_skill")" "description: Manual Superpowers workflow only."
+  assert_contains "$(cat "$claude_skill")" "description: Manual Superpowers workflow only."
+  assert_contains "$(cat "$codex_skill")" "Superpowers is installed and available, but this stack does not invoke Superpowers skills automatically."
+  assert_not_contains "$(cat "$codex_skill")" "Use when starting any conversation"
+  assert_not_contains "$(cat "$codex_skill")" "1% chance"
+  assert_not_contains "$(cat "$codex_skill")" "ABSOLUTELY MUST invoke"
+  assert_not_contains "$(cat "$claude_skill")" "You MUST use this before any creative work"
 }
 
 # Verify Claude Code Caveman installs through skills, not the Claude plugin

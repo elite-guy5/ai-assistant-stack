@@ -478,6 +478,105 @@ install_caveman() {
   fi
 }
 
+write_manual_superpowers_using_skill() {
+  local file="$1"
+  local tmp_file
+
+  tmp_file="$(mktemp)"
+  {
+    printf '%s\n' '---'
+    printf '%s\n' 'name: using-superpowers'
+    printf '%s\n' 'description: Manual Superpowers workflow only. Use this skill only when the user explicitly requests Superpowers, names this skill, or an already-active Superpowers workflow requires it.'
+    printf '%s\n' '---'
+    printf '\n'
+    printf '%s\n' '# Using Superpowers Manually'
+    printf '\n'
+    printf '%s\n' 'Superpowers is installed and available, but this stack does not invoke Superpowers skills automatically.'
+    printf '\n'
+    printf '%s\n' 'Invoke a Superpowers skill only when:'
+    printf '\n'
+    printf '%s\n' '- The user explicitly names or requests Superpowers.'
+    printf '%s\n' '- The user explicitly names a specific Superpowers skill.'
+    printf '%s\n' '- An already-active Superpowers workflow requires the next Superpowers skill.'
+    printf '\n'
+    printf '%s\n' 'Do not invoke Superpowers skills automatically for normal session startup, routine software development, code edits, debugging, planning, review, or verification.'
+    printf '\n'
+    printf '%s\n' 'Local `AGENTS.md` or `CLAUDE.md` manual-only instructions take precedence over upstream automatic activation guidance.'
+  } > "$tmp_file"
+
+  if cmp -s "$tmp_file" "$file"; then
+    rm -f "$tmp_file"
+    return 1
+  fi
+
+  mv "$tmp_file" "$file"
+  return 0
+}
+
+limit_superpowers_skill_activation() {
+  local root
+  local list
+  local file
+  local tmp_file
+  local found=0
+  local changed=0
+  local replacement
+
+  replacement="description: Manual Superpowers workflow only. Use this skill only when the user explicitly requests Superpowers, names this skill, or an already-active Superpowers workflow requires it."
+
+  if [ "$dry_run" = "1" ]; then
+    status_dry_run "Limit Superpowers skills to manual invocation"
+    log_line "superpowers_manual_activation=dry-run"
+    return 0
+  fi
+
+  for root in "$HOME/.codex/plugins/cache" "$HOME/.claude/plugins/cache"; do
+    [ -d "$root" ] || continue
+    list="$(mktemp)"
+    find "$root" -path '*/superpowers/*/skills/*/SKILL.md' -type f > "$list"
+    while IFS= read -r file; do
+      [ -n "$file" ] || continue
+      found=1
+      case "$file" in
+        */skills/using-superpowers/SKILL.md)
+          if write_manual_superpowers_using_skill "$file"; then
+            changed=1
+            log_line "superpowers_manual_activation_file=$file"
+          fi
+          continue
+          ;;
+      esac
+
+      if grep -q '^description: Manual Superpowers workflow only\.' "$file"; then
+        continue
+      fi
+
+      tmp_file="$(mktemp)"
+      awk -v replacement="$replacement" '
+        NR == 1 && $0 == "---" { in_frontmatter = 1 }
+        in_frontmatter && !replaced && /^description:/ {
+          print replacement
+          replaced = 1
+          next
+        }
+        { print }
+      ' "$file" > "$tmp_file"
+      mv "$tmp_file" "$file"
+      changed=1
+      log_line "superpowers_manual_activation_file=$file"
+    done < "$list"
+    rm -f "$list"
+  done
+
+  if [ "$found" -eq 0 ]; then
+    status_skipped "Superpowers skill metadata not found for manual activation"
+  elif [ "$changed" -eq 0 ]; then
+    status_skipped "Superpowers skills already manual-only"
+  else
+    status_ok "Limit Superpowers skills to manual invocation"
+  fi
+}
+
 # Install Superpowers through each client's native plugin system.
 install_superpowers() {
   step "Install Superpowers"
@@ -498,6 +597,8 @@ install_superpowers() {
   elif tool_enabled claude; then
     status_skipped "Claude Code CLI not found; skipped Superpowers for Claude Code"
   fi
+
+  limit_superpowers_skill_activation
 }
 
 # Run every stack-tool setup step in the required order.

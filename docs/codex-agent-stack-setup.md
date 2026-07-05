@@ -153,6 +153,12 @@ Do not auto-invoke Superpowers just because the task is software development.
 The user should explicitly request the workflow, or an already-active
 Superpowers workflow should require the next Superpowers skill.
 
+When the installer adds Superpowers, it preserves the plugin but rewrites cached
+Superpowers skill descriptions to require explicit manual invocation. This keeps
+the skills available without advertising them as automatic triggers for normal
+sessions. It also replaces the cached `using-superpowers` body so manual
+invocation does not reintroduce upstream automatic routing rules.
+
 ## Ownership Matrix
 
 | Surface | Owner | Use For | Do Not Use For |
