@@ -1,11 +1,11 @@
 <div align="center">
 
-```text
+```
 ╔══════════════════════════════╗
 ║      AI ASSISTANT STACK      ║
 ╚══════════════════════════════╝
-```
 
+```
 </div>
 
 <div align="center">
