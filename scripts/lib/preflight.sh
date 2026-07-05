@@ -98,6 +98,7 @@ preflight_claude() {
   if [ "$has_cli" = "1" ]; then
     log_line "preflight_ok target=claude command=claude"
     status_ok "claude found for claude"
+    require_command_for_target "claude" "npx" "Install Node.js/npm so this installer can install Claude Code skills."
   else
     status_skipped "Claude Code CLI not found; skipping CLI-only setup"
   fi

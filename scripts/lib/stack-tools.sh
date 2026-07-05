@@ -103,8 +103,10 @@ process.stdin.on("end", () => {
 ' "$label" "$field" "$expected"
 }
 
-codex_skill_installed() {
-  local skill="$1"
+agent_skill_installed() {
+  local label="$1"
+  local agent="$2"
+  local skill="$3"
   local output
   local parse_error
   local status
@@ -112,20 +114,20 @@ codex_skill_installed() {
   local stderr
 
   if [ "$dry_run" = "1" ]; then
-    status_dry_run "Check Codex skill $skill"
+    status_dry_run "Check $label skill $skill"
     return 1
   fi
 
   stderr_file="$(mktemp)"
-  if output="$(npx skills list --json --global --agent codex 2>"$stderr_file")"; then
+  if output="$(npx skills list --json --global --agent "$agent" 2>"$stderr_file")"; then
     rm -f "$stderr_file"
   else
     stderr="$(cat "$stderr_file")"
     rm -f "$stderr_file"
     if [ -n "$stderr" ]; then
-      die "failed to list Codex skills: $stderr"
+      die "failed to list $label skills: $stderr"
     fi
-    die "failed to list Codex skills: $output"
+    die "failed to list $label skills: $output"
   fi
 
   if parse_error="$(printf '%s\n' "$output" | json_array_contains_field_value "npx skills list" "name" "$skill" 2>&1)"; then
@@ -136,6 +138,16 @@ codex_skill_installed() {
 
   [ "$status" -eq 1 ] && return 1
   die "$parse_error"
+}
+
+codex_skill_installed() {
+  local skill="$1"
+  agent_skill_installed "Codex" codex "$skill"
+}
+
+claude_code_skill_installed() {
+  local skill="$1"
+  agent_skill_installed "Claude Code" claude-code "$skill"
 }
 
 codex_plugin_installed() {
@@ -451,16 +463,15 @@ install_caveman() {
     if codex_skill_installed caveman; then
       status_skipped "Caveman already installed for Codex"
     else
-      run_stack_command "Install all Caveman skills for Codex" npx skills add JuliusBrussee/caveman --yes --global
+      run_stack_command "Install all Caveman skills for Codex" npx skills add JuliusBrussee/caveman --yes --global --agent codex
     fi
   fi
 
   if tool_enabled claude && claude_cli_available; then
-    if claude_plugin_installed caveman@caveman; then
+    if claude_code_skill_installed caveman; then
       status_skipped "Caveman already installed for Claude Code"
     else
-      run_stack_command "Install Caveman marketplace for Claude Code" claude plugin marketplace add JuliusBrussee/caveman
-      run_stack_command "Install Caveman for Claude Code" claude plugin install caveman@caveman --scope user
+      run_stack_command "Install Caveman skills for Claude Code" npx skills add JuliusBrussee/caveman --yes --global --agent claude-code
     fi
   elif tool_enabled claude; then
     status_skipped "Claude Code CLI not found; skipped Caveman for Claude Code"

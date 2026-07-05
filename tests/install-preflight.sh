@@ -83,6 +83,25 @@ claude_desktop_without_cli_passes_preflight() {
   assert_contains "$output" "Dry run Configure Context7 for Claude Desktop"
 }
 
+# Verify Claude Code CLI setup requires npx for skills-based Caveman installs.
+claude_cli_without_npx_stops_before_changes() {
+  local home="$tmp/home-claude-cli-without-npx"
+  mkdir -p "$home/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/claude"
+  chmod +x "$home/bin/claude"
+
+  if HOME="$home" PATH="$home/bin:/usr/bin:/bin" CONTEXT7_API_KEY=test-key \
+    CLAUDE_DESKTOP_APP_PATH="$home/missing/Claude.app" \
+    bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --targets claude >"$tmp/claude-cli-npx.out" 2>"$tmp/claude-cli-npx.err"; then
+    printf 'missing Claude Code npx unexpectedly succeeded\n' >&2
+    exit 1
+  fi
+
+  assert_contains "$(cat "$tmp/claude-cli-npx.err")" "missing prerequisite for claude: npx"
+  assert_contains "$(cat "$tmp/claude-cli-npx.err")" "Install Node.js/npm so this installer can install Claude Code skills."
+  assert_not_exists "$home/.claude/CLAUDE.md"
+}
+
 # Verify interactive target-mode installs can collect the Context7 API key
 # during preflight before stack setup begins.
 interactive_claude_prompts_for_context7_key() {
@@ -111,6 +130,7 @@ interactive_claude_prompts_for_context7_key() {
 missing_codex_stops_before_changes
 missing_claude_surfaces_stop_before_changes
 claude_desktop_without_cli_passes_preflight
+claude_cli_without_npx_stops_before_changes
 interactive_claude_prompts_for_context7_key
 
 printf 'install-preflight.sh: OK\n'

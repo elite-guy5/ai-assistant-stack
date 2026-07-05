@@ -36,7 +36,7 @@ Instead of configuring multiple tools by hand, AI Assistant Stack installs and c
 | Target | Required prerequisites |
 |--------|------------------------|
 | `codex` | Codex CLI (`codex`) |
-| `claude` | Claude Desktop, Claude Code CLI (`claude`), or both |
+| `claude` | Claude Desktop, Claude Code CLI (`claude`), or both; `npx` when Claude Code CLI setup is selected |
 | `vscode` | VS Code app or CLI, plus `npx` for Context7 MCP |
 
 If a selected prerequisite is missing, the installer stops before making
@@ -161,9 +161,8 @@ Install Caveman:
 
 ```powershell
 irm https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.ps1 | iex
-npx skills add JuliusBrussee/caveman --yes --global
-claude plugin marketplace add JuliusBrussee/caveman
-claude plugin install caveman@caveman
+npx skills add JuliusBrussee/caveman --yes --global --agent codex
+npx skills add JuliusBrussee/caveman --yes --global --agent claude-code
 ```
 
 Install Superpowers from the target client.
@@ -544,7 +543,8 @@ configuration parses correctly.
 Install runtime skills manually:
 
 ```bash
-npx skills add JuliusBrussee/caveman --yes --global
+npx skills add JuliusBrussee/caveman --yes --global --agent codex
+npx skills add JuliusBrussee/caveman --yes --global --agent claude-code
 npx skills add superpowers -a codex
 ```
 

@@ -87,7 +87,7 @@ dry_run_prints_stack_steps_for_codex() {
   assert_not_contains "$(cat "$log")" "LEAN_CTX_PROJECT_ROOT"
   assert_contains "$(cat "$log")" "lean-ctx config set path_jail false --yes"
   assert_contains "$(cat "$log")" "lean-ctx proxy disable"
-  assert_contains "$(cat "$log")" "npx skills add JuliusBrussee/caveman --yes --global"
+  assert_contains "$(cat "$log")" "npx skills add JuliusBrussee/caveman --yes --global --agent codex"
   assert_contains "$(cat "$log")" "codex plugin add superpowers@openai-curated"
   assert_contains "$(cat "$log")" "codex mcp add context7"
   assert_contains "$(cat "$log")" "--api-key <redacted>"
@@ -200,9 +200,9 @@ installed_state_helpers_detect_existing_tools() {
   mkdir -p "$home/bin" "$home/.agents"
   ln -s "$node_path" "$home/bin/node"
 
-  printf '#!/usr/bin/env bash\ncase "$*" in\n  "skills list --json --global --agent codex") printf "warning: cache stale\\n" >&2; printf "[{\\"name\\":\\"caveman\\"}]\\n" ;;\n  *) printf "unexpected npx args: %s\\n" "$*" >&2; exit 9 ;;\nesac\n' > "$home/bin/npx"
+  printf '#!/usr/bin/env bash\ncase "$*" in\n  "skills list --json --global --agent codex") printf "warning: cache stale\\n" >&2; printf "[{\\"name\\":\\"caveman\\"}]\\n" ;;\n  "skills list --json --global --agent claude-code") printf "[{\\"name\\":\\"caveman\\"}]\\n" ;;\n  *) printf "unexpected npx args: %s\\n" "$*" >&2; exit 9 ;;\nesac\n' > "$home/bin/npx"
   printf '#!/usr/bin/env bash\nif [ "$1 $2" = "plugin list" ]; then printf "PLUGIN STATUS VERSION PATH\\nsuperpowers@openai-curated installed, enabled 1 /tmp/superpowers\\n"; else exit 9; fi\n' > "$home/bin/codex"
-  printf '#!/usr/bin/env bash\nif [ "$1 $2" = "plugin list" ]; then printf "[{\\"id\\":\\"caveman@caveman\\"},{\\"id\\":\\"superpowers@claude-plugins-official\\"}]\\n"; else exit 9; fi\n' > "$home/bin/claude"
+  printf '#!/usr/bin/env bash\nif [ "$1 $2" = "plugin list" ]; then printf "[{\\"id\\":\\"superpowers@claude-plugins-official\\"}]\\n"; else exit 9; fi\n' > "$home/bin/claude"
   chmod +x "$home/bin/npx" "$home/bin/codex" "$home/bin/claude"
 
   output="$(
@@ -216,7 +216,7 @@ installed_state_helpers_detect_existing_tools() {
       . "$ROOT/scripts/lib/stack-tools.sh"
       codex_skill_installed caveman && printf "codex-caveman=yes\n"
       codex_plugin_installed superpowers@openai-curated && printf "codex-superpowers=yes\n"
-      claude_plugin_installed caveman@caveman && printf "claude-caveman=yes\n"
+      claude_code_skill_installed caveman && printf "claude-caveman=yes\n"
       claude_plugin_installed superpowers@claude-plugins-official && printf "claude-superpowers=yes\n"
     ' sh "$ROOT" "$log"
   )"
@@ -283,7 +283,7 @@ installed_state_helpers_reject_invalid_json() {
       . "$ROOT/scripts/lib/targets.sh"
       . "$ROOT/scripts/lib/logging.sh"
       . "$ROOT/scripts/lib/stack-tools.sh"
-      claude_plugin_installed caveman@caveman
+      claude_plugin_installed superpowers@claude-plugins-official
     ' sh "$ROOT" "$log" 2>&1
   )"; then
     printf 'invalid JSON unexpectedly succeeded\n' >&2
@@ -308,9 +308,9 @@ installed_stack_tools_are_skipped() {
 
   mkdir -p "$home/bin" "$home/.agents"
   ln -s "$node_path" "$home/bin/node"
-  printf '#!/usr/bin/env bash\ncase "$*" in\n  "skills list --json --global --agent codex") printf "[{\\"name\\":\\"caveman\\"}]\\n" ;;\n  "skills add"*) printf "unexpected install: %%s\\n" "$*" >> "$HOME/commands.log"; exit 8 ;;\n  *) printf "unexpected npx args: %%s\\n" "$*" >&2; exit 9 ;;\nesac\n' > "$home/bin/npx"
+  printf '#!/usr/bin/env bash\ncase "$*" in\n  "skills list --json --global --agent codex") printf "[{\\"name\\":\\"caveman\\"}]\\n" ;;\n  "skills list --json --global --agent claude-code") printf "[{\\"name\\":\\"caveman\\"}]\\n" ;;\n  "skills add"*) printf "unexpected install: %%s\\n" "$*" >> "$HOME/commands.log"; exit 8 ;;\n  *) printf "unexpected npx args: %%s\\n" "$*" >&2; exit 9 ;;\nesac\n' > "$home/bin/npx"
   printf '#!/usr/bin/env bash\nprintf "codex %%s\\n" "$*" >> "$HOME/commands.log"\nif [ "$1 $2" = "plugin list" ]; then printf "PLUGIN STATUS VERSION PATH\\nsuperpowers@openai-curated installed, enabled 1 /tmp/superpowers\\n"; exit 0; fi\nexit 8\n' > "$home/bin/codex"
-  printf '#!/usr/bin/env bash\nprintf "claude %%s\\n" "$*" >> "$HOME/commands.log"\nif [ "$1 $2 $3" = "plugin list --json" ]; then printf "[{\\"id\\":\\"caveman@caveman\\"},{\\"id\\":\\"superpowers@claude-plugins-official\\"}]\\n"; exit 0; fi\nexit 8\n' > "$home/bin/claude"
+  printf '#!/usr/bin/env bash\nprintf "claude %%s\\n" "$*" >> "$HOME/commands.log"\nif [ "$1 $2 $3" = "plugin list --json" ]; then printf "[{\\"id\\":\\"superpowers@claude-plugins-official\\"}]\\n"; exit 0; fi\nexit 8\n' > "$home/bin/claude"
   chmod +x "$home/bin/npx" "$home/bin/codex" "$home/bin/claude"
 
   output="$(
@@ -346,9 +346,9 @@ installed_stack_tools_are_skipped() {
   assert_not_contains "$commands" "plugin install superpowers"
 }
 
-# Verify invalid Claude plugin JSON stops Caveman install instead of falling
+# Verify invalid Claude Code skill JSON stops Caveman install instead of falling
 # through to install commands.
-invalid_claude_plugin_json_stops_caveman_install() {
+invalid_claude_skill_json_stops_caveman_install() {
   local home="$tmp/home-invalid-claude-json-caveman"
   local log="$home/.agents/install.log"
   local output commands
@@ -361,8 +361,8 @@ invalid_claude_plugin_json_stops_caveman_install() {
 
   mkdir -p "$home/bin" "$home/.agents"
   ln -s "$node_path" "$home/bin/node"
-  printf '#!/usr/bin/env bash\ncase "$*" in\n  "skills list --json --global --agent codex") printf "[{\\"name\\":\\"caveman\\"}]\\n" ;;\n  *) printf "unexpected npx args: %%s\\n" "$*" >&2; exit 9 ;;\nesac\n' > "$home/bin/npx"
-  printf '#!/usr/bin/env bash\nprintf "claude %%s\\n" "$*" >> "$HOME/commands.log"\nif [ "$1 $2 $3" = "plugin list --json" ]; then printf "not-json\\n"; exit 0; fi\nprintf "unexpected install: %%s\\n" "$*" >> "$HOME/commands.log"; exit 8\n' > "$home/bin/claude"
+  printf '#!/usr/bin/env bash\nprintf "npx %%s\\n" "$*" >> "$HOME/commands.log"\ncase "$*" in\n  "skills list --json --global --agent codex") printf "[{\\"name\\":\\"caveman\\"}]\\n" ;;\n  "skills list --json --global --agent claude-code") printf "not-json\\n" ;;\n  "skills add"*) printf "unexpected install: %%s\\n" "$*" >> "$HOME/commands.log"; exit 8 ;;\n  *) printf "unexpected npx args: %%s\\n" "$*" >&2; exit 9 ;;\nesac\n' > "$home/bin/npx"
+  printf '#!/usr/bin/env bash\nprintf "claude %%s\\n" "$*" >> "$HOME/commands.log"\nexit 8\n' > "$home/bin/claude"
   chmod +x "$home/bin/npx" "$home/bin/claude"
 
   if output="$(
@@ -385,13 +385,14 @@ invalid_claude_plugin_json_stops_caveman_install() {
       install_caveman
     ' sh "$ROOT" "$log" 2>&1
   )"; then
-    printf 'invalid Claude plugin JSON unexpectedly succeeded\n' >&2
+    printf 'invalid Claude Code skill JSON unexpectedly succeeded\n' >&2
     exit 1
   fi
 
-  assert_contains "$output" "invalid JSON from claude plugin list"
+  assert_contains "$output" "invalid JSON from npx skills list"
   commands="$(cat "$home/commands.log")"
-  assert_contains "$commands" "claude plugin list --json"
+  assert_contains "$commands" "npx skills list --json --global --agent claude-code"
+  assert_not_contains "$commands" "skills add JuliusBrussee/caveman"
   assert_not_contains "$commands" "plugin marketplace add"
   assert_not_contains "$commands" "plugin install caveman"
 }
@@ -538,6 +539,55 @@ missing_superpowers_uses_plugin_installers() {
   assert_not_contains "$commands" "ln -sfn"
 }
 
+# Verify Claude Code Caveman installs through skills, not the Claude plugin
+# namespace that exposes caveman:caveman-* slash commands.
+missing_caveman_uses_claude_code_skills() {
+  local home="$tmp/home-caveman-claude-skills"
+  local log="$home/.agents/install.log"
+  local output commands
+  local node_path
+  node_path="$(command -v node || true)"
+  [ -n "$node_path" ] || {
+    printf 'node is required for this test\n' >&2
+    exit 1
+  }
+
+  mkdir -p "$home/bin" "$home/.agents"
+  ln -s "$node_path" "$home/bin/node"
+
+  printf '#!/usr/bin/env bash\nprintf "npx %%s\\n" "$*" >> "$HOME/commands.log"\ncase "$*" in\n  "skills list --json --global --agent claude-code") printf "[]\\n"; exit 0 ;;\n  "skills add JuliusBrussee/caveman --yes --global --agent claude-code") exit 0 ;;\n  *) printf "unexpected npx args: %%s\\n" "$*" >&2; exit 9 ;;\nesac\n' > "$home/bin/npx"
+  printf '#!/usr/bin/env bash\nprintf "claude %%s\\n" "$*" >> "$HOME/commands.log"\nif [ "$1 $2 $3" = "plugin list --json" ]; then printf "[]\\n"; exit 0; fi\nif [ "$1 $2 $3" = "plugin marketplace add" ]; then exit 0; fi\nif [ "$1 $2 $3 $4 $5" = "plugin install caveman@caveman --scope user" ]; then exit 0; fi\nexit 8\n' > "$home/bin/claude"
+  chmod +x "$home/bin/npx" "$home/bin/claude"
+
+  output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" agents_home="$home/.agents" dry_run=0 bash -c '
+      ROOT="$1"
+      install_log="$2"
+      tools=claude
+      tool_enabled() {
+        case "$tools:$1" in
+          both:*|codex:codex|claude:claude) return 0 ;;
+          *) return 1 ;;
+        esac
+      }
+      say() { printf "%s\n" "$*"; }
+      die() { printf "error: %s\n" "$*" >&2; exit 1; }
+      run() { "$@"; }
+      . "$ROOT/scripts/lib/targets.sh"
+      . "$ROOT/scripts/lib/logging.sh"
+      . "$ROOT/scripts/lib/stack-tools.sh"
+      install_caveman
+    ' sh "$ROOT" "$log"
+  )"
+
+  assert_contains "$output" "OK Install Caveman skills for Claude Code"
+  commands="$(cat "$home/commands.log")"
+  assert_contains "$commands" "npx skills list --json --global --agent claude-code"
+  assert_contains "$commands" "npx skills add JuliusBrussee/caveman --yes --global --agent claude-code"
+  assert_not_contains "$commands" "claude plugin marketplace add JuliusBrussee/caveman"
+  assert_not_contains "$commands" "claude plugin install caveman@caveman"
+}
+
 # Verify empty JSON helper output fails explicitly instead of looking like a
 # missing install.
 installed_state_helpers_reject_empty_json_output() {
@@ -565,7 +615,7 @@ installed_state_helpers_reject_empty_json_output() {
       . "$ROOT/scripts/lib/targets.sh"
       . "$ROOT/scripts/lib/logging.sh"
       . "$ROOT/scripts/lib/stack-tools.sh"
-      claude_plugin_installed caveman@caveman
+      claude_plugin_installed superpowers@claude-plugins-official
     ' sh "$ROOT" "$log" 2>&1
   )"; then
     printf 'empty JSON unexpectedly succeeded\n' >&2
@@ -648,10 +698,11 @@ installed_state_helpers_detect_existing_tools
 codex_plugin_installed_accepts_marketplace_sections
 installed_state_helpers_reject_invalid_json
 installed_stack_tools_are_skipped
-invalid_claude_plugin_json_stops_caveman_install
+invalid_claude_skill_json_stops_caveman_install
 invalid_codex_skill_json_stops_caveman_install
 malformed_codex_plugin_list_stops_superpowers_install
 missing_superpowers_uses_plugin_installers
+missing_caveman_uses_claude_code_skills
 installed_state_helpers_reject_empty_json_output
 dry_run_prints_stack_steps_for_claude_desktop
 claude_desktop_config_is_merged
