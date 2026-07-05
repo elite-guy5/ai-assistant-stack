@@ -1,6 +1,14 @@
 <div align="center">
 
-# AI Assistant Stack
+```text
+╔══════════════════════════════╗
+║      AI ASSISTANT STACK      ║
+╚══════════════════════════════╝
+```
+
+</div>
+
+<div align="center">
 
 ### Your AI Assistant Stack for Smarter Development
 
