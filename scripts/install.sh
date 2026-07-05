@@ -13,6 +13,7 @@ tools=""
 repo_path=""
 apply_current_repo=""
 uninstall=0
+claude_proxy_enabled=0
 
 agents_home="${TOKEN_SAVER_HOME:-$HOME/.agents}"
 state_file="${TOKEN_SAVER_STATE:-$agents_home/install_state}"
@@ -43,6 +44,8 @@ Options:
                            Legacy instruction-file tools to configure.
                            Skips third-party stack setup.
   --repo <path>            Also seed and install managed hooks in this Git repo.
+  --enable-claude-proxy    Route Claude/Anthropic traffic through LeanCTX proxy.
+                           Requires ANTHROPIC_API_KEY.
   --non-interactive        Do not prompt.
   --dry-run                Print actions without changing files.
   --overwrite              Back up and replace existing managed target files.
@@ -422,6 +425,7 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     --repo=*) repo_path="${1#*=}"; apply_current_repo=1 ;;
+    --enable-claude-proxy) claude_proxy_enabled=1 ;;
     --non-interactive) non_interactive=1 ;;
     --dry-run) dry_run=1 ;;
     --overwrite) overwrite=1 ;;
@@ -472,6 +476,8 @@ else
   log_kv "selected_tools" "none"
 fi
 [ -n "${CONTEXT7_API_KEY:-}" ] && log_line "CONTEXT7_API_KEY=$CONTEXT7_API_KEY"
+
+[ -n "${ANTHROPIC_API_KEY:-}" ] && log_line "ANTHROPIC_API_KEY=[REDACTED:API key param]"
 
 # For target-mode installs, validate prerequisites before making changes and
 # configure stack tools before writing instruction files.

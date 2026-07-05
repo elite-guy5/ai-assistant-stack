@@ -173,6 +173,26 @@ claude_desktop_without_cli_passes_preflight() {
   assert_contains "$output" "Dry run Configure Context7 for Claude Desktop"
 }
 
+# Verify Claude target-mode setup requires an Anthropic key for LeanCTX proxy.
+missing_claude_anthropic_key_stops_before_changes() {
+  local home="$tmp/home-claude-missing-anthropic"
+  mkdir -p "$home/bin" "$home/Applications/Claude.app"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/node"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/npx"
+  chmod +x "$home/bin/node" "$home/bin/npx"
+
+  if HOME="$home" PATH="$home/bin:/usr/bin:/bin" CONTEXT7_API_KEY="test-context7" \
+    CLAUDE_DESKTOP_APP_PATH="$home/Applications/Claude.app" \
+    bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --targets claude --enable-claude-proxy >"$tmp/claude-anthropic.out" 2>"$tmp/claude-anthropic.err"; then
+    printf 'missing Anthropic key unexpectedly succeeded\n' >&2
+    exit 1
+  fi
+
+  assert_contains "$(cat "$tmp/claude-anthropic.err")" "missing prerequisite for claude: Anthropic API key"
+  assert_contains "$(cat "$tmp/claude-anthropic.err")" "export ANTHROPIC_API_KEY="
+  assert_not_exists "$home/.claude/CLAUDE.md"
+}
+
 # Verify Claude Code CLI setup requires npx for skills-based Caveman installs.
 claude_cli_without_npx_stops_before_changes() {
   local home="$tmp/home-claude-cli-without-npx"
@@ -203,7 +223,7 @@ interactive_claude_prompts_for_context7_key() {
   chmod +x "$home/bin/node" "$home/bin/npx"
 
   output="$(
-    printf 'prompted-context7-key\nn\n' | HOME="$home" PATH="$home/bin:/usr/bin:/bin" \
+    printf 'prompted-context7-key\nn\nn\n' | HOME="$home" PATH="$home/bin:/usr/bin:/bin" \
       CLAUDE_DESKTOP_APP_PATH="$home/Applications/Claude.app" \
       bash "$ROOT/scripts/install.sh" --dry-run --targets claude
   )"
@@ -211,8 +231,11 @@ interactive_claude_prompts_for_context7_key() {
 
   assert_contains "$output" "Enter Context7 API key"
   assert_contains "$output" "OK Context7 API key provided"
+  assert_contains "$output" "Enable LeanCTX proxy for Claude? Requires ANTHROPIC_API_KEY. [y/N]"
+  assert_contains "$output" "Skipped LeanCTX proxy for Claude disabled"
   assert_contains "$output" "Dry run Configure Context7 for Claude Desktop"
   assert_contains "$(cat "$log")" "context7_credentials=present"
+  assert_contains "$(cat "$log")" "claude_proxy=disabled"
   assert_contains "$(cat "$log")" "CONTEXT7_API_KEY=<redacted>"
 }
 
@@ -223,6 +246,7 @@ interactive_rtk_conflict_runs_uninstall_command
 missing_codex_stops_before_changes
 missing_claude_surfaces_stop_before_changes
 claude_desktop_without_cli_passes_preflight
+missing_claude_anthropic_key_stops_before_changes
 claude_cli_without_npx_stops_before_changes
 interactive_claude_prompts_for_context7_key
 

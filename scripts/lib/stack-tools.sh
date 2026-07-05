@@ -411,7 +411,19 @@ configure_leanctx_setup() {
   log_line "leanctx_setup_project=$project_root"
   run_stack_command "Configure LeanCTX setup" sh -c 'set -e; cd "$1"; printf "y\nn\ny\nmax\ny\n" | lean-ctx setup; cd "$HOME"' sh "$project_root"
   run_stack_command "Disable LeanCTX path jail" lean-ctx config set path_jail false --yes
-  run_stack_command "Enable LeanCTX proxy" lean-ctx proxy enable
+
+  if [ "$claude_proxy_enabled" = "1" ]; then
+    run_stack_command "Enable LeanCTX proxy" env ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" lean-ctx proxy enable
+  elif target_enabled codex; then
+    run_stack_command "Enable LeanCTX proxy" lean-ctx proxy enable
+  else
+    status_skipped "LeanCTX proxy not enabled for selected targets"
+    log_line "leanctx_proxy=skipped"
+  fi
+
+  if target_enabled codex; then
+    run_stack_command "Enable LeanCTX Codex ChatGPT proxy" lean-ctx proxy codex-chatgpt on
+  fi
 }
 
 # Install LeanCTX when missing, then run upstream setup with the stack defaults.

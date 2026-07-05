@@ -5,10 +5,11 @@
 install_log="${TOKEN_SAVER_LOG:-$agents_home/install.log}"
 install_title_printed=0
 
-# Redact Context7 credentials from dry-run output and persisted logs.
+# Redact credentials from dry-run output and persisted logs.
 redact_text() {
   sed -E \
     -e 's/CONTEXT7_API_KEY=[^[:space:]]+/CONTEXT7_API_KEY=<redacted>/g' \
+    -e 's/ANTHROPIC_API_KEY=[^[:space:]]+/ANTHROPIC_API_KEY=<redacted>/g' \
     -e 's/(--api-key)[[:space:]]+[^[:space:]]+/\1 <redacted>/g' \
     -e 's/(CONTEXT7_API_KEY: )[^[:space:]]+/\1<redacted>/g'
 }

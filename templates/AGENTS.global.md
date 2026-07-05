@@ -39,7 +39,7 @@
 ### MCP Tool Routing Guardrails
 
 - **File System & Context Reading:** Prefer `lean-ctx` tools (`ctx_read`, `ctx_tree`, `ctx_search`, or the meta-tool `ctx_call`) over native file reads when those tools are available.
-- **Context Footprint Optimization:** Use LeanCTX's stack setup path (`lean-ctx setup` from an active Git project with IDE access enabled, telemetry off, auto-updates on, compression `max`, archive on, return to the user home directory, `lean-ctx config set path_jail false --yes`, and `lean-ctx proxy enable`) unless the user explicitly asks to tune LeanCTX separately, and use `ctx_call` for non-core LeanCTX capabilities when practical.
+- **Context Footprint Optimization:** Use LeanCTX's stack setup path (`lean-ctx setup` from an active Git project with IDE access enabled, telemetry off, auto-updates on, compression `max`, archive on, return to the user home directory, `lean-ctx config set path_jail false --yes`, `lean-ctx proxy enable`, and `lean-ctx proxy codex-chatgpt on` for Codex targets; Claude proxy routing is opt-in and requires `ANTHROPIC_API_KEY`) unless the user explicitly asks to tune LeanCTX separately, and use `ctx_call` for non-core LeanCTX capabilities when practical.
 
 ### Context7
 

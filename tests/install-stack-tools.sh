@@ -71,6 +71,7 @@ dry_run_prints_stack_steps_for_codex() {
   assert_contains "$output" "Dry run Configure LeanCTX setup"
   assert_contains "$output" "Dry run Disable LeanCTX path jail"
   assert_contains "$output" "Dry run Enable LeanCTX proxy"
+  assert_contains "$output" "Dry run Enable LeanCTX Codex ChatGPT proxy"
   assert_contains "$output" "Configure Context7"
   assert_contains "$output" "Install Caveman"
   assert_contains "$output" "Dry run Check Codex skill caveman"
@@ -88,6 +89,7 @@ dry_run_prints_stack_steps_for_codex() {
   assert_not_contains "$(cat "$log")" "LEAN_CTX_PROJECT_ROOT"
   assert_contains "$(cat "$log")" "lean-ctx config set path_jail false --yes"
   assert_contains "$(cat "$log")" "lean-ctx proxy enable"
+  assert_contains "$(cat "$log")" "lean-ctx proxy codex-chatgpt on"
   assert_contains "$(cat "$log")" "npx skills add JuliusBrussee/caveman --yes --global --agent codex"
   assert_contains "$(cat "$log")" "codex plugin add superpowers@openai-curated"
   assert_contains "$(cat "$log")" "superpowers_manual_activation=dry-run"
@@ -661,9 +663,39 @@ dry_run_prints_stack_steps_for_claude_desktop() {
   log="$home/.agents/install.log"
 
   assert_contains "$output" "Dry run Configure Context7 for Claude Desktop"
+  assert_contains "$output" "Skipped LeanCTX proxy for Claude disabled"
   assert_contains "$output" "$config"
   assert_contains "$output" "Skipped Claude Code CLI not found"
+  assert_contains "$(cat "$log")" "claude_proxy=disabled"
+  assert_not_contains "$(cat "$log")" "lean-ctx proxy enable"
   assert_contains "$(cat "$log")" "update_claude_desktop_config=$config server=context7"
+}
+
+# Verify users can explicitly enable Claude proxy setup when they provide the
+# Anthropic API key.
+dry_run_can_enable_claude_proxy() {
+  local home="$tmp/home-stack-claude-proxy"
+  local output log config
+  mkdir -p "$home/bin" "$home/Applications/Claude.app"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/node"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/npx"
+  chmod +x "$home/bin/node" "$home/bin/npx"
+  config="$home/Library/Application Support/Claude/claude_desktop_config.json"
+
+  output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" CONTEXT7_API_KEY="test-context7" \
+      CLAUDE_DESKTOP_APP_PATH="$home/Applications/Claude.app" \
+      CLAUDE_DESKTOP_CONFIG_PATH="$config" \
+      ANTHROPIC_API_KEY="test-anthropic" \
+      bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --targets claude --enable-claude-proxy
+  )"
+  log="$home/.agents/install.log"
+
+  assert_contains "$output" "Dry run Enable LeanCTX proxy"
+  assert_contains "$output" "Dry run Configure Context7 for Claude Desktop"
+  assert_contains "$(cat "$log")" "claude_proxy=enabled"
+  assert_contains "$(cat "$log")" "ANTHROPIC_API_KEY=<redacted>"
+  assert_contains "$(cat "$log")" "env ANTHROPIC_API_KEY=<redacted> lean-ctx proxy enable"
 }
 
 # Verify the Claude Desktop config writer preserves existing MCP servers and
@@ -721,6 +753,7 @@ missing_superpowers_uses_plugin_installers
 missing_caveman_uses_claude_code_skills
 installed_state_helpers_reject_empty_json_output
 dry_run_prints_stack_steps_for_claude_desktop
+dry_run_can_enable_claude_proxy
 claude_desktop_config_is_merged
 
 printf 'install-stack-tools.sh: OK\n'

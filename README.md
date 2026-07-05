@@ -58,8 +58,18 @@ Context7 configuration requires an API key in the install environment:
 export CONTEXT7_API_KEY="your-context7-api-key"
 ```
 
+Codex targets enable the LeanCTX proxy and Codex ChatGPT proxy routing by
+default. Claude proxy routing is disabled by default and requires
+`--enable-claude-proxy` plus an Anthropic API key:
+
+```bash
+export ANTHROPIC_API_KEY="your-anthropic-api-key"
+```
+
 If `CONTEXT7_API_KEY` is missing, the installer stops before Context7
-configuration and prints setup instructions.
+configuration and prints setup instructions. If `--enable-claude-proxy` is
+selected and `ANTHROPIC_API_KEY` is missing, interactive installs prompt for it
+and non-interactive installs stop before changes.
 
 ## Installation
 
@@ -146,6 +156,7 @@ lean-ctx setup
 Set-Location $HOME
 lean-ctx config set path_jail false --yes
 lean-ctx proxy enable
+lean-ctx proxy codex-chatgpt on
 lean-ctx doctor
 ```
 
@@ -161,6 +172,13 @@ Install Context7 for Codex and Claude Code:
 $env:CONTEXT7_API_KEY = "your-context7-api-key"
 npx ctx7 setup --codex --api-key $env:CONTEXT7_API_KEY
 npx ctx7 setup --claude --api-key $env:CONTEXT7_API_KEY
+```
+
+Optional Claude/Anthropic proxy routing:
+
+```powershell
+$env:ANTHROPIC_API_KEY = "your-anthropic-api-key"
+lean-ctx proxy enable
 ```
 
 Install Caveman:
@@ -358,6 +376,7 @@ repository when the installer is run from inside a Git worktree.
 | `--tools claude` | Install only Claude Code instruction files and hooks. |
 | `--tools both` | Install both instruction-file sets. |
 | `--repo <path>` | Also seed and install managed hooks in an existing repo. |
+| `--enable-claude-proxy` | Enable LeanCTX proxy routing for Claude/Anthropic traffic. Requires `ANTHROPIC_API_KEY`. |
 | `--dry-run` | Print actions without changing files. |
 | `--non-interactive` | Disable prompts; installed stack targets are auto-detected unless `--targets` or `--tools` is passed. |
 | `--overwrite` | Back up and replace existing target files. |

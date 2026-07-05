@@ -46,9 +46,9 @@ require_command_for_target() {
   status_ok "$command_name found for $target"
 }
 
-# Read the Context7 API key without echoing it when an interactive terminal is
+# Read a secret value without echoing it when an interactive terminal is
 # available, while still supporting piped test/bootstrap input.
-read_context7_api_key() {
+read_secret_value() {
   local var_name="$1"
   local value=""
 
@@ -84,7 +84,7 @@ preflight_context7_credentials() {
 
   if [ "$non_interactive" = "0" ]; then
     printf 'Enter Context7 API key (get key from https://context7.com/): '
-    read_context7_api_key api_key
+    read_secret_value api_key
     if [ -n "$api_key" ]; then
       CONTEXT7_API_KEY="$api_key"
       export CONTEXT7_API_KEY
@@ -96,6 +96,33 @@ preflight_context7_credentials() {
   fi
 
   preflight_die "selected targets" "Context7 API key" "Create a Context7 API key, then rerun with:" "export CONTEXT7_API_KEY=\"your-context7-api-key\""
+}
+
+# Require Anthropic credentials for Claude proxy setup. Interactive installs can
+# provide the key once and reuse it when LeanCTX enables the proxy.
+preflight_anthropic_credentials() {
+  local api_key=""
+
+  if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+    log_line "anthropic_credentials=present"
+    status_ok "Anthropic API key provided"
+    return 0
+  fi
+
+  if [ "$non_interactive" = "0" ]; then
+    printf 'Enter Anthropic API key for LeanCTX Claude proxy: '
+    read_secret_value api_key
+    if [ -n "$api_key" ]; then
+      ANTHROPIC_API_KEY="$api_key"
+      export ANTHROPIC_API_KEY
+      log_line "anthropic_credentials=present"
+      log_line "ANTHROPIC_API_KEY=[REDACTED:API key param]"
+      status_ok "Anthropic API key provided"
+      return 0
+    fi
+  fi
+
+  preflight_die "claude" "Anthropic API key" "Create an Anthropic API key, then rerun with:" "export ANTHROPIC_API_KEY=[REDACTED:API key param]\"your-anthropic-api-key\""
 }
 
 # RTK rewrites and compresses shell commands before agents see output, which
@@ -182,4 +209,18 @@ preflight_targets() {
 
   preflight_rtk_conflict
   preflight_context7_credentials
+
+  if target_enabled claude && [ "$claude_proxy_enabled" = "0" ] && [ "$non_interactive" = "0" ]; then
+    if prompt_yes_no "Enable LeanCTX proxy for Claude? Requires ANTHROPIC_API_KEY." "no"; then
+      claude_proxy_enabled=1
+    fi
+  fi
+
+  if target_enabled claude && [ "$claude_proxy_enabled" = "1" ]; then
+    log_line "claude_proxy=enabled"
+    preflight_anthropic_credentials
+  elif target_enabled claude; then
+    status_skipped "LeanCTX proxy for Claude disabled"
+    log_line "claude_proxy=disabled"
+  fi
 }

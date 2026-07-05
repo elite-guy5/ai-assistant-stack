@@ -61,6 +61,7 @@ printf "y\nn\ny\nmax\ny\n" | lean-ctx setup
 cd "$HOME"
 lean-ctx config set path_jail false --yes
 lean-ctx proxy enable
+lean-ctx proxy codex-chatgpt on
 ```
 
 Do not force a custom tool profile or document invalid config keys:
@@ -74,8 +75,8 @@ The answers enable IDE config access, decline anonymous telemetry, enable
 auto-updates, select `max` compression, and enable result archiving. Run setup
 from an active Git project so LeanCTX can use its default project-root
 detection. Do not set `LEAN_CTX_PROJECT_ROOT` manually. Return to the user's
-home directory before continuing, and disable the path jail and proxy after
-setup.
+home directory before continuing, disable the path jail, enable the proxy, and
+turn on Codex ChatGPT proxy routing after setup.
 
 Verify LeanCTX:
 
