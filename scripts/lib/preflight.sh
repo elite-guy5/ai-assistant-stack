@@ -67,7 +67,7 @@ preflight_context7_credentials() {
   fi
 
   if [ "$non_interactive" = "0" ]; then
-    printf 'Context7 API key: '
+    printf 'Enter Context7 API key (get key from https://context7.com/): '
     read_context7_api_key api_key
     if [ -n "$api_key" ]; then
       CONTEXT7_API_KEY="$api_key"
