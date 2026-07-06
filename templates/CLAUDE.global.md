@@ -24,12 +24,6 @@
 
 ---
 
-## Context Layer Setup
-
-```text
-@~/.claude/LEAN-CTX.md
-```
-
 Claude Code reads `CLAUDE.md` as persistent instruction context. Use Claude Code settings and hooks for technical enforcement. Do not treat this file as a hard security boundary.
 
 ---
