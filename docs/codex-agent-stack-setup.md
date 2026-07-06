@@ -31,9 +31,12 @@ Project files:
 
 ```text
 AGENTS.md
-.codexignore
 .gitignore
 ```
+
+Use `.codexignore` only as a repo-local convention when local tooling is
+verified to consume it; current Codex behavior should not depend on it for
+context exclusion.
 
 ## Codex MCP Configuration
 
@@ -170,7 +173,7 @@ invocation does not reintroduce upstream automatic routing rules.
 | Context7 MCP | Current docs | Library, framework, SDK, API, CLI, and cloud-service documentation | Local code search or business logic debugging |
 | Caveman | Response style | Concise narrative | Code, commands, errors, routing |
 | Superpowers | Manual dev workflow | Explicitly requested implementation and review workflows | Automatic activation for every software task |
-| `.codexignore` | Agent context boundary | Excluding token-heavy or sensitive files from Codex context | Source-control policy |
+| `.codexignore` | Local convention | Token-heavy or sensitive file exclusions only when verified local tooling consumes it | Codex-native context exclusion |
 | `.gitignore` | Source-control boundary | Keeping generated files untracked | Agent context by itself |
 
 ## Model Routing For Codex

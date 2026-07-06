@@ -131,6 +131,29 @@ dry_run_finds_git_project_from_home() {
   assert_not_contains "$(cat "$log")" "LEAN_CTX_PROJECT_ROOT"
 }
 
+# Verify Claude Code targets register LeanCTX as a user MCP server by default.
+dry_run_prints_leanctx_mcp_step_for_claude_code() {
+  local home="$tmp/home-stack-claude-code"
+  local output log
+  mkdir -p "$home/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/claude"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/npx"
+  chmod +x "$home/bin/claude" "$home/bin/npx"
+
+  output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" CONTEXT7_API_KEY="test-key" \
+      CLAUDE_DESKTOP_APP_PATH="$home/missing-Claude.app" \
+      bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --targets claude
+  )"
+  log="$home/.agents/install.log"
+
+  assert_contains "$output" "Dry run Configure LeanCTX for Claude Code"
+  assert_contains "$output" "Skipped Claude Desktop app not found; skipped Desktop LeanCTX MCP config"
+  assert_contains "$output" "Dry run Configure Context7 for Claude Code"
+  assert_contains "$(cat "$log")" "claude mcp add --scope user --transport stdio lean-ctx -- lean-ctx"
+  assert_not_contains "$(cat "$log")" "update_claude_desktop_config="
+}
+
 # Verify stack commands continue when an upstream installer reports an existing
 # config with a nonzero exit code.
 stack_command_already_exists_continues() {
@@ -842,6 +865,7 @@ vscode_mcp_config_invalid_json_fails_cleanly() {
 context7_credentials_required
 dry_run_prints_stack_steps_for_codex
 dry_run_finds_git_project_from_home
+dry_run_prints_leanctx_mcp_step_for_claude_code
 stack_command_already_exists_continues
 stack_command_real_failure_still_fails
 installed_state_helpers_detect_existing_tools

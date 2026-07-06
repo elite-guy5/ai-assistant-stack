@@ -83,15 +83,15 @@ verify with the best available command.
 - Keep generated files, secrets, logs, coverage reports, dependency folders,
   local databases, and binary assets out of agent context by default.
 - Maintain source-control exclusions through `.gitignore`.
-- Maintain Claude Code context and permission boundaries through:
+- Maintain Claude Code permission and local configuration boundaries through:
   - `.claude/settings.json`
   - `.claude/settings.local.json`
   - `CLAUDE.local.md`
   - `.mcp.json` when project-scoped MCP servers are shared
 
-- If this repository also supports Codex, maintain Codex-specific exclusions
-  through `.codexignore` and `AGENTS.md` without making Claude Code depend on
-  Codex configuration.
+- If this repository also supports Codex, maintain Codex context-budget guidance
+  through `AGENTS.md` and LeanCTX path controls. Treat `.codexignore` as a local
+  convention only unless local tooling is verified to consume it.
 - If this repository requires broader or narrower exclusions, update the local
   ignore and settings files instead of weakening global behavior.
 

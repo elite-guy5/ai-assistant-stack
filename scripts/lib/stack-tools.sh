@@ -227,6 +227,11 @@ leanctx_command_for_desktop() {
   command -v lean-ctx 2>/dev/null || printf 'lean-ctx\n'
 }
 
+# Register the local LeanCTX MCP server with Claude Code's user config.
+configure_claude_code_leanctx() {
+  run_stack_command "Configure LeanCTX for Claude Code" claude mcp add --scope user --transport stdio lean-ctx -- lean-ctx
+}
+
 # Merge the local LeanCTX MCP server into Claude Desktop's config.
 configure_claude_desktop_leanctx() {
   local config
@@ -590,6 +595,12 @@ configure_leanctx_setup() {
   run_stack_command "Configure LeanCTX setup" sh -c 'set -e; cd "$1"; printf "y\nn\ny\nmax\ny\n" | lean-ctx setup; cd "$HOME"' sh "$project_root"
   run_stack_command "Disable LeanCTX path jail" lean-ctx config set path_jail false --yes
   run_stack_command "Run LeanCTX doctor --fix" lean-ctx doctor --fix
+
+  if tool_enabled claude && claude_cli_available; then
+    configure_claude_code_leanctx
+  elif tool_enabled claude; then
+    status_skipped "Claude Code CLI not found; skipped Claude Code LeanCTX MCP config"
+  fi
 
   if tool_enabled claude && claude_desktop_available; then
     configure_claude_desktop_leanctx

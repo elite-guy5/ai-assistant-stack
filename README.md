@@ -99,6 +99,7 @@ Installer logs are written to:
 - Codex project template: `~/.codex/AGENTS.project-template.md`
 - Claude Code global instructions: `~/.claude/CLAUDE.md`
 - Claude Code project template: `~/.claude/CLAUDE.project-template.md`
+- Claude Code LeanCTX and Context7 user MCP entries through `claude mcp`
 - Claude Desktop LeanCTX and Context7 MCP entries:
   `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Shared seeding script: `~/.agents/scripts/seed-project-instructions.sh`
@@ -156,6 +157,7 @@ lean-ctx setup
 Set-Location $HOME
 lean-ctx config set path_jail false --yes
 lean-ctx doctor --fix
+claude mcp add --scope user --transport stdio lean-ctx -- lean-ctx
 lean-ctx proxy enable
 lean-ctx proxy codex-chatgpt on
 lean-ctx doctor
