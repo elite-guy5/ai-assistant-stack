@@ -174,7 +174,6 @@ invocation does not reintroduce upstream automatic routing rules.
 | Caveman | Response style | Concise narrative | Code, commands, errors, routing |
 | Superpowers | Manual dev workflow | Explicitly requested implementation and review workflows | Automatic activation for every software task |
 | `.codexignore` | Local convention | Token-heavy or sensitive file exclusions only when verified local tooling consumes it | Codex-native context exclusion |
-| `.gitignore` | Source-control boundary | Keeping generated files untracked | Agent context by itself |
 
 ## Model Routing For Codex
 

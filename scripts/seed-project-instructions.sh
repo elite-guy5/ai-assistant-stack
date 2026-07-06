@@ -61,6 +61,31 @@ copy_instruction_file() {
   cp "$template" "$target"
 }
 
+append_token_saver_boundaries() {
+  local template="$1"
+  local target="$2"
+  local section
+
+  [ -f "$template" ] || return 0
+  [ -f "$target" ] || return 0
+  [ ! -L "$target" ] || return 0
+  ! grep -Fq '## Token-Saver File Boundaries' "$target" || return 0
+
+  section="$(
+    awk '
+      /^## Token-Saver File Boundaries$/ { in_section = 1 }
+      in_section { print }
+      in_section && /^---$/ { exit }
+    ' "$template"
+  )"
+  [ -n "$section" ] || return 0
+
+  {
+    printf '\n---\n\n'
+    printf '%s\n' "$section"
+  } >> "$target"
+}
+
 # Detect either supported project instruction file so mixed-tool installs avoid
 # writing around user-owned configuration.
 project_instruction_file_exists() {
@@ -96,6 +121,14 @@ repo_root="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || true)"
 # Preserve existing project instruction files unless the caller explicitly
 # requested overwrite.
 if [ "$overwrite" = "0" ] && project_instruction_file_exists; then
+  if tool_enabled codex; then
+    append_token_saver_boundaries "$HOME/.codex/AGENTS.project-template.md" "$repo_root/AGENTS.md"
+  fi
+
+  if tool_enabled claude; then
+    append_token_saver_boundaries "$HOME/.claude/CLAUDE.project-template.md" "$repo_root/CLAUDE.md"
+  fi
+
   exit 0
 fi
 

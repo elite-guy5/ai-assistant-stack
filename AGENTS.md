@@ -111,13 +111,12 @@ verify with the best available command.
 - Keep generated files, secrets, logs, coverage reports, dependency folders,
   local databases, and binary assets out of agent context by default.
 - Projects should maintain:
-  - `.gitignore` for source-control exclusions.
   - `AGENTS.md` path guidance and LeanCTX path controls for Codex context-budget exclusions.
   - `.codexignore` only when local tooling is verified to consume it.
   - `.claude/settings.json` for Claude Code permissions and tool behavior.
 
 - If this repository requires broader or narrower exclusions, update the local
-  ignore, settings, or context-layer files instead of weakening global behavior.
+  settings or context-layer files instead of weakening global behavior.
 - Keep `.claude/settings.local.json` for private machine-local Claude settings
   only, and do not commit it.
 

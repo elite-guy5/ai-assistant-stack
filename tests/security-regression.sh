@@ -34,6 +34,19 @@ assert_not_exists() {
   }
 }
 
+# Assert that a file contains an expected substring a specific number of times.
+assert_match_count() {
+  local path="$1"
+  local pattern="$2"
+  local expected="$3"
+  local count
+  count="$(grep -c "$pattern" "$path" || true)"
+  [ "$count" = "$expected" ] || {
+    printf 'expected %s matches for %s in %s, found %s\n' "$expected" "$pattern" "$path" "$count" >&2
+    exit 1
+  }
+}
+
 # Verify Git template hooks seed Codex instructions into repositories created
 # after installation.
 git_template_hooks_seed_future_repos() {
@@ -88,6 +101,9 @@ seeder_skips_existing_files_and_overwrite_creates_backup() {
 
   HOME="$home" "$home/.agents/scripts/seed-project-instructions.sh" --tools codex "$repo"
   assert_contains "$(cat "$repo/AGENTS.md")" "custom"
+  assert_contains "$(cat "$repo/AGENTS.md")" "Token-Saver File Boundaries"
+  HOME="$home" "$home/.agents/scripts/seed-project-instructions.sh" --tools codex "$repo"
+  assert_match_count "$repo/AGENTS.md" "Token-Saver File Boundaries" "1"
 
   HOME="$home" "$home/.agents/scripts/seed-project-instructions.sh" --tools codex --overwrite "$repo"
   assert_contains "$(cat "$repo/AGENTS.md")" "Project AGENTS.md"
@@ -107,12 +123,14 @@ seeder_skips_project_when_any_instruction_file_exists() {
   printf 'custom agents\n' > "$repo_with_agents/AGENTS.md"
   HOME="$home" "$home/.agents/scripts/seed-project-instructions.sh" --tools both "$repo_with_agents"
   assert_contains "$(cat "$repo_with_agents/AGENTS.md")" "custom agents"
+  assert_contains "$(cat "$repo_with_agents/AGENTS.md")" "Token-Saver File Boundaries"
   assert_not_exists "$repo_with_agents/CLAUDE.md"
 
   git -c init.defaultBranch=main init "$repo_with_claude" >/dev/null
   printf 'custom claude\n' > "$repo_with_claude/CLAUDE.md"
   HOME="$home" "$home/.agents/scripts/seed-project-instructions.sh" --tools both "$repo_with_claude"
   assert_contains "$(cat "$repo_with_claude/CLAUDE.md")" "custom claude"
+  assert_contains "$(cat "$repo_with_claude/CLAUDE.md")" "Token-Saver File Boundaries"
   assert_not_exists "$repo_with_claude/AGENTS.md"
 }
 
