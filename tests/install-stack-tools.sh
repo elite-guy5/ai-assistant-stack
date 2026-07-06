@@ -29,6 +29,19 @@ assert_not_contains() {
   esac
 }
 
+assert_before() {
+  local output="$1"
+  local first="$2"
+  local second="$3"
+  case "$output" in
+    *"$first"*"$second"*) ;;
+    *)
+      printf 'expected output to show "%s" before "%s"\noutput was:\n%s\n' "$first" "$second" "$output" >&2
+      exit 1
+      ;;
+  esac
+}
+
 # Verify target-mode setup fails during preflight when Context7 credentials are
 # missing, before any stack setup begins.
 context7_credentials_required() {
@@ -68,7 +81,9 @@ dry_run_prints_stack_steps_for_codex() {
   log="$home/.agents/install.log"
 
   assert_contains "$output" "Install LeanCTX"
+  assert_contains "$output" "Dry run Initialize LeanCTX globally"
   assert_contains "$output" "Dry run Configure LeanCTX setup"
+  assert_before "$output" "Dry run Initialize LeanCTX globally" "Dry run Configure LeanCTX setup"
   assert_contains "$output" "Dry run Disable LeanCTX path jail"
   assert_contains "$output" "Dry run Run LeanCTX doctor --fix"
   assert_contains "$output" "Dry run Enable LeanCTX proxy"
@@ -83,7 +98,9 @@ dry_run_prints_stack_steps_for_codex() {
   assert_contains "$output" "Dry run Limit Superpowers skills to manual invocation"
   assert_contains "$output" "Dry run Configure Context7 for Codex"
   assert_not_contains "$output" "Configure LeanCTX tools"
+  assert_contains "$(cat "$log")" "lean-ctx init --global"
   assert_contains "$(cat "$log")" "lean-ctx setup"
+  assert_before "$(cat "$log")" "lean-ctx init --global" "lean-ctx setup"
   assert_contains "$(cat "$log")" "leanctx_setup_project=$ROOT"
   assert_contains "$(cat "$log")" 'cd "$1"'
   assert_contains "$(cat "$log")" 'cd "$HOME"'
@@ -147,10 +164,13 @@ dry_run_prints_leanctx_mcp_step_for_claude_code() {
   )"
   log="$home/.agents/install.log"
 
+  assert_contains "$output" "Dry run Configure LeanCTX MCP in Claude Code settings"
   assert_contains "$output" "Dry run Configure LeanCTX for Claude Code"
   assert_contains "$output" "Skipped Claude Desktop app not found; skipped Desktop LeanCTX MCP config"
   assert_contains "$output" "Dry run Configure Context7 for Claude Code"
-  assert_contains "$(cat "$log")" "claude mcp add --scope user --transport stdio lean-ctx -- lean-ctx"
+  assert_contains "$(cat "$log")" "claude_code_settings=$home/.claude/settings.json"
+  assert_contains "$(cat "$log")" "node - $home/.claude/settings.json lean-ctx"
+  assert_contains "$(cat "$log")" "claude mcp add --scope user --transport stdio lean-ctx -- lean-ctx mcp"
   assert_not_contains "$(cat "$log")" "update_claude_desktop_config="
 }
 
@@ -727,6 +747,53 @@ dry_run_can_enable_claude_proxy() {
   assert_contains "$(cat "$log")" "env ANTHROPIC_API_KEY=<redacted> lean-ctx proxy enable"
 }
 
+# Verify Claude Code settings receive the local LeanCTX MCP server entry without
+# clobbering existing settings.
+claude_code_settings_config_is_merged() {
+  local home="$tmp/home-claude-code-settings-merge"
+  local output config node_path leanctx_path log
+  node_path="$(command -v node || true)"
+  [ -n "$node_path" ] || {
+    printf 'node is required for this test\n' >&2
+    exit 1
+  }
+
+  mkdir -p "$home/bin" "$home/.agents" "$home/.claude"
+  ln -s "$node_path" "$home/bin/node"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/lean-ctx"
+  chmod +x "$home/bin/lean-ctx"
+  leanctx_path="$home/bin/lean-ctx"
+  config="$home/.claude/settings.json"
+  log="$home/.agents/install.log"
+  printf '{"theme":"dark","mcpServers":{"existing":{"command":"true"}}}\n' > "$config"
+
+  output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" agents_home="$home/.agents" dry_run=0 bash -c '
+      ROOT="$1"
+      install_log="$2"
+      say() { printf "%s\n" "$*"; }
+      run() { "$@"; }
+      backup_path() { printf "%s.token-saver-backup-%s" "$1" "$(date +%Y%m%d%H%M%S)"; }
+      . "$ROOT/scripts/lib/logging.sh"
+      . "$ROOT/scripts/lib/stack-tools.sh"
+      configure_claude_code_leanctx_settings
+    ' sh "$ROOT" "$log"
+  )"
+
+  assert_contains "$output" "OK Configure LeanCTX MCP in Claude Code settings $config"
+  assert_contains "$(cat "$log")" "claude_code_settings=$config"
+  assert_contains "$(cat "$log")" "backup_claude_code_settings="
+  "$node_path" -e '
+const fs = require("fs");
+const config = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+const leanctxPath = process.argv[2];
+if (config.theme !== "dark") process.exit(1);
+if (!config.mcpServers.existing) process.exit(2);
+if (config.mcpServers["lean-ctx"].command !== leanctxPath) process.exit(3);
+if (config.mcpServers["lean-ctx"].args[0] !== "mcp") process.exit(4);
+' "$config" "$leanctx_path"
+}
+
 # Verify the Claude Desktop config writer preserves existing MCP servers and
 # merges the managed Context7 entry.
 claude_desktop_config_is_merged() {
@@ -880,6 +947,7 @@ missing_caveman_uses_claude_code_skills
 installed_state_helpers_reject_empty_json_output
 dry_run_prints_stack_steps_for_claude_desktop
 dry_run_can_enable_claude_proxy
+claude_code_settings_config_is_merged
 claude_desktop_config_is_merged
 vscode_mcp_config_jsonc_is_merged
 vscode_mcp_config_invalid_json_fails_cleanly

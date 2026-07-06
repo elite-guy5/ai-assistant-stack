@@ -229,7 +229,64 @@ leanctx_command_for_desktop() {
 
 # Register the local LeanCTX MCP server with Claude Code's user config.
 configure_claude_code_leanctx() {
-  run_stack_command "Configure LeanCTX for Claude Code" claude mcp add --scope user --transport stdio lean-ctx -- lean-ctx
+  run_stack_command "Configure LeanCTX for Claude Code" claude mcp add --scope user --transport stdio lean-ctx -- lean-ctx mcp
+}
+
+claude_code_settings_path() {
+  printf '%s\n' "$HOME/.claude/settings.json"
+}
+
+configure_claude_code_leanctx_settings() {
+  local config backup leanctx_command
+  config="$(claude_code_settings_path)"
+  leanctx_command="$(leanctx_command_for_desktop)"
+
+  log_line "claude_code_settings=$config"
+  if [ "$dry_run" = "1" ]; then
+    run_stack_command "Configure LeanCTX MCP in Claude Code settings" node - "$config" "$leanctx_command" <<'NODE'
+const configPath = process.argv[2];
+const leanctxCommand = process.argv[3];
+void configPath;
+void leanctxCommand;
+NODE
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$config")"
+  if [ -e "$config" ]; then
+    backup="$(backup_path "$config")"
+    cp "$config" "$backup"
+    log_line "backup_claude_code_settings=$backup"
+  fi
+
+  node - "$config" "$leanctx_command" <<'NODE'
+const fs = require("fs");
+
+const configPath = process.argv[2];
+const leanctxCommand = process.argv[3];
+let config = {};
+
+if (fs.existsSync(configPath)) {
+  const raw = fs.readFileSync(configPath, "utf8").trim();
+  config = raw ? JSON.parse(raw) : {};
+}
+
+if (!config || typeof config !== "object" || Array.isArray(config)) {
+  throw new Error("Claude Code settings must be a JSON object");
+}
+
+if (!config.mcpServers || typeof config.mcpServers !== "object" || Array.isArray(config.mcpServers)) {
+  config.mcpServers = {};
+}
+
+config.mcpServers["lean-ctx"] = {
+  command: leanctxCommand,
+  args: ["mcp"]
+};
+
+fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+NODE
+  status_ok "Configure LeanCTX MCP in Claude Code settings $config"
 }
 
 # Merge the local LeanCTX MCP server into Claude Desktop's config.
@@ -592,14 +649,18 @@ configure_leanctx_setup() {
 
   project_root="$(leanctx_setup_project_dir)"
   log_line "leanctx_setup_project=$project_root"
+  run_stack_command "Initialize LeanCTX globally" lean-ctx init --global
   run_stack_command "Configure LeanCTX setup" sh -c 'set -e; cd "$1"; printf "y\nn\ny\nmax\ny\n" | lean-ctx setup; cd "$HOME"' sh "$project_root"
   run_stack_command "Disable LeanCTX path jail" lean-ctx config set path_jail false --yes
   run_stack_command "Run LeanCTX doctor --fix" lean-ctx doctor --fix
 
-  if tool_enabled claude && claude_cli_available; then
-    configure_claude_code_leanctx
-  elif tool_enabled claude; then
-    status_skipped "Claude Code CLI not found; skipped Claude Code LeanCTX MCP config"
+  if tool_enabled claude; then
+    configure_claude_code_leanctx_settings
+    if claude_cli_available; then
+      configure_claude_code_leanctx
+    else
+      status_skipped "Claude Code CLI not found; skipped Claude Code LeanCTX MCP CLI config"
+    fi
   fi
 
   if tool_enabled claude && claude_desktop_available; then
