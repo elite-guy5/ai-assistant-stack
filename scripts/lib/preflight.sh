@@ -149,7 +149,7 @@ preflight_rtk_conflict() {
   status_warning "rtk found; rtk conflicts with lean-ctx. Resolved as: $rtk_path"
 
   if [ "$dry_run" = "1" ]; then
-    status_dry_run "Run rtk init -g --uninstall, then verify rtk is no longer on PATH"
+    status_dry_run "Run rtk init -g --uninstall or brew uninstall rtk, then verify rtk is no longer on PATH"
     return 0
   fi
 
@@ -159,7 +159,7 @@ preflight_rtk_conflict() {
         preflight_conflict_die "lean-ctx" "rtk" \
           "rtk conflicts with lean-ctx." \
           "The rtk uninstall command completed, but rtk still resolves on PATH at: $rtk_path" \
-          "Remove that executable or shim, open a fresh shell if needed, then rerun this installer."
+          "Remove that executable or shim, run brew uninstall rtk if Homebrew installed it, open a fresh shell if needed, then rerun this installer."
       fi
       status_ok "rtk uninstall command completed"
       log_line "rtk_uninstall=completed"
@@ -167,12 +167,12 @@ preflight_rtk_conflict() {
     fi
     preflight_conflict_die "lean-ctx" "rtk" \
       "rtk conflicts with lean-ctx." \
-      "The rtk uninstall command failed. Run rtk init -g --uninstall, then rerun this installer."
+      "The rtk uninstall command failed. Run rtk init -g --uninstall or brew uninstall rtk, then rerun this installer."
   fi
 
   preflight_conflict_die "lean-ctx" "rtk" \
     "rtk conflicts with lean-ctx." \
-    "Run rtk init -g --uninstall, then rerun this installer."
+    "Run rtk init -g --uninstall or brew uninstall rtk, then rerun this installer."
 }
 
 # Check that at least one Claude product surface is available, then verify the

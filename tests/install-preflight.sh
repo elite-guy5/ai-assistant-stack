@@ -43,7 +43,7 @@ rtk_conflict_stops_non_interactive_install() {
 
   assert_contains "$(cat "$tmp/rtk-noninteractive.out")" "Warning rtk found; rtk conflicts with lean-ctx. Resolved as: $home/bin/rtk"
   assert_contains "$(cat "$tmp/rtk-noninteractive.err")" "conflicting tool for lean-ctx: rtk"
-  assert_contains "$(cat "$tmp/rtk-noninteractive.err")" "Run rtk init -g --uninstall, then rerun this installer."
+  assert_contains "$(cat "$tmp/rtk-noninteractive.err")" "Run rtk init -g --uninstall or brew uninstall rtk, then rerun this installer."
   assert_not_exists "$home/commands.log"
   assert_not_exists "$home/.codex/AGENTS.md"
 }
@@ -63,7 +63,7 @@ rtk_conflict_dry_run_reports_uninstall_command() {
   )"
 
   assert_contains "$output" "Warning rtk found; rtk conflicts with lean-ctx. Resolved as: $home/bin/rtk"
-  assert_contains "$output" "Dry run Run rtk init -g --uninstall, then verify rtk is no longer on PATH"
+  assert_contains "$output" "Dry run Run rtk init -g --uninstall or brew uninstall rtk, then verify rtk is no longer on PATH"
   assert_not_exists "$home/commands.log"
 }
 
@@ -160,7 +160,7 @@ interactive_rtk_conflict_stops_when_uninstall_leaves_rtk() {
 
   assert_contains "$(cat "$tmp/rtk-still-present.out")" "Warning rtk found; rtk conflicts with lean-ctx. Resolved as: $home/bin/rtk"
   assert_contains "$(cat "$tmp/rtk-still-present.err")" "The rtk uninstall command completed, but rtk still resolves on PATH at: $home/bin/rtk"
-  assert_contains "$(cat "$tmp/rtk-still-present.err")" "Remove that executable or shim, open a fresh shell if needed, then rerun this installer."
+  assert_contains "$(cat "$tmp/rtk-still-present.err")" "Remove that executable or shim, run brew uninstall rtk if Homebrew installed it, open a fresh shell if needed, then rerun this installer."
   assert_contains "$(cat "$home/.agents/install.log")" "command=rtk init -g --uninstall"
 }
 
