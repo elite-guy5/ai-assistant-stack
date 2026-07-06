@@ -360,12 +360,133 @@ const configPath = process.argv[2];
 const apiKey = process.env.CONTEXT7_API_KEY;
 let config = {};
 
-if (fs.existsSync(configPath) && fs.readFileSync(configPath, "utf8").trim()) {
-  config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+function stripJsonc(input) {
+  let output = "";
+  let inString = false;
+  let escaped = false;
+  let lineComment = false;
+  let blockComment = false;
+
+  for (let index = 0; index < input.length; index += 1) {
+    const char = input[index];
+    const next = input[index + 1];
+
+    if (lineComment) {
+      if (char === "\n" || char === "\r") {
+        lineComment = false;
+        output += char;
+      }
+      continue;
+    }
+
+    if (blockComment) {
+      if (char === "*" && next === "/") {
+        blockComment = false;
+        index += 1;
+      } else if (char === "\n" || char === "\r") {
+        output += char;
+      }
+      continue;
+    }
+
+    if (inString) {
+      output += char;
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+      output += char;
+      continue;
+    }
+
+    if (char === "/" && next === "/") {
+      lineComment = true;
+      index += 1;
+      continue;
+    }
+
+    if (char === "/" && next === "*") {
+      blockComment = true;
+      index += 1;
+      continue;
+    }
+
+    output += char;
+  }
+
+  return removeTrailingCommas(output);
+}
+
+function removeTrailingCommas(input) {
+  let output = "";
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < input.length; index += 1) {
+    const char = input[index];
+
+    if (inString) {
+      output += char;
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+      output += char;
+      continue;
+    }
+
+    if (char === ",") {
+      let nextIndex = index + 1;
+      while (/\s/.test(input[nextIndex] || "")) {
+        nextIndex += 1;
+      }
+      if (input[nextIndex] === "}" || input[nextIndex] === "]") {
+        continue;
+      }
+    }
+
+    output += char;
+  }
+
+  return output;
+}
+
+if (fs.existsSync(configPath)) {
+  const input = fs.readFileSync(configPath, "utf8");
+  if (input.trim()) {
+    try {
+      config = JSON.parse(input);
+    } catch (_) {
+      try {
+        config = JSON.parse(stripJsonc(input));
+      } catch (error) {
+        console.error(`error: invalid VS Code MCP config at ${configPath}: ${error.message}`);
+        console.error("Fix the JSON/JSONC file and rerun; no Context7 VS Code config was written.");
+        process.exit(1);
+      }
+    }
+  }
 }
 
 if (!config || Array.isArray(config) || typeof config !== "object") {
-  throw new Error("VS Code MCP config must be a JSON object");
+  console.error(`error: invalid VS Code MCP config at ${configPath}: expected a JSON object`);
+  process.exit(1);
 }
 
 if (!config.servers || Array.isArray(config.servers) || typeof config.servers !== "object") {

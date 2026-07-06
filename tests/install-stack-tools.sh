@@ -746,6 +746,98 @@ if (config.mcpServers.context7.env.CONTEXT7_API_KEY !== "test-key") process.exit
 ' "$config" "$leanctx_path"
 }
 
+# Verify the VS Code MCP config writer accepts VS Code's JSON with Comments
+# format and merges the managed Context7 entry.
+vscode_mcp_config_jsonc_is_merged() {
+  local home="$tmp/home-vscode-jsonc-merge"
+  local output config node_path
+  node_path="$(command -v node || true)"
+  [ -n "$node_path" ] || {
+    printf 'node is required for this test\n' >&2
+    exit 1
+  }
+
+  mkdir -p "$home/bin" "$home/.agents" "$home/Library/Application Support/Code/User"
+  ln -s "$node_path" "$home/bin/node"
+  config="$home/Library/Application Support/Code/User/mcp.json"
+  printf '%s\n' \
+    '{' \
+    '  // Existing user MCP server.' \
+    '  "servers": {' \
+    '    "existing": {' \
+    '      "command": "true",' \
+    '    },' \
+    '  },' \
+    '}' > "$config"
+
+  output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" agents_home="$home/.agents" dry_run=0 \
+      VSCODE_MCP_CONFIG_PATH="$config" CONTEXT7_API_KEY="test-key" bash -c '
+      set -euo pipefail
+      ROOT="$1"
+      install_log="$2"
+      say() { printf "%s\n" "$*"; }
+      run() { "$@"; }
+      backup_path() { printf "%s.token-saver-backup-%s" "$1" "$(date +%Y%m%d%H%M%S)"; }
+      . "$ROOT/scripts/lib/targets.sh"
+      . "$ROOT/scripts/lib/logging.sh"
+      . "$ROOT/scripts/lib/stack-tools.sh"
+      configure_vscode_context7
+    ' sh "$ROOT" "$home/.agents/install.log"
+  )"
+
+  assert_contains "$output" "OK Configure Context7 for VS Code $config"
+  "$node_path" -e '
+const fs = require("fs");
+const config = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+if (!config.servers.existing) process.exit(1);
+if (config.servers.context7.command !== "npx") process.exit(2);
+if (config.servers.context7.env.CONTEXT7_API_KEY !== "test-key") process.exit(3);
+' "$config"
+}
+
+# Verify malformed VS Code MCP config fails cleanly instead of printing a Node
+# stack trace from JSON.parse.
+vscode_mcp_config_invalid_json_fails_cleanly() {
+  local home="$tmp/home-vscode-invalid-json"
+  local output config node_path
+  node_path="$(command -v node || true)"
+  [ -n "$node_path" ] || {
+    printf 'node is required for this test\n' >&2
+    exit 1
+  }
+
+  mkdir -p "$home/bin" "$home/.agents" "$home/Library/Application Support/Code/User"
+  ln -s "$node_path" "$home/bin/node"
+  config="$home/Library/Application Support/Code/User/mcp.json"
+  printf '%s\n' '{ "servers": { "existing": { "command": "true" } "broken": { "command": "false" } } }' > "$config"
+
+  if output="$(
+    HOME="$home" PATH="$home/bin:/usr/bin:/bin" agents_home="$home/.agents" dry_run=0 \
+      VSCODE_MCP_CONFIG_PATH="$config" CONTEXT7_API_KEY="test-key" bash -c '
+      set -euo pipefail
+      ROOT="$1"
+      install_log="$2"
+      say() { printf "%s\n" "$*"; }
+      run() { "$@"; }
+      backup_path() { printf "%s.token-saver-backup-%s" "$1" "$(date +%Y%m%d%H%M%S)"; }
+      . "$ROOT/scripts/lib/targets.sh"
+      . "$ROOT/scripts/lib/logging.sh"
+      . "$ROOT/scripts/lib/stack-tools.sh"
+      configure_vscode_context7
+    ' sh "$ROOT" "$home/.agents/install.log" 2>&1
+  )"; then
+    printf 'malformed VS Code MCP config unexpectedly succeeded\n' >&2
+    exit 1
+  fi
+
+  assert_contains "$output" "error: invalid VS Code MCP config at $config"
+  assert_contains "$output" "Fix the JSON/JSONC file and rerun"
+  assert_not_contains "$output" "SyntaxError"
+  assert_not_contains "$output" "at JSON.parse"
+  assert_not_contains "$(cat "$config")" "context7"
+}
+
 # Run the stack-tool scenarios.
 context7_credentials_required
 dry_run_prints_stack_steps_for_codex
@@ -765,5 +857,7 @@ installed_state_helpers_reject_empty_json_output
 dry_run_prints_stack_steps_for_claude_desktop
 dry_run_can_enable_claude_proxy
 claude_desktop_config_is_merged
+vscode_mcp_config_jsonc_is_merged
+vscode_mcp_config_invalid_json_fails_cleanly
 
 printf 'install-stack-tools.sh: OK\n'
