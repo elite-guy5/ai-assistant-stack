@@ -41,7 +41,7 @@ rtk_conflict_stops_non_interactive_install() {
     exit 1
   fi
 
-  assert_contains "$(cat "$tmp/rtk-noninteractive.out")" "Warning rtk found; rtk conflicts with lean-ctx."
+  assert_contains "$(cat "$tmp/rtk-noninteractive.out")" "Warning rtk found; rtk conflicts with lean-ctx. Resolved as: $home/bin/rtk"
   assert_contains "$(cat "$tmp/rtk-noninteractive.err")" "conflicting tool for lean-ctx: rtk"
   assert_contains "$(cat "$tmp/rtk-noninteractive.err")" "Run rtk init -g --uninstall, then rerun this installer."
   assert_not_exists "$home/commands.log"
@@ -62,8 +62,8 @@ rtk_conflict_dry_run_reports_uninstall_command() {
       bash "$ROOT/scripts/install.sh" --dry-run --non-interactive --targets codex
   )"
 
-  assert_contains "$output" "Warning rtk found; rtk conflicts with lean-ctx."
-  assert_contains "$output" "Dry run Run rtk init -g --uninstall"
+  assert_contains "$output" "Warning rtk found; rtk conflicts with lean-ctx. Resolved as: $home/bin/rtk"
+  assert_contains "$output" "Dry run Run rtk init -g --uninstall, then verify rtk is no longer on PATH"
   assert_not_exists "$home/commands.log"
 }
 
@@ -73,7 +73,7 @@ interactive_rtk_conflict_runs_uninstall_command() {
   local home="$tmp/home-rtk-conflict-interactive"
   local output
   mkdir -p "$home/bin"
-  printf '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$HOME/commands.log"\nexit 0\n' > "$home/bin/rtk"
+  printf '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$HOME/commands.log"\nrm -f "$0"\nexit 0\n' > "$home/bin/rtk"
   chmod +x "$home/bin/rtk"
 
   output="$(
@@ -114,6 +114,54 @@ interactive_rtk_conflict_runs_uninstall_command() {
   assert_contains "$output" "OK rtk uninstall command completed"
   assert_contains "$(cat "$home/.agents/install.log")" "command=rtk init -g --uninstall"
   assert_contains "$(cat "$home/.agents/install.log")" "rtk_uninstall=completed"
+}
+
+# Verify interactive preflight does not continue if the rtk uninstall command
+# succeeds but leaves rtk resolvable on PATH.
+interactive_rtk_conflict_stops_when_uninstall_leaves_rtk() {
+  local home="$tmp/home-rtk-conflict-still-present"
+  mkdir -p "$home/bin"
+  printf '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$HOME/commands.log"\nexit 0\n' > "$home/bin/rtk"
+  chmod +x "$home/bin/rtk"
+
+  if printf 'y\n' | HOME="$home" PATH="$home/bin:/usr/bin:/bin" bash -c '
+    ROOT="$1"
+    agents_home="$HOME/.agents"
+    dry_run=0
+    non_interactive=0
+    say() { printf "%s\n" "$*"; }
+    die() { printf "error: %s\n" "$*" >&2; exit 1; }
+    run() { "$@"; }
+    . "$ROOT/scripts/lib/targets.sh"
+    . "$ROOT/scripts/lib/logging.sh"
+    . "$ROOT/scripts/lib/preflight.sh"
+    prompt_yes_no() {
+      local prompt="$1"
+      local default="$2"
+      local answer suffix
+      if [ "$default" = "yes" ]; then
+        suffix="[Y/n]"
+      else
+        suffix="[y/N]"
+      fi
+      printf "%s %s " "$prompt" "$suffix"
+      read_prompt_value answer
+      answer="${answer:-$default}"
+      case "$answer" in
+        y|Y|yes|YES) return 0 ;;
+        *) return 1 ;;
+      esac
+    }
+    preflight_rtk_conflict
+  ' sh "$ROOT" >"$tmp/rtk-still-present.out" 2>"$tmp/rtk-still-present.err"; then
+    printf 'rtk conflict unexpectedly continued after incomplete uninstall\n' >&2
+    exit 1
+  fi
+
+  assert_contains "$(cat "$tmp/rtk-still-present.out")" "Warning rtk found; rtk conflicts with lean-ctx. Resolved as: $home/bin/rtk"
+  assert_contains "$(cat "$tmp/rtk-still-present.err")" "The rtk uninstall command completed, but rtk still resolves on PATH at: $home/bin/rtk"
+  assert_contains "$(cat "$tmp/rtk-still-present.err")" "Remove that executable or shim, open a fresh shell if needed, then rerun this installer."
+  assert_contains "$(cat "$home/.agents/install.log")" "command=rtk init -g --uninstall"
 }
 
 # Verify missing Codex stops the install before managed files are written.
@@ -243,6 +291,7 @@ interactive_claude_prompts_for_context7_key() {
 rtk_conflict_stops_non_interactive_install
 rtk_conflict_dry_run_reports_uninstall_command
 interactive_rtk_conflict_runs_uninstall_command
+interactive_rtk_conflict_stops_when_uninstall_leaves_rtk
 missing_codex_stops_before_changes
 missing_claude_surfaces_stop_before_changes
 claude_desktop_without_cli_passes_preflight

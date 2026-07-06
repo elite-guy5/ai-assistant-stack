@@ -125,23 +125,42 @@ preflight_anthropic_credentials() {
   preflight_die "claude" "Anthropic API key" "Create an Anthropic API key, then rerun with:" "export ANTHROPIC_API_KEY=[REDACTED:API key param]\"your-anthropic-api-key\""
 }
 
+# Resolve rtk from PATH after clearing Bash's command hash so a removed command
+# is not reported from a stale shell cache.
+rtk_command_path() {
+  local rtk_path=""
+
+  hash -r 2>/dev/null || true
+  rtk_path="$(command -v rtk 2>/dev/null || true)"
+  [ -n "$rtk_path" ] || return 1
+  printf '%s\n' "$rtk_path"
+}
+
 # RTK rewrites and compresses shell commands before agents see output, which
 # conflicts with LeanCTX's own shell/context layer.
 preflight_rtk_conflict() {
-  if ! command -v rtk >/dev/null 2>&1; then
+  local rtk_path=""
+
+  if ! rtk_path="$(rtk_command_path)"; then
     return 0
   fi
 
-  log_line "preflight_conflict target=lean-ctx tool=rtk"
-  status_warning "rtk found; rtk conflicts with lean-ctx."
+  log_line "preflight_conflict target=lean-ctx tool=rtk path=$rtk_path"
+  status_warning "rtk found; rtk conflicts with lean-ctx. Resolved as: $rtk_path"
 
   if [ "$dry_run" = "1" ]; then
-    status_dry_run "Run rtk init -g --uninstall"
+    status_dry_run "Run rtk init -g --uninstall, then verify rtk is no longer on PATH"
     return 0
   fi
 
   if [ "$non_interactive" = "0" ] && prompt_yes_no "Uninstall rtk before installing LeanCTX?" "yes"; then
     if run_logged rtk init -g --uninstall; then
+      if rtk_path="$(rtk_command_path)"; then
+        preflight_conflict_die "lean-ctx" "rtk" \
+          "rtk conflicts with lean-ctx." \
+          "The rtk uninstall command completed, but rtk still resolves on PATH at: $rtk_path" \
+          "Remove that executable or shim, open a fresh shell if needed, then rerun this installer."
+      fi
       status_ok "rtk uninstall command completed"
       log_line "rtk_uninstall=completed"
       return 0
