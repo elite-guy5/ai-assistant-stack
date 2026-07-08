@@ -165,6 +165,9 @@ dry_run_prints_leanctx_mcp_step_for_claude_code() {
   log="$home/.agents/install.log"
 
   assert_contains "$output" "Dry run Configure LeanCTX MCP in Claude Code settings"
+  assert_contains "$output" "Dry run Install lean-ctx routing hooks for Claude Code"
+  assert_contains "$output" "Dry run Harden lean-ctx routing in Claude Code settings"
+  assert_contains "$output" "Dry run Harden lean-ctx guidance in"
   assert_contains "$output" "Dry run Configure LeanCTX for Claude Code"
   assert_contains "$output" "Skipped Claude Desktop app not found; skipped Desktop LeanCTX MCP config"
   assert_contains "$output" "Dry run Configure Context7 for Claude Code"

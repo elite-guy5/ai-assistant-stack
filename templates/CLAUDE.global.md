@@ -99,7 +99,7 @@ Do not auto-invoke Superpowers just because the task is software development.
 
 ## Token-Saver File Boundaries
 
-- Prefer targeted `rg`, `sed`, `git diff`, and package-manager metadata commands instead of opening large generated files.
+- Prefer `ctx_search` / `ctx_shell` (they already apply the rg / sed / git-diff compression patterns) instead of opening large generated files.
 - Do not read the following unless explicitly required:
   - lockfiles
   - dependency folders
@@ -130,7 +130,7 @@ Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-s
 
 ## General Rules
 
-- Read existing files before writing new code.
+- Read existing files (via `ctx_read`) before writing new code.
 - Do not re-read files unless they have changed.
 - Skip files larger than 100 KB unless explicitly required.
 - Touch only what maps directly to the user's request.

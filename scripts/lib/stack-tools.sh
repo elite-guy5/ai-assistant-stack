@@ -289,6 +289,61 @@ NODE
   status_ok "Configure LeanCTX MCP in Claude Code settings $config"
 }
 
+claude_code_hooks_dir() {
+  printf '%s\n' "$HOME/.claude/hooks"
+}
+
+# Install the managed lean-ctx routing hook scripts and harden Claude Code's
+# settings.json and CLAUDE.md so ctx_* tools are the enforced default for code
+# exploration, search, and edits. Runs after LeanCTX setup has generated its
+# base hooks and the CLAUDE.md lean-ctx block. Claude-only; leaves Codex alone.
+configure_claude_code_leanctx_routing() {
+  local settings hooks_dir wrapper enforce claude_md backup
+
+  settings="$(claude_code_settings_path)"
+  hooks_dir="$(claude_code_hooks_dir)"
+  wrapper="$hooks_dir/lean-ctx-rewrite-wrapper.sh"
+  enforce="$hooks_dir/lean-ctx-redirect-enforce.sh"
+  claude_md="$HOME/.claude/CLAUDE.md"
+
+  if [ "$dry_run" = "1" ]; then
+    status_dry_run "Install lean-ctx routing hooks for Claude Code $hooks_dir"
+    status_dry_run "Harden lean-ctx routing in Claude Code settings $settings"
+    status_dry_run "Harden lean-ctx guidance in $claude_md"
+    log_line "claude_routing_hooks_dir=$hooks_dir"
+    log_line "claude_routing_settings=$settings"
+    log_line "claude_routing_claude_md=$claude_md"
+    return 0
+  fi
+
+  mkdir -p "$hooks_dir"
+  cp "$ROOT/templates/hooks/lean-ctx-rewrite-wrapper.sh" "$wrapper"
+  cp "$ROOT/templates/hooks/lean-ctx-redirect-enforce.sh" "$enforce"
+  chmod +x "$wrapper" "$enforce"
+  status_ok "Install lean-ctx routing hooks for Claude Code $hooks_dir"
+  log_line "claude_routing_hooks_dir=$hooks_dir"
+
+  if [ -e "$settings" ]; then
+    backup="$(backup_path "$settings")"
+    cp "$settings" "$backup"
+    log_line "backup_claude_routing_settings=$backup"
+  fi
+  node "$ROOT/scripts/lib/harden-claude-settings.js" "$settings" "$wrapper" "$enforce"
+  status_ok "Harden lean-ctx routing in Claude Code settings $settings"
+  log_line "claude_routing_settings=$settings"
+
+  if [ -e "$claude_md" ]; then
+    backup="$(backup_path "$claude_md")"
+    cp "$claude_md" "$backup"
+    log_line "backup_claude_routing_claude_md=$backup"
+    node "$ROOT/scripts/lib/harden-claude-claudemd.js" "$claude_md"
+    status_ok "Harden lean-ctx guidance in $claude_md"
+  else
+    status_skipped "CLAUDE.md not found; skipped lean-ctx guidance hardening"
+  fi
+  log_line "claude_routing_claude_md=$claude_md"
+}
+
 # Merge the local LeanCTX MCP server into Claude Desktop's config.
 configure_claude_desktop_leanctx() {
   local config
@@ -656,6 +711,7 @@ configure_leanctx_setup() {
 
   if tool_enabled claude; then
     configure_claude_code_leanctx_settings
+    configure_claude_code_leanctx_routing
     if claude_cli_available; then
       configure_claude_code_leanctx
     else
